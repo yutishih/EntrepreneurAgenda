@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企業家國際演講會｜議程表產生器</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ===== FORM PANEL ===== -->
+  <div class="form-panel">
+    <h1>🎤 議程表產生器</h1>
+
+    <details open>
+      <summary>🖼 圖片上傳 Images</summary>
+      <div class="form-section">
+        <p class="img-hint">上傳後即時更新預覽</p>
+
+        <div class="img-upload-row">
+          <label>TM Logo</label>
+          <input type="file" id="img_logo" accept="image/*"
+                 onchange="handleImageUpload('logo', this)">
+          <button class="img-clear-btn" onclick="clearImage('logo')">✕</button>
+        </div>
+        <div class="img-upload-row">
+          <label>主題圖片 (右上)</label>
+          <input type="file" id="img_themeImg" accept="image/*"
+                 onchange="handleImageUpload('themeImg', this)">
+          <button class="img-clear-btn" onclick="clearImage('themeImg')">✕</button>
+        </div>
+        <div class="img-upload-row">
+          <label>FB QR Code</label>
+          <input type="file" id="img_fbQr" accept="image/*"
+                 onchange="handleImageUpload('fbQr', this)">
+          <button class="img-clear-btn" onclick="clearImage('fbQr')">✕</button>
+        </div>
+        <div class="img-upload-row">
+          <label>LINE@ QR Code</label>
+          <input type="file" id="img_lineQr" accept="image/*"
+                 onchange="handleImageUpload('lineQr', this)">
+          <button class="img-clear-btn" onclick="clearImage('lineQr')">✕</button>
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>📋 會議資訊</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>會議日期</label>
+          <input type="date" id="meetingDate">
+        </div>
+        <div class="form-row">
+          <label>會議編號 Meeting No.</label>
+          <input type="number" id="meetingNo" value="256">
+        </div>
+        <div class="form-row">
+          <label>會議主題 Meeting Theme</label>
+          <input type="text" id="meetingTheme" placeholder="-Urban Legend-">
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>👤 角色分配</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>Reception Host <span class="time-hint">18:50</span></label>
+          <input type="text" id="receptionHost" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Calling Meeting to Order <span class="time-hint">1'</span></label>
+          <input type="text" id="callingToOrder" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Welcome Guests &amp; TME 介紹者 <span class="time-hint">2'</span></label>
+          <input type="text" id="welcomeTME" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Toastmaster of the Evening (TME) <span class="time-hint">3'</span></label>
+          <input type="text" id="tme" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Timer 計時員 <span class="time-hint">2'</span></label>
+          <input type="text" id="timer" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Ah-counter 贅語統計員 <span class="time-hint">2'</span></label>
+          <input type="text" id="ahCounter" placeholder="Name, Title">
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>🎤 準備演講 Prepared Speeches</summary>
+      <div class="form-section">
+        <div id="speechesList"></div>
+        <button class="btn-add" onclick="addSpeech()">+ 新增演講</button>
+      </div>
+    </details>
+
+    <details open>
+      <summary>🎯 桌上即席 Table Topics</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>Table Topics Master <span class="time-hint">20'</span></label>
+          <input type="text" id="tableTopicsMaster" placeholder="Name, Title">
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>📝 評估環節 Evaluation</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>General Evaluator 總評 <span class="time-hint">3'~5'</span></label>
+          <input type="text" id="generalEvaluator" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Evaluator for Speaker #1 <span class="time-hint">2'~3'</span></label>
+          <input type="text" id="evaluator1" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Evaluator for Speaker #2 <span class="time-hint">2'~3'</span></label>
+          <input type="text" id="evaluator2" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Evaluator for Speaker #3 <span class="time-hint">2'~3'</span></label>
+          <input type="text" id="evaluator3" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Language Evaluator 語言評估 <span class="time-hint">3'~5'</span></label>
+          <input type="text" id="langEvaluator" placeholder="Name, Title">
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>🏆 結束環節 Closing</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>Awards Presentation 頒獎 <span class="time-hint">3'</span></label>
+          <input type="text" id="awardsPresenter" placeholder="Name, Title">
+        </div>
+        <div class="form-row">
+          <label>Sharing &amp; Feedback 分享 <span class="time-hint">5'</span></label>
+          <input type="text" id="sharingFeedback" placeholder="Name, Title">
+        </div>
+      </div>
+    </details>
+
+    <div class="form-actions">
+      <button class="btn-download" onclick="downloadPDF()">⬇ 下載 PDF</button>
+      <button class="btn-print" onclick="window.print()">🖨 列印</button>
+      <button class="btn-reset" onclick="resetForm()">↺ 重設</button>
+    </div>
+  </div>
+
+  <!-- ===== PREVIEW PANEL ===== -->
+  <div class="preview-panel">
+    <div class="preview-toolbar">
+      <span>預覽（即時更新）</span>
+      <button class="btn-download-sm" onclick="downloadPDF()">⬇ 下載 PDF</button>
+    </div>
+    <div class="preview-scroll">
+      <div id="agendaPreview" class="agenda-page"></div>
+    </div>
+  </div>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

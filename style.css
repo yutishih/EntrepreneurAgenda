@@ -1,0 +1,431 @@
+/* ============================================================
+   APP LAYOUT
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei",
+               "PingFang TC", sans-serif;
+  background: #f0f2f5;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-layout { display: flex; height: 100vh; }
+
+/* ---- Form Panel ---- */
+.form-panel {
+  width: 360px;
+  min-width: 300px;
+  background: #fff;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  padding: 14px;
+  flex-shrink: 0;
+}
+
+.form-panel h1 {
+  font-size: 17px;
+  margin-bottom: 12px;
+  color: #1a1a2e;
+  border-bottom: 2px solid #e63946;
+  padding-bottom: 7px;
+}
+
+details {
+  margin-bottom: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+details[open] summary { background: #f7f7fb; }
+summary {
+  cursor: pointer;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  background: #fafafa;
+  user-select: none;
+  list-style: none;
+}
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "▶ "; font-size: 9px; color: #aaa; }
+details[open] summary::before { content: "▼ "; }
+
+.form-section { padding: 8px 11px 10px; }
+
+.form-row { margin-bottom: 7px; }
+.form-row label { display: block; font-size: 11px; color: #666; margin-bottom: 2px; }
+.time-hint { color: #aaa; font-size: 10px; }
+
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%;
+  padding: 4px 7px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #333;
+  transition: border-color 0.2s;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+  outline: none; border-color: #e63946;
+}
+.form-row textarea { resize: vertical; min-height: 44px; }
+
+/* Image upload row */
+.img-upload-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 7px;
+}
+.img-upload-row label { font-size: 11px; color: #666; flex: 0 0 auto; width: 100px; }
+.img-upload-row input[type="file"] {
+  flex: 1;
+  padding: 3px 4px;
+  font-size: 11px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.img-clear-btn {
+  padding: 3px 7px;
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.img-clear-btn:hover { background: #ffd6d6; border-color: #f88; }
+.img-hint { font-size: 10px; color: #aaa; margin-top: 2px; }
+
+/* Speech entry */
+.speech-entry {
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fafafa;
+}
+.speech-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+}
+.speech-entry-header span { font-size: 12px; font-weight: 600; color: #555; }
+.btn-remove {
+  background: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.btn-add {
+  width: 100%;
+  padding: 6px;
+  background: #f0f8ff;
+  border: 1px dashed #4a90d9;
+  border-radius: 4px;
+  color: #4a90d9;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-add:hover { background: #daeeff; }
+
+/* Form actions */
+.form-actions { margin-top: 14px; display: flex; gap: 7px; flex-wrap: wrap; }
+.btn-download {
+  flex: 1; padding: 9px;
+  background: #e63946; color: white;
+  border: none; border-radius: 5px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.btn-download:hover { background: #c1121f; }
+.btn-print {
+  flex: 1; padding: 9px;
+  background: #457b9d; color: white;
+  border: none; border-radius: 5px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.btn-print:hover { background: #1d3557; }
+.btn-reset {
+  padding: 9px 12px;
+  background: #eee; color: #555;
+  border: none; border-radius: 5px;
+  font-size: 12px; cursor: pointer;
+}
+.btn-reset:hover { background: #ddd; }
+
+/* ---- Preview Panel ---- */
+.preview-panel {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; background: #e0e2e8;
+}
+.preview-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 14px;
+  background: #fff; border-bottom: 1px solid #ddd;
+  font-size: 12px; color: #666;
+}
+.btn-download-sm {
+  padding: 4px 10px;
+  background: #e63946; color: white;
+  border: none; border-radius: 4px;
+  font-size: 11px; cursor: pointer;
+}
+.preview-scroll {
+  flex: 1; overflow: auto; padding: 18px;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+
+/* ============================================================
+   AGENDA DOCUMENT
+   ============================================================ */
+.agenda-page {
+  background: white;
+  width: 194mm;
+  min-height: 277mm;
+  padding: 4mm;
+  font-family: "Times New Roman", "新細明體", "PMingLiU", serif;
+  font-size: 7.5pt;
+  color: #000;
+  box-shadow: 0 2px 14px rgba(0,0,0,0.2);
+  line-height: 1.3;
+}
+
+/* ---- HEADER (3-column grid) ---- */
+.doc-header {
+  display: grid;
+  grid-template-columns: 26mm 1fr 38mm;
+  grid-template-rows: auto auto;
+  column-gap: 2mm;
+  row-gap: 0.5mm;
+  padding-bottom: 2mm;
+  border-bottom: 1.5pt solid #000;
+  margin-bottom: 1.5mm;
+}
+
+.hg-logo {
+  grid-column: 1; grid-row: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.hg-names {
+  grid-column: 2; grid-row: 1;
+  text-align: center;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.hg-img {
+  grid-column: 3; grid-row: 1 / span 2;
+  overflow: hidden;
+}
+.hg-meta-left {
+  grid-column: 1; grid-row: 2;
+  font-size: 7pt; line-height: 1.5;
+}
+.hg-meta-right {
+  grid-column: 2; grid-row: 2;
+  font-size: 7pt; line-height: 1.6;
+}
+
+/* Logo */
+.hg-logo-img { width: 100%; max-width: 22mm; height: auto; display: block; }
+.hg-logo-ph {
+  width: 22mm; height: 22mm;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-ring {
+  width: 20mm; height: 20mm; border-radius: 50%;
+  border: 2.5pt solid #00458b;
+  background: #00458b;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-ring span {
+  color: white; font-size: 7pt; font-weight: bold;
+  text-align: center; letter-spacing: 0.5px;
+}
+
+/* Club names */
+.club-name-zh {
+  font-size: 13pt; font-weight: bold; letter-spacing: 1px;
+  line-height: 1.2; margin-bottom: 0.5mm;
+}
+.club-name-en {
+  font-size: 9.5pt; font-weight: bold;
+  line-height: 1.2;
+}
+
+/* Theme image */
+.hg-theme-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hg-theme-ph {
+  width: 100%; height: 100%; min-height: 28mm;
+  background: #888; display: flex; align-items: center; justify-content: center;
+}
+.hg-theme-ph span { color: #ddd; font-size: 6.5pt; text-align: center; line-height: 1.5; }
+
+/* ---- THEME ROW ---- */
+.theme-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 1.5mm 0 1mm;
+}
+.theme-label { font-size: 7.5pt; font-style: italic; white-space: nowrap; }
+.theme-value { font-size: 17pt; flex: 1; text-align: center; line-height: 1; }
+.meeting-no-label { font-size: 7pt; white-space: nowrap; }
+
+/* ---- MISSION ---- */
+.mission-section {
+  background: #c2d8ec;
+  padding: 1.5mm 2mm;
+  margin-bottom: 1.5mm;
+  font-size: 7pt;
+  line-height: 1.45;
+}
+.mission-title {
+  font-weight: bold; text-align: center;
+  margin-bottom: 0.5mm; font-size: 7.5pt;
+}
+.mission-text { text-align: center; }
+
+/* ---- AGENDA TABLE ---- */
+.agenda-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7pt;
+  table-layout: fixed;
+}
+
+/* Column widths — must sum to 178mm (194 - 8*2 padding) */
+.agenda-table col.col-time   { width: 10mm; }
+.agenda-table col.col-dur    { width: 8mm; }
+.agenda-table col.col-agenda { width: 68mm; }
+.agenda-table col.col-taker  { width: 44mm; }
+.agenda-table col.col-rp     { width: 48mm; }
+
+.agenda-table th, .agenda-table td {
+  border: 0.4pt solid #777;
+  padding: 0.6mm 1mm;
+  vertical-align: middle;
+}
+
+/* Table header — salmon/orange */
+.agenda-table thead tr {
+  background: #e8956d;
+  color: #000;
+}
+.agenda-table thead th {
+  font-size: 7.5pt; font-weight: bold; text-align: center;
+  border-color: #c06030;
+}
+
+/* Section rows — sage green */
+.row-section td { background: #bdd5a0; }
+
+/* Regular cells */
+.agenda-table td.time-cell {
+  text-align: center; font-weight: bold;
+  font-size: 7pt; vertical-align: middle;
+}
+.agenda-table td.dur-cell {
+  text-align: center; font-size: 6.5pt; vertical-align: middle;
+}
+.agenda-table td.agenda-cell {
+  white-space: pre-wrap; line-height: 1.3;
+}
+.agenda-table td.taker-cell {
+  font-size: 6.5pt; line-height: 1.25;
+}
+
+/* Intermission */
+.row-intermission td {
+  text-align: center; font-style: italic; font-weight: bold;
+  font-size: 7pt; padding: 0.7mm;
+  border-left: none; border-right: none;
+  background: #f5f5f5;
+}
+
+/* Spacer */
+.row-spacer td { height: 1.5mm; border: none; background: transparent; }
+
+/* ---- RIGHT PANEL CELL ---- */
+.rp-cell {
+  vertical-align: top;
+  padding: 1.5mm 1mm !important;
+  border-left: 0.8pt solid #777 !important;
+}
+
+.rp-wrap {
+  display: flex; flex-direction: column; gap: 1.5mm;
+  height: 100%;
+}
+
+/* Pathways list */
+.rp-pw-list { }
+.rp-pw {
+  display: flex; align-items: baseline; gap: 1px;
+  font-size: 6pt; line-height: 1.5;
+  color: #444;
+}
+.rp-pwc { font-weight: bold; font-size: 6pt; white-space: nowrap; }
+.rp-pwn { font-size: 5.8pt; }
+
+/* Time Rules */
+.rp-tr { margin-top: 1mm; }
+.rp-tr-title {
+  font-weight: bold; font-size: 6.5pt;
+  text-align: center; margin-bottom: 0.5mm;
+}
+.rp-tr-table {
+  width: 100%; border-collapse: collapse; font-size: 5.8pt;
+}
+.rp-tr-table td, .rp-tr-table th {
+  border: 0.3pt solid #aaa; padding: 0.3mm 0.5mm;
+  text-align: center; vertical-align: middle;
+}
+.tr-lbl { text-align: left !important; font-size: 5.5pt; }
+.tc-g { background: #5cb85c; color: white; font-weight: bold; }
+.tc-y { background: #f0ad4e; color: white; font-weight: bold; }
+.tc-r { background: #d9534f; color: white; font-weight: bold; }
+
+/* QR codes */
+.rp-qr-items {
+  display: flex; flex-direction: column; gap: 1mm;
+  align-items: center; margin-top: 1mm;
+}
+.rp-qr-item { text-align: center; }
+.qr-img { width: 18mm; height: 18mm; display: block; margin: 0 auto; }
+.qr-ph {
+  width: 18mm; height: 18mm;
+  border: 0.5pt solid #999;
+  background: #f8f8f8;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 5pt; color: #bbb; margin: 0 auto;
+}
+.rp-qr-lbl { font-size: 5.8pt; font-weight: bold; margin-top: 0.5mm; }
+
+/* ---- FOOTER ---- */
+.agenda-footer {
+  background: #c2d8ec;
+  text-align: center; font-weight: bold;
+  font-size: 8.5pt;
+  padding: 1.5mm;
+  margin-top: 1.5mm;
+}
+
+/* ============================================================
+   PRINT
+   ============================================================ */
+@media print {
+  body { background: white; overflow: visible; height: auto; }
+  .form-panel, .preview-toolbar { display: none !important; }
+  .preview-panel { overflow: visible; background: white; }
+  .preview-scroll { padding: 0; overflow: visible; }
+  .agenda-page { box-shadow: none; width: 100%; padding: 5mm; }
+  @page { size: A4 portrait; margin: 8mm; }
+}

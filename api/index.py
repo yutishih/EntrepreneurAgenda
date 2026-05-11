@@ -1,4 +1,5 @@
 import os
+import re
 import bcrypt
 import jwt
 import psycopg2
@@ -13,7 +14,9 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# psycopg2 不支援 channel_binding 參數，移除後再連線
+_raw_url = os.getenv("DATABASE_URL", "")
+DATABASE_URL = re.sub(r"[&?]channel_binding=[^&]*", "", _raw_url)
 JWT_SECRET = os.getenv("JWT_SECRET", "please-change-this-secret")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24

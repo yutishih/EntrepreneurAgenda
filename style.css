@@ -190,13 +190,15 @@ details[open] summary::before { content: "▼ "; }
 .agenda-page {
   background: white;
   width: 194mm;
-  min-height: 277mm;
+  height: 277mm;
   padding: 4mm;
   font-family: "Times New Roman", "新細明體", "PMingLiU", serif;
   font-size: 7.5pt;
   color: #000;
   box-shadow: 0 2px 14px rgba(0,0,0,0.2);
   line-height: 1.3;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---- HEADER (3-column grid) ---- */
@@ -299,6 +301,8 @@ details[open] summary::before { content: "▼ "; }
   border-collapse: collapse;
   font-size: 7pt;
   table-layout: fixed;
+  flex: 1;
+  height: 0;
 }
 
 /* Column widths — must sum to 178mm (194 - 8*2 padding) */
@@ -351,7 +355,7 @@ details[open] summary::before { content: "▼ "; }
 }
 
 /* Spacer */
-.row-spacer td { height: 1.5mm; border: none; background: transparent; }
+.row-spacer td { border: none; background: transparent; }
 
 /* ---- RIGHT PANEL CELL ---- */
 .rp-cell {
@@ -417,6 +421,134 @@ details[open] summary::before { content: "▼ "; }
   padding: 1.5mm;
   margin-top: 1.5mm;
 }
+
+/* ============================================================
+   AUTH — form header & logout
+   ============================================================ */
+.form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #e63946;
+  padding-bottom: 7px;
+}
+.form-header h1 {
+  font-size: 17px;
+  color: #1a1a2e;
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.btn-logout {
+  padding: 4px 10px;
+  background: #eee;
+  color: #555;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-logout:hover { background: #ffd6d6; border-color: #f88; color: #c00; }
+
+/* ============================================================
+   AUTH — login overlay
+   ============================================================ */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.login-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 36px 32px 32px;
+  width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  text-align: center;
+}
+.login-logo { font-size: 36px; margin-bottom: 8px; }
+.login-card h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 3px;
+}
+.login-subtitle {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 20px;
+}
+.login-tabs {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 18px;
+}
+.login-tab {
+  flex: 1;
+  padding: 7px;
+  border: none;
+  background: #fafafa;
+  font-size: 13px;
+  cursor: pointer;
+  color: #666;
+  transition: background 0.15s;
+}
+.login-tab.active {
+  background: #e63946;
+  color: #fff;
+  font-weight: 600;
+}
+.login-field {
+  text-align: left;
+  margin-bottom: 12px;
+}
+.login-field label {
+  display: block;
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 4px;
+}
+.login-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 13px;
+  transition: border-color 0.2s;
+}
+.login-field input:focus {
+  outline: none;
+  border-color: #e63946;
+}
+.login-error {
+  font-size: 12px;
+  color: #e63946;
+  min-height: 18px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+.btn-login-submit {
+  width: 100%;
+  padding: 10px;
+  background: #e63946;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-login-submit:hover { background: #c1121f; }
 
 /* ============================================================
    PRINT

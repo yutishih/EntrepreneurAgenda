@@ -1,6 +1,36 @@
 'use strict';
 
 // ================================================================
+// AUTH
+// ================================================================
+async function checkAuth() {
+  const token = getToken();
+  if (!token) { window.location.href = 'login.html'; return; }
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/verify`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      document.querySelector('.app-layout').style.display = 'flex';
+      const btn = document.getElementById('logoutBtn');
+      if (btn) btn.textContent = `登出（${getUsername()}）`;
+    } else {
+      clearAuth();
+      window.location.href = 'login.html';
+    }
+  } catch {
+    clearAuth();
+    window.location.href = 'login.html';
+  }
+}
+
+function doLogout() {
+  if (!confirm('確定要登出嗎？')) return;
+  clearAuth();
+  window.location.href = 'login.html';
+}
+
+// ================================================================
 // CONSTANTS
 // ================================================================
 const PATHWAYS = [
@@ -30,7 +60,12 @@ let speeches = [
   { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
 ];
 
-const images = { logo: null, themeImg: null, fbQr: null, lineQr: null };
+const images = {
+  logo:     'media/toastmasters_logo.png',
+  themeImg: null,
+  fbQr:     'media/FacebookQR.png',
+  lineQr:   'media/LINEQR.png',
+};
 
 // ================================================================
 // IMAGE HANDLING
@@ -444,9 +479,23 @@ function collectData() {
   };
 }
 
+function equalizeRowHeights() {
+  const table = document.querySelector('#agendaPreview .agenda-table');
+  if (!table) return;
+  const rows = [...table.querySelectorAll('tbody tr')];
+  if (!rows.length) return;
+
+  const extra = table.offsetHeight - rows.reduce((sum, tr) => sum + tr.offsetHeight, 0);
+  if (extra <= 0) return;
+
+  const addPerRow = extra / rows.length;
+  rows.forEach(tr => { tr.style.height = (tr.offsetHeight + addPerRow) + 'px'; });
+}
+
 function updatePreview() {
   const data = collectData();
   document.getElementById('agendaPreview').innerHTML = generateAgendaHTML(data);
+  requestAnimationFrame(equalizeRowHeights);
 }
 
 // ================================================================
@@ -485,7 +534,8 @@ function resetForm() {
   renderSpeechForms();
 }
 
-function init() {
+async function init() {
+  await checkAuth();
   // Default date: next 1st or 3rd Tuesday
   const today = new Date();
   let d = new Date(today);

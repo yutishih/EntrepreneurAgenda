@@ -8,11 +8,15 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app-layout">
+
+<div class="app-layout" style="display:none">
 
   <!-- ===== FORM PANEL ===== -->
   <div class="form-panel">
-    <h1>🎤 議程表產生器</h1>
+    <div class="form-header">
+      <h1>🎤 議程表產生器</h1>
+      <button id="logoutBtn" class="btn-logout" onclick="doLogout()"></button>
+    </div>
 
     <details open>
       <summary>🖼 圖片上傳 Images</summary>
@@ -55,7 +59,7 @@
         </div>
         <div class="form-row">
           <label>會議編號 Meeting No.</label>
-          <input type="number" id="meetingNo" value="256">
+          <input type="number" id="meetingNo" value="258">
         </div>
         <div class="form-row">
           <label>會議主題 Meeting Theme</label>
@@ -171,6 +175,7 @@
   </div>
 
 </div>
+<script src="auth.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

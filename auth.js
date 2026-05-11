@@ -1,6 +1,6 @@
 'use strict';
 
-const API_BASE = 'http://localhost:8001';
+const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:8001' : '';
 
 function getToken()    { return localStorage.getItem('auth_token'); }
 function getUsername() { return localStorage.getItem('auth_username'); }

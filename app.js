@@ -47,6 +47,20 @@ const PATHWAYS = [
   ['LD', 'Leadership Development'],
 ];
 
+const PATHWAYS_ZH = [
+  ['DL', '動態領導'],
+  ['EH', '風趣表達'],
+  ['MS', '激勵策略'],
+  ['PI', '說服影響'],
+  ['PM', '演講精粹'],
+  ['VC', '願景溝通'],
+  ['EC', '高效教練'],
+  ['IP', '創新規劃'],
+  ['SR', '策略人脈'],
+  ['TC', '團隊合作'],
+  ['LD', '領導力發展'],
+];
+
 const PATHWAY_OPTIONS = PATHWAYS.map(([code, name]) =>
   `<option value="${code}">${code} — ${name}</option>`
 ).join('');
@@ -61,6 +75,99 @@ let speeches = [
 ];
 
 let evaluators = ['', '', ''];
+
+let lang = 'en';
+
+const TRANSLATIONS = {
+  en: {
+    reception:      'Reception & Social Gathering',
+    callingOrder:   "1' Calling Meeting to Order",
+    welcomeGuests:  "2' Welcome Guests & TME",
+    tmeIntro:       "3' Toastmaster of The Evening",
+    timerExplain:   "2' Timer｜Meeting Rules Explanation",
+    ahExplain:      "2' Ah-counter｜Meeting Rules Explanation",
+    preparedSpeech: 'Prepared Speech',
+    groupPhoto:     'Group Photo',
+    allParticipants:'All Participants',
+    intermission:   '— Intermission & Social Time (15 mins) —',
+    tableTopics:    'Table Topics Session',
+    evaluation:     'Evaluation Session',
+    evaluatorFor:   n => `Individual Evaluator for Speaker #${n}`,
+    timerReport:    'Timer Report',
+    ahReport:       'Ah-counter Report',
+    langEval:       'Language Evaluation',
+    generalEval:    'General Evaluation',
+    tmeClosing:     'Toastmaster of the Evening',
+    awards:         'Awards Presentation',
+    sharing:        'Sharing & Feedback',
+    adjournment:    '— Meeting Adjournment —',
+    thTime:         'Time',
+    thAgenda:       'Agenda (Program)',
+    thTaker:        'Assignment Taker',
+    thPathways:     '⏱ Pathways',
+    themeLabel:     'Meeting  Theme:',
+    meetingNoLabel: n => `Meeting No.${n}`,
+    missionTitle:   '— Mission of Toastmasters Club —',
+    missionText:    '"We provide a supportive and positive learning experience in which members are empowered to develop communication and leadership skills, resulting in greater self-confidence and personal growth."',
+    timeRules:      'Time Rules',
+    trPrepared:     'Prepared Speech',
+    trTopic:        'Table Topic',
+    trEval:         'Evaluator',
+    trLEGE:         'LE&GE',
+    fbLabel:        'Follow us on FB!',
+    lineLabel:      'Connect us with LINE@',
+  },
+  zh: {
+    reception:      '報到 & 交誼',
+    callingOrder:   "1' 宣布例會開始－領導宣讀宣言",
+    welcomeGuests:  "2' 會長致歡迎詞",
+    tmeIntro:       "3' 總主持人",
+    timerExplain:   "2' 計時員",
+    ahExplain:      "2' 贅語記錄員",
+    preparedSpeech: '指定演講',
+    groupPhoto:     '大合照',
+    allParticipants:'所有與會者',
+    intermission:   '✂ ——— 休息 & 交誼時間（10 分鐘）——— ✂',
+    tableTopics:    '即席問答',
+    evaluation:     '講評時間',
+    evaluatorFor:   n => `個別講評員 #${n}`,
+    timerReport:    '計時員報告',
+    ahReport:       '贅語記錄員報告',
+    langEval:       '語言講評',
+    generalEval:    '總講評',
+    tmeClosing:     '總主持人',
+    awards:         '贈感謝狀',
+    sharing:        '會後分享 & 來賓回饋',
+    adjournment:    '——— 會議圓滿 ———',
+    thTime:         '時間',
+    thAgenda:       '議程表',
+    thTaker:        '角色擔任',
+    thPathways:     '⏱ 學習路徑',
+    themeLabel:     '會議主題：',
+    meetingNoLabel: n => `第 ${n} 次例會`,
+    missionTitle:   '——— 演講會宗旨 ———',
+    missionText:    '訓練溝通及領導能力，強調終身學習。參加國際演講協會是增進溝通技巧的最佳方法，除了大幅增加公開演講的自信外，在這裡所學到的領導技巧，更是您邁向成功之路的必備基石。',
+    timeRules:      '時間規則',
+    trPrepared:     '準備演講',
+    trTopic:        '即席問答',
+    trEval:         '個別講評',
+    trLEGE:         '語言&總講評',
+    fbLabel:        '追蹤我們的 FB！',
+    lineLabel:      '加入企業家 LINE 群組！',
+  },
+};
+
+function t(key, ...args) {
+  const v = TRANSLATIONS[lang][key];
+  return typeof v === 'function' ? v(...args) : v;
+}
+
+function toggleLang() {
+  lang = lang === 'en' ? 'zh' : 'en';
+  const btn = document.getElementById('langToggle');
+  if (btn) btn.textContent = lang === 'en' ? '切換中文' : 'Switch to EN';
+  updatePreview();
+}
 
 const timeOverrides = {
   openingStart: '',
@@ -254,15 +361,15 @@ function resetTimeOverride(key) {
 }
 
 function refreshAutoHints() {
-  const t = calcTimes(speeches);
+  const times = calcTimes(speeches);
   [
-    ['openingStart', t.openingStart],
-    ['speechStart',  t.speechStart],
-    ['photoStart',   t.photoStart],
-    ['topicsStart',  t.topicsStart],
-    ['evalStart',    t.evalStart],
-    ['closingStart', t.closingStart],
-    ['sharingStart', t.sharingStart],
+    ['openingStart', times.openingStart],
+    ['speechStart',  times.speechStart],
+    ['photoStart',   times.photoStart],
+    ['topicsStart',  times.topicsStart],
+    ['evalStart',    times.evalStart],
+    ['closingStart', times.closingStart],
+    ['sharingStart', times.sharingStart],
   ].forEach(([key, val]) => {
     const el = document.getElementById(`auto_${key}`);
     if (el) el.textContent = `自動: ${val}`;
@@ -307,7 +414,8 @@ function buildSpeechAgendaLine(sp) {
 // RIGHT PANEL BUILDER
 // ================================================================
 function buildRightPanel() {
-  const pwList = PATHWAYS.map(([code, name]) =>
+  const pwSource = lang === 'zh' ? PATHWAYS_ZH : PATHWAYS;
+  const pwList = pwSource.map(([code, name]) =>
     `<div class="rp-pw"><span class="rp-pwc">${esc(code)}｜</span><em class="rp-pwn">${esc(name)}</em></div>`
   ).join('');
 
@@ -321,20 +429,20 @@ function buildRightPanel() {
   return `<div class="rp-wrap">
   <div class="rp-pw-list">${pwList}</div>
   <div class="rp-tr">
-    <div class="rp-tr-title">Time Rules</div>
+    <div class="rp-tr-title">${t('timeRules')}</div>
     <table class="rp-tr-table">
       <thead><tr><td></td><th class="tc-g">min</th><th class="tc-y">ok</th><th class="tc-r">max</th></tr></thead>
       <tbody>
-        <tr><td class="tr-lbl">Prepared Speech</td><td class="tc-g">5</td><td class="tc-y">6</td><td class="tc-r">7</td></tr>
-        <tr><td class="tr-lbl">Table Topic</td><td class="tc-g">1</td><td class="tc-y">1.5</td><td class="tc-r">2</td></tr>
-        <tr><td class="tr-lbl">Evaluator</td><td class="tc-g">2</td><td class="tc-y">2.5</td><td class="tc-r">3</td></tr>
-        <tr><td class="tr-lbl">LE&amp;GE</td><td class="tc-g">3</td><td class="tc-y">4</td><td class="tc-r">5</td></tr>
+        <tr><td class="tr-lbl">${t('trPrepared')}</td><td class="tc-g">5</td><td class="tc-y">6</td><td class="tc-r">7</td></tr>
+        <tr><td class="tr-lbl">${t('trTopic')}</td><td class="tc-g">1</td><td class="tc-y">1.5</td><td class="tc-r">2</td></tr>
+        <tr><td class="tr-lbl">${t('trEval')}</td><td class="tc-g">2</td><td class="tc-y">2.5</td><td class="tc-r">3</td></tr>
+        <tr><td class="tr-lbl">${t('trLEGE')}</td><td class="tc-g">3</td><td class="tc-y">4</td><td class="tc-r">5</td></tr>
       </tbody>
     </table>
   </div>
   <div class="rp-qr-items">
-    <div class="rp-qr-item">${fbContent}<div class="rp-qr-lbl">Follow us on FB!</div></div>
-    <div class="rp-qr-item">${lineContent}<div class="rp-qr-lbl">Connect us with LINE@</div></div>
+    <div class="rp-qr-item">${fbContent}<div class="rp-qr-lbl">${t('fbLabel')}</div></div>
+    <div class="rp-qr-item">${lineContent}<div class="rp-qr-lbl">${t('lineLabel')}</div></div>
   </div>
 </div>`;
 }
@@ -381,7 +489,7 @@ function buildHeader(data) {
 function generateAgendaHTML(data) {
   const speechCount = data.speeches.length;
   const evalCount   = data.evaluators.length;
-  const t = calcTimes(data.speeches);
+  const times = calcTimes(data.speeches);
 
   // rows: reception(1) + opening(5) + speech_header(1) + speeches(N)
   //       + photo(1) + intermission(1) + topics(1) + spacer(1)
@@ -399,7 +507,7 @@ function generateAgendaHTML(data) {
   <tr>
     <td class="time-cell">18:50</td>
     <td class="dur-cell">20'</td>
-    <td class="agenda-cell">Reception &amp; Social Gathering</td>
+    <td class="agenda-cell">${t('reception')}</td>
     <td class="taker-cell">${esc(data.receptionHost)}</td>
     <td class="rp-cell" rowspan="${totalRows}">${rightPanelHtml}</td>
   </tr>`;
@@ -407,25 +515,25 @@ function generateAgendaHTML(data) {
   // Opening block — time & dur rowspan 5
   tbody += `
   <tr>
-    <td class="time-cell" rowspan="5">${t.openingStart}</td>
+    <td class="time-cell" rowspan="5">${times.openingStart}</td>
     <td class="dur-cell" rowspan="5">10'</td>
-    <td class="agenda-cell">1' Calling Meeting to Order</td>
+    <td class="agenda-cell">${t('callingOrder')}</td>
     <td class="taker-cell">${esc(data.callingToOrder)}</td>
   </tr>
   <tr>
-    <td class="agenda-cell">2' Welcome Guests &amp; TME</td>
+    <td class="agenda-cell">${t('welcomeGuests')}</td>
     <td class="taker-cell">${esc(data.welcomeTME)}</td>
   </tr>
   <tr>
-    <td class="agenda-cell">3' Toastmaster of The Evening</td>
+    <td class="agenda-cell">${t('tmeIntro')}</td>
     <td class="taker-cell">${esc(data.tme)}</td>
   </tr>
   <tr>
-    <td class="agenda-cell">2' Timer｜Meeting Rules Explanation</td>
+    <td class="agenda-cell">${t('timerExplain')}</td>
     <td class="taker-cell">${esc(data.timer)}</td>
   </tr>
   <tr>
-    <td class="agenda-cell">2' Ah-counter｜Meeting Rules Explanation</td>
+    <td class="agenda-cell">${t('ahExplain')}</td>
     <td class="taker-cell">${esc(data.ahCounter)}</td>
   </tr>`;
 
@@ -433,9 +541,9 @@ function generateAgendaHTML(data) {
   const speechBlockSpan = 1 + speechCount;
   tbody += `
   <tr class="row-section">
-    <td class="time-cell" rowspan="${speechBlockSpan}">${t.speechStart}</td>
+    <td class="time-cell" rowspan="${speechBlockSpan}">${times.speechStart}</td>
     <td class="dur-cell">25'</td>
-    <td class="agenda-cell"><strong>Prepared Speech</strong></td>
+    <td class="agenda-cell"><strong>${t('preparedSpeech')}</strong></td>
     <td class="taker-cell">${esc(data.tme)}</td>
   </tr>`;
 
@@ -451,24 +559,24 @@ function generateAgendaHTML(data) {
   // Group Photo
   tbody += `
   <tr>
-    <td class="time-cell">${t.photoStart}</td>
+    <td class="time-cell">${times.photoStart}</td>
     <td class="dur-cell">4'</td>
-    <td class="agenda-cell">Group Photo</td>
-    <td class="taker-cell">All Participants</td>
+    <td class="agenda-cell">${t('groupPhoto')}</td>
+    <td class="taker-cell">${t('allParticipants')}</td>
   </tr>`;
 
   // Intermission
   tbody += `
   <tr class="row-intermission">
-    <td colspan="4">— Intermission &amp; Social Time (15 mins) —</td>
+    <td colspan="4">${t('intermission')}</td>
   </tr>`;
 
   // Table Topics
   tbody += `
   <tr class="row-section">
-    <td class="time-cell">${t.topicsStart}</td>
+    <td class="time-cell">${times.topicsStart}</td>
     <td class="dur-cell">20'</td>
-    <td class="agenda-cell"><strong>Table Topics Session</strong></td>
+    <td class="agenda-cell"><strong>${t('tableTopics')}</strong></td>
     <td class="taker-cell">${esc(data.tableTopicsMaster)}</td>
   </tr>`;
 
@@ -479,9 +587,9 @@ function generateAgendaHTML(data) {
   const evalRowSpan = evalCount + 5;
   tbody += `
   <tr class="row-section">
-    <td class="time-cell" rowspan="${evalRowSpan}">${t.evalStart}</td>
+    <td class="time-cell" rowspan="${evalRowSpan}">${times.evalStart}</td>
     <td class="dur-cell">25'</td>
-    <td class="agenda-cell"><strong>Evaluation Session</strong></td>
+    <td class="agenda-cell"><strong>${t('evaluation')}</strong></td>
     <td class="taker-cell">${esc(data.generalEvaluator)}</td>
   </tr>`;
 
@@ -489,7 +597,7 @@ function generateAgendaHTML(data) {
     tbody += `
   <tr>
     <td class="dur-cell">2'~3'</td>
-    <td class="agenda-cell">Individual Evaluator for Speaker #${i + 1}</td>
+    <td class="agenda-cell">${t('evaluatorFor', i + 1)}</td>
     <td class="taker-cell">${esc(ev)}</td>
   </tr>`;
   });
@@ -497,45 +605,45 @@ function generateAgendaHTML(data) {
   tbody += `
   <tr>
     <td class="dur-cell">1'</td>
-    <td class="agenda-cell">Timer Report</td>
+    <td class="agenda-cell">${t('timerReport')}</td>
     <td class="taker-cell">${esc(data.timer)}</td>
   </tr>
   <tr>
     <td class="dur-cell">1'</td>
-    <td class="agenda-cell">Ah-counter Report</td>
+    <td class="agenda-cell">${t('ahReport')}</td>
     <td class="taker-cell">${esc(data.ahCounter)}</td>
   </tr>
   <tr>
     <td class="dur-cell">3'~5'</td>
-    <td class="agenda-cell">Language Evaluation</td>
+    <td class="agenda-cell">${t('langEval')}</td>
     <td class="taker-cell">${esc(data.langEvaluator)}</td>
   </tr>
   <tr>
     <td class="dur-cell">3'~5'</td>
-    <td class="agenda-cell">General Evaluation</td>
+    <td class="agenda-cell">${t('generalEval')}</td>
     <td class="taker-cell">${esc(data.generalEvaluator)}</td>
   </tr>`;
 
   // Closing — time rowspan 2
   tbody += `
   <tr>
-    <td class="time-cell" rowspan="2">${t.closingStart}</td>
+    <td class="time-cell" rowspan="2">${times.closingStart}</td>
     <td class="dur-cell">3'</td>
-    <td class="agenda-cell">Toastmaster of the Evening</td>
+    <td class="agenda-cell">${t('tmeClosing')}</td>
     <td class="taker-cell">${esc(data.tme)}</td>
   </tr>
   <tr>
     <td class="dur-cell">3'</td>
-    <td class="agenda-cell">Awards Presentation</td>
+    <td class="agenda-cell">${t('awards')}</td>
     <td class="taker-cell">${esc(data.awardsPresenter)}</td>
   </tr>`;
 
   // Sharing & Feedback
   tbody += `
   <tr>
-    <td class="time-cell">${t.sharingStart}</td>
+    <td class="time-cell">${times.sharingStart}</td>
     <td class="dur-cell">5'</td>
-    <td class="agenda-cell">Sharing &amp; Feedback</td>
+    <td class="agenda-cell">${t('sharing')}</td>
     <td class="taker-cell">${esc(data.sharingFeedback)}</td>
   </tr>`;
 
@@ -543,15 +651,14 @@ function generateAgendaHTML(data) {
 ${headerHtml}
 
 <div class="theme-row">
-  <span class="theme-label">Meeting&nbsp;&nbsp;Theme:</span>
+  <span class="theme-label">${t('themeLabel')}</span>
   <span class="theme-value"><strong><em>${esc(data.meetingTheme) || '—'}</em></strong></span>
-  <span class="meeting-no-label">Meeting No.${esc(data.meetingNo)}</span>
+  <span class="meeting-no-label">${t('meetingNoLabel', data.meetingNo)}</span>
 </div>
 
 <div class="mission-section">
-  <div class="mission-title">— Mission of Toastmasters Club —</div>
-  <div class="mission-text">"We provide a supportive and positive learning experience in which members are empowered to
-develop communication and leadership skills, resulting in greater self-confidence and personal growth."</div>
+  <div class="mission-title">${t('missionTitle')}</div>
+  <div class="mission-text">${t('missionText')}</div>
 </div>
 
 <table class="agenda-table">
@@ -564,17 +671,17 @@ develop communication and leadership skills, resulting in greater self-confidenc
   </colgroup>
   <thead>
     <tr>
-      <th>Time</th>
+      <th>${t('thTime')}</th>
       <th></th>
-      <th>Agenda (Program)</th>
-      <th>Assignment Taker</th>
-      <th>⏱ Pathways</th>
+      <th>${t('thAgenda')}</th>
+      <th>${t('thTaker')}</th>
+      <th>${t('thPathways')}</th>
     </tr>
   </thead>
   <tbody>${tbody}</tbody>
 </table>
 
-<div class="agenda-footer">— Meeting Adjournment —</div>
+<div class="agenda-footer">${t('adjournment')}</div>
 `;
 }
 

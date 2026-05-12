@@ -342,6 +342,14 @@ details[open] summary::before { content: "▼ "; }
   background: #fff; border-bottom: 1px solid #ddd;
   font-size: 12px; color: #666;
 }
+.btn-lang {
+  padding: 4px 10px;
+  background: #1a1a2e; color: #fff;
+  border: none; border-radius: 4px;
+  font-size: 12px; cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-lang:hover { background: #16213e; }
 .btn-download-sm {
   padding: 4px 10px;
   background: #e63946; color: white;
@@ -506,6 +514,7 @@ details[open] summary::before { content: "▼ "; }
 
 /* Section rows — sage green */
 .row-section td { background: #bdd5a0; }
+.row-section .agenda-cell { text-align: center; }
 
 /* Regular cells */
 .agenda-table td.time-cell {

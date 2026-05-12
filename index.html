@@ -247,7 +247,10 @@
   <div class="preview-panel">
     <div class="preview-toolbar">
       <span>預覽（即時更新）</span>
-      <button class="btn-download-sm" onclick="downloadPDF()">⬇ 下載 PDF</button>
+      <div style="display:flex;gap:6px">
+        <button id="langToggle" class="btn-lang" onclick="toggleLang()">切換中文</button>
+        <button class="btn-download-sm" onclick="downloadPDF()">⬇ 下載 PDF</button>
+      </div>
     </div>
     <div class="preview-scroll">
       <div id="agendaPreview" class="agenda-page"></div>

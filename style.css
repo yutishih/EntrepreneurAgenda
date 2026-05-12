@@ -100,6 +100,16 @@ details[open] summary::before { content: "▼ "; }
 }
 .img-clear-btn:hover { background: #ffd6d6; border-color: #f88; }
 .img-hint { font-size: 10px; color: #aaa; margin-top: 2px; }
+.img-warning {
+  font-size: 10px;
+  color: #e67700;
+  background: #fff8ee;
+  border: 1px solid #ffd591;
+  border-radius: 5px;
+  padding: 5px 8px;
+  margin-top: 6px;
+  line-height: 1.5;
+}
 
 /* Speech entry */
 .speech-entry {
@@ -236,7 +246,20 @@ details[open] summary::before { content: "▼ "; }
 .btn-load:hover { background: #e76f51; }
 
 /* Save status indicator */
+.form-header-left  { display: flex; align-items: center; gap: 8px; }
 .form-header-right { display: flex; align-items: center; gap: 8px; }
+.btn-back {
+  background: none;
+  border: 1px solid #ccc;
+  color: #666;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-back:hover { border-color: #1a1a2e; color: #1a1a2e; }
 .save-status { font-size: 11px; white-space: nowrap; }
 .save-status.saved   { color: #2a9d8f; }
 .save-status.unsaved { color: #aaa; }
@@ -379,7 +402,13 @@ details[open] summary::before { content: "▼ "; }
 .hg-meta-right {
   grid-column: 2; grid-row: 2;
   font-size: 7pt; line-height: 1.6;
+  display: grid;
+  grid-template-columns: 1.6em 1fr;
+  column-gap: 2px;
+  align-items: start;
 }
+.hmr-icon { text-align: center; }
+.hmr-text { }
 
 /* Logo */
 .hg-logo-img { width: 100%; max-width: 22mm; height: auto; display: block; }
@@ -400,11 +429,11 @@ details[open] summary::before { content: "▼ "; }
 
 /* Club names */
 .club-name-zh {
-  font-size: 13pt; font-weight: bold; letter-spacing: 1px;
+  font-size: 17pt; font-weight: bold; letter-spacing: 1px;
   line-height: 1.2; margin-bottom: 0.5mm;
 }
 .club-name-en {
-  font-size: 9.5pt; font-weight: bold;
+  font-size: 12pt; font-weight: bold;
   line-height: 1.2;
 }
 
@@ -460,8 +489,9 @@ details[open] summary::before { content: "▼ "; }
 
 .agenda-table th, .agenda-table td {
   border: 0.4pt solid #777;
-  padding: 0.6mm 1mm;
+  padding: 0.8mm 1.2mm;
   vertical-align: middle;
+  font-size: 8pt;
 }
 
 /* Table header — salmon/orange */
@@ -480,16 +510,16 @@ details[open] summary::before { content: "▼ "; }
 /* Regular cells */
 .agenda-table td.time-cell {
   text-align: center; font-weight: bold;
-  font-size: 7pt; vertical-align: middle;
+  font-size: 9pt; vertical-align: middle;
 }
 .agenda-table td.dur-cell {
-  text-align: center; font-size: 6.5pt; vertical-align: middle;
+  text-align: center; font-size: 8pt; vertical-align: middle;
 }
 .agenda-table td.agenda-cell {
-  white-space: pre-wrap; line-height: 1.3;
+  white-space: pre-wrap; line-height: 1.4; font-size: 8pt;
 }
 .agenda-table td.taker-cell {
-  font-size: 6.5pt; line-height: 1.25;
+  font-size: 8pt; line-height: 1.3;
 }
 
 /* Intermission */
@@ -511,53 +541,56 @@ details[open] summary::before { content: "▼ "; }
 }
 
 .rp-wrap {
-  display: flex; flex-direction: column; gap: 1.5mm;
+  display: flex; flex-direction: column; gap: 2mm;
   height: 100%;
 }
 
 /* Pathways list */
-.rp-pw-list { }
-.rp-pw {
-  display: flex; align-items: baseline; gap: 1px;
-  font-size: 6pt; line-height: 1.5;
+.rp-pw-list {
+  display: grid;
+  grid-template-columns: 3em 1fr;
+  column-gap: 2px;
+  font-size: 7.5pt;
+  line-height: 1.6;
   color: #444;
 }
-.rp-pwc { font-weight: bold; font-size: 6pt; white-space: nowrap; }
-.rp-pwn { font-size: 5.8pt; }
+.rp-pw    { display: contents; }
+.rp-pwc   { font-weight: bold; white-space: nowrap; text-align: right; }
+.rp-pwn   { font-size: 7pt; }
 
 /* Time Rules */
-.rp-tr { margin-top: 1mm; }
+.rp-tr { margin-top: 2mm; }
 .rp-tr-title {
-  font-weight: bold; font-size: 6.5pt;
-  text-align: center; margin-bottom: 0.5mm;
+  font-weight: bold; font-size: 10pt;
+  text-align: center; margin-bottom: 1.5mm;
 }
 .rp-tr-table {
-  width: 100%; border-collapse: collapse; font-size: 5.8pt;
+  width: 100%; border-collapse: collapse; font-size: 9pt;
 }
 .rp-tr-table td, .rp-tr-table th {
-  border: 0.3pt solid #aaa; padding: 0.3mm 0.5mm;
+  border: 0.3pt solid #aaa; padding: 1mm 1.2mm;
   text-align: center; vertical-align: middle;
 }
-.tr-lbl { text-align: left !important; font-size: 5.5pt; }
+.tr-lbl { text-align: left !important; font-size: 9pt; }
 .tc-g { background: #5cb85c; color: white; font-weight: bold; }
 .tc-y { background: #f0ad4e; color: white; font-weight: bold; }
 .tc-r { background: #d9534f; color: white; font-weight: bold; }
 
 /* QR codes */
 .rp-qr-items {
-  display: flex; flex-direction: column; gap: 1mm;
-  align-items: center; margin-top: 1mm;
+  display: flex; flex-direction: column; gap: 2mm;
+  align-items: center; margin-top: 1.5mm;
 }
 .rp-qr-item { text-align: center; }
-.qr-img { width: 18mm; height: 18mm; display: block; margin: 0 auto; }
+.qr-img { width: 24mm; height: 24mm; display: block; margin: 0 auto; }
 .qr-ph {
-  width: 18mm; height: 18mm;
+  width: 24mm; height: 24mm;
   border: 0.5pt solid #999;
   background: #f8f8f8;
   display: flex; align-items: center; justify-content: center;
-  font-size: 5pt; color: #bbb; margin: 0 auto;
+  font-size: 6pt; color: #bbb; margin: 0 auto;
 }
-.rp-qr-lbl { font-size: 5.8pt; font-weight: bold; margin-top: 0.5mm; }
+.rp-qr-lbl { font-size: 7pt; font-weight: bold; margin-top: 1mm; }
 
 /* ---- FOOTER ---- */
 .agenda-footer {

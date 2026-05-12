@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企業家國際演講會｜議程管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+      min-height: 100vh;
+      background: #f4f6f9;
+      color: #1a1a2e;
+    }
+
+    /* ---- Navbar ---- */
+    .navbar {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 28px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .navbar-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .navbar-title span { color: #e63946; }
+    .navbar-right { display: flex; align-items: center; gap: 12px; }
+    .navbar-user { font-size: 12px; color: #aaa; }
+    .btn-nav-logout {
+      background: none;
+      border: 1px solid #555;
+      color: #ccc;
+      padding: 4px 12px;
+      border-radius: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-nav-logout:hover { border-color: #e63946; color: #e63946; }
+
+    /* ---- Main layout ---- */
+    .main { max-width: 860px; margin: 0 auto; padding: 36px 20px; }
+
+    /* ---- New agenda card ---- */
+    .new-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 32px 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      margin-bottom: 32px;
+      gap: 20px;
+    }
+    .new-card-text h2 { font-size: 20px; margin-bottom: 6px; }
+    .new-card-text p  { font-size: 13px; color: #888; }
+    .btn-new {
+      flex-shrink: 0;
+      padding: 13px 30px;
+      background: #e63946;
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .btn-new:hover { background: #c1121f; }
+
+    /* ---- Past agendas ---- */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .section-header h2 { font-size: 16px; font-weight: 700; }
+    .filter-row { display: flex; align-items: center; gap: 8px; }
+    .filter-row input[type="date"] {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 7px;
+      font-size: 13px;
+    }
+    .filter-row input[type="date"]:focus { outline: none; border-color: #e63946; }
+    .btn-filter-clear {
+      padding: 6px 12px;
+      background: #eee;
+      border: none;
+      border-radius: 7px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #555;
+    }
+    .btn-filter-clear:hover { background: #e0e0e0; }
+
+    /* ---- Agenda cards ---- */
+    .agenda-grid { display: flex; flex-direction: column; gap: 10px; }
+    .agenda-card {
+      background: #fff;
+      border-radius: 11px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      cursor: pointer;
+      transition: box-shadow 0.15s, transform 0.15s;
+      border: 1px solid transparent;
+    }
+    .agenda-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      border-color: #e63946;
+      transform: translateY(-1px);
+    }
+    .ac-date {
+      min-width: 90px;
+      text-align: center;
+      background: #1a1a2e;
+      color: #fff;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .ac-date-main { font-size: 15px; font-weight: 700; }
+    .ac-date-year { font-size: 10px; color: #aaa; margin-top: 2px; }
+    .ac-body { flex: 1; min-width: 0; }
+    .ac-title {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ac-meta { font-size: 11px; color: #888; margin-top: 3px; }
+    .ac-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .btn-edit {
+      padding: 6px 14px;
+      background: #e63946;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-edit:hover { background: #c1121f; }
+    .btn-del {
+      padding: 6px 10px;
+      background: #f5f5f5;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #888;
+    }
+    .btn-del:hover { background: #ffe0e0; color: #e63946; }
+
+    .empty-msg {
+      text-align: center;
+      color: #bbb;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    /* ---- Pagination ---- */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .pg-btn {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 10px;
+      border: 1px solid #ddd;
+      background: #fff;
+      border-radius: 7px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #444;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .pg-btn:hover:not(:disabled) { border-color: #e63946; color: #e63946; }
+    .pg-btn.active { background: #e63946; border-color: #e63946; color: #fff; font-weight: 700; }
+    .pg-btn:disabled { color: #ccc; cursor: not-allowed; }
+    .pg-info { font-size: 12px; color: #888; margin: 0 6px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-title">🎤 <span>企業家</span>國際演講會｜議程表產生器</div>
+  <div class="navbar-right">
+    <span id="navUser" class="navbar-user"></span>
+    <button class="btn-nav-logout" onclick="doLogout()">登出</button>
+  </div>
+</nav>
+
+<main class="main">
+  <!-- New Agenda -->
+  <div class="new-card">
+    <div class="new-card-text">
+      <h2>新建議程</h2>
+      <p>從空白議程開始，填入會議資訊、角色與演講安排</p>
+    </div>
+    <button class="btn-new" onclick="location.href='index.html'">＋ 新建議程</button>
+  </div>
+
+  <!-- Past Agendas -->
+  <div class="section-header">
+    <h2>過往議程</h2>
+    <div class="filter-row">
+      <input type="date" id="dateFilter" onchange="fetchList(this.value, 1)">
+      <button class="btn-filter-clear" onclick="document.getElementById('dateFilter').value=''; fetchList('',1)">全部</button>
+    </div>
+  </div>
+  <div id="agendaGrid" class="agenda-grid">
+    <p class="empty-msg">載入中...</p>
+  </div>
+  <div id="pagination" class="pagination"></div>
+</main>
+
+<script src="auth.js"></script>
+<script>
+  async function checkHomeAuth() {
+    const token = getToken();
+    if (!token) { location.href = 'login.html'; return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/verify`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById('navUser').textContent = data.username;
+      } else {
+        clearAuth(); location.href = 'login.html';
+      }
+    } catch {
+      clearAuth(); location.href = 'login.html';
+    }
+  }
+
+  let currentDate = '';
+  let currentPage = 1;
+  const PAGE_SIZE = 10;
+
+  async function fetchList(date, page = 1) {
+    currentDate = date;
+    currentPage = page;
+    const grid = document.getElementById('agendaGrid');
+    const pag  = document.getElementById('pagination');
+    grid.innerHTML = '<p class="empty-msg">載入中...</p>';
+    pag.innerHTML  = '';
+    try {
+      const params = new URLSearchParams({ limit: PAGE_SIZE, page });
+      if (date) params.set('date', date);
+      const res = await fetch(`${API_BASE}/api/agendas?${params}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error();
+      const { items, total, pages } = await res.json();
+
+      if (!items.length) {
+        grid.innerHTML = '<p class="empty-msg">尚無符合的議程</p>';
+        return;
+      }
+
+      grid.innerHTML = items.map(item => {
+        const d     = item.meetingDate || null;
+        const mmdd  = d ? d.slice(5).replace('-', '/') : '—';
+        const year  = d ? d.slice(0, 4) : '';
+        const theme = item.meetingTheme || '（無主題）';
+        const no    = item.meetingNo ? `No.${item.meetingNo}` : '';
+        const ts    = item.updatedAt ? new Date(item.updatedAt).toLocaleString('zh-TW') : '';
+        return `
+          <div class="agenda-card" onclick="editAgenda(${item.id})">
+            <div class="ac-date">
+              <div class="ac-date-main">${mmdd}</div>
+              <div class="ac-date-year">${year}</div>
+            </div>
+            <div class="ac-body">
+              <div class="ac-title">${theme}</div>
+              <div class="ac-meta">${[no, `儲存於 ${ts}`].filter(Boolean).join('　')}</div>
+            </div>
+            <div class="ac-actions">
+              <button class="btn-edit" onclick="event.stopPropagation(); editAgenda(${item.id})">編輯</button>
+              <button class="btn-del"  onclick="event.stopPropagation(); deleteItem(${item.id}, this)">🗑</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      renderPagination(page, pages, total);
+    } catch {
+      grid.innerHTML = '<p class="empty-msg">載入失敗，請確認後端已啟動</p>';
+    }
+  }
+
+  function renderPagination(page, pages, total) {
+    const pag = document.getElementById('pagination');
+    if (pages <= 1) { pag.innerHTML = ''; return; }
+
+    const start = (page - 1) * PAGE_SIZE + 1;
+    const end   = Math.min(page * PAGE_SIZE, total);
+    let html = '';
+
+    html += `<button class="pg-btn" onclick="fetchList(currentDate,${page-1})" ${page===1?'disabled':''}>‹ 上一頁</button>`;
+
+    // show at most 5 page numbers centered around current
+    const delta = 2;
+    const lo = Math.max(1, page - delta);
+    const hi = Math.min(pages, page + delta);
+    if (lo > 1) html += `<button class="pg-btn" onclick="fetchList(currentDate,1)">1</button>${lo > 2 ? '<span class="pg-info">…</span>' : ''}`;
+    for (let p = lo; p <= hi; p++) {
+      html += `<button class="pg-btn ${p===page?'active':''}" onclick="fetchList(currentDate,${p})">${p}</button>`;
+    }
+    if (hi < pages) html += `${hi < pages-1 ? '<span class="pg-info">…</span>' : ''}<button class="pg-btn" onclick="fetchList(currentDate,${pages})">${pages}</button>`;
+
+    html += `<button class="pg-btn" onclick="fetchList(currentDate,${page+1})" ${page===pages?'disabled':''}>下一頁 ›</button>`;
+    html += `<span class="pg-info">${start}–${end} / ${total} 筆</span>`;
+
+    pag.innerHTML = html;
+  }
+
+  function editAgenda(id) {
+    location.href = `index.html?id=${id}`;
+  }
+
+  async function deleteItem(id, btn) {
+    if (!confirm('確定要刪除這份議程嗎？')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/agendas/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error();
+      btn.closest('.agenda-card').remove();
+      if (!document.querySelector('.agenda-card')) {
+        document.getElementById('agendaGrid').innerHTML = '<p class="empty-msg">尚無符合的議程</p>';
+      }
+    } catch {
+      alert('刪除失敗');
+    }
+  }
+
+  function doLogout() {
+    if (!confirm('確定要登出嗎？')) return;
+    clearAuth();
+    location.href = 'login.html';
+  }
+
+  async function init() {
+    await checkHomeAuth();
+    fetchList('');
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

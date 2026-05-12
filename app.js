@@ -357,7 +357,7 @@ function buildHeader(data) {
   <div class="hg-logo">${logoHtml}</div>
   <div class="hg-names">
     <div class="club-name-zh">企業家國際演講會</div>
-    <div class="club-name-en"><em>Entrepreneur Toastmasters Club</em></div>
+    <div class="club-name-en">Entrepreneur Toastmasters Club</div>
   </div>
   <div class="hg-img">${themeImgHtml}</div>
   <div class="hg-meta-left">
@@ -368,10 +368,9 @@ function buildHeader(data) {
     <div>Fee : NTD150</div>
   </div>
   <div class="hg-meta-right">
-    <div>⏰&ensp;<strong>Time : ${dateDisplay} ｜ 19:10 ~ 21:00</strong></div>
-    <div>📅&ensp;Meeting on every 1<sup>st</sup> (中文) and 3<sup>rd</sup> (English) Tuesday evening</div>
-    <div>📍&ensp;Venue: 鑫喜文創｜台北市信義區忠孝東路五段71巷11弄25號1樓<br>
-    &emsp;&emsp;&emsp;（捷運板南線：市政府站4號出口，走路3分鐘）</div>
+    <span class="hmr-icon">⏰</span><div class="hmr-text"><strong>Time : ${dateDisplay} ｜ ${esc(data.timeRange)}</strong></div>
+    <span class="hmr-icon">📅</span><div class="hmr-text">${esc(data.meetingSchedule).replace(/\n/g, '<br>')}</div>
+    <span class="hmr-icon">📍</span><div class="hmr-text">${esc(data.venueInfo).replace(/\n/g, '<br>')}</div>
   </div>
 </div>`;
 }
@@ -587,6 +586,9 @@ function collectData() {
     meetingDate:       val('meetingDate'),
     meetingNo:         val('meetingNo'),
     meetingTheme:      val('meetingTheme'),
+    timeRange:         val('timeRange'),
+    meetingSchedule:   val('meetingSchedule'),
+    venueInfo:         val('venueInfo'),
     receptionHost:     val('receptionHost'),
     callingToOrder:    val('callingToOrder'),
     welcomeTME:        val('welcomeTME'),
@@ -636,6 +638,7 @@ function collectSaveData() {
 function applyAgendaData(d) {
   const fields = [
     'meetingDate', 'meetingNo', 'meetingTheme',
+    'timeRange', 'meetingSchedule', 'venueInfo',
     'receptionHost', 'callingToOrder', 'welcomeTME', 'tme', 'timer', 'ahCounter',
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
@@ -703,10 +706,10 @@ async function fetchAgendaList(date) {
   const list = document.getElementById('agendaListBody');
   list.innerHTML = '<p class="agenda-list-empty">載入中...</p>';
   try {
-    const url = date ? `${API_BASE}/api/agendas?date=${date}` : `${API_BASE}/api/agendas`;
+    const url = date ? `${API_BASE}/api/agendas?date=${date}&limit=100` : `${API_BASE}/api/agendas?limit=100`;
     const res  = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
     if (!res.ok) throw new Error('無法取得列表');
-    const items = await res.json();
+    const { items } = await res.json();
     if (!items.length) {
       list.innerHTML = '<p class="agenda-list-empty">找不到符合的議程</p>';
       return;
@@ -817,21 +820,22 @@ function resetForm() {
 
 async function init() {
   await checkAuth();
-  // Default date: next 1st or 3rd Tuesday
-  const today = new Date();
-  let d = new Date(today);
-  while (true) {
-    d.setDate(d.getDate() + 1);
-    if (d.getDay() === 2) {
-      const day = d.getDate();
-      if (day <= 7 || (day >= 15 && day <= 21)) break;
-    }
-  }
-  const pad = n => String(n).padStart(2, '0');
-  document.getElementById('meetingDate').value =
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-  renderSpeechForms();
+  // 若 URL 帶 ?id=xxx，直接載入該議程；否則設預設日期
+  const urlId = new URLSearchParams(window.location.search).get('id');
+  if (urlId) {
+    await loadAgenda(parseInt(urlId));
+  } else {
+    const today = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('meetingDate').value =
+      `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    document.getElementById('timeRange').value        = '19:10 ~ 21:00';
+    document.getElementById('meetingSchedule').value  = 'Meeting on every 1st (中文) and 3rd (English) Tuesday evening';
+    document.getElementById('venueInfo').value        = 'Venue: 鑫喜文創｜台北市信義區忠孝東路五段71巷11弄25號1樓\n（捷運板南線：市政府站4號出口，走路3分鐘）';
+
+    renderSpeechForms();
+  }
 
   document.querySelector('.form-panel').addEventListener('input', updatePreview);
   document.querySelector('.form-panel').addEventListener('change', updatePreview);

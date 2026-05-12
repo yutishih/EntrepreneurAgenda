@@ -168,36 +168,45 @@ def verify(credentials: HTTPAuthorizationCredentials = Depends(security)):
 # ------------------------------------------------------------------ agenda
 @app.get("/api/agendas")
 def list_agendas(
-    date: Optional[str] = Query(default=None),
+    date:  Optional[str] = Query(default=None),
+    page:  int           = Query(default=1,  ge=1),
+    limit: int           = Query(default=10, ge=1, le=100),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     username = decode_token(credentials.credentials)
+    offset = (page - 1) * limit
     with get_db() as conn:
         with conn.cursor() as cur:
+            where  = "WHERE username = %s"
+            params: list = [username]
             if date:
-                cur.execute(
-                    "SELECT id, data, updated_at FROM agendas"
-                    " WHERE username = %s AND meeting_date = %s ORDER BY updated_at DESC",
-                    (username, date),
-                )
-            else:
-                cur.execute(
-                    "SELECT id, data, updated_at FROM agendas"
-                    " WHERE username = %s ORDER BY updated_at DESC",
-                    (username,),
-                )
+                where += " AND meeting_date = %s"
+                params.append(date)
+            cur.execute(f"SELECT COUNT(*) FROM agendas {where}", params)
+            total = cur.fetchone()[0]
+            cur.execute(
+                f"SELECT id, data, updated_at FROM agendas {where}"
+                f" ORDER BY updated_at DESC LIMIT %s OFFSET %s",
+                params + [limit, offset],
+            )
             rows = cur.fetchall()
-    result = []
+    items = []
     for r in rows:
         d = parse_jsonb(r[1])
-        result.append({
+        items.append({
             "id":           r[0],
             "meetingDate":  d.get("meetingDate", ""),
             "meetingNo":    d.get("meetingNo", ""),
             "meetingTheme": d.get("meetingTheme", ""),
             "updatedAt":    r[2].isoformat() if r[2] else "",
         })
-    return result
+    import math
+    return {
+        "items": items,
+        "total": total,
+        "page":  page,
+        "pages": math.ceil(total / limit) if total else 1,
+    }
 
 
 @app.post("/api/agendas")

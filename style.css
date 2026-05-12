@@ -138,6 +138,62 @@ details[open] summary::before { content: "▼ "; }
 }
 .btn-add:hover { background: #daeeff; }
 
+/* Time override rows */
+.time-override-hint {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+.time-override-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.time-override-label {
+  flex: 1;
+  font-size: 11px;
+  color: #666;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.time-auto {
+  font-size: 10px;
+  color: #aaa;
+}
+.time-override-row input {
+  width: 68px;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 12px;
+  text-align: center;
+  transition: border-color 0.2s;
+  flex-shrink: 0;
+}
+.time-override-row input:focus {
+  outline: none;
+  border-color: #e63946;
+}
+.time-override-row input.is-overridden {
+  border-color: #e63946;
+  color: #e63946;
+  font-weight: 600;
+}
+.btn-time-reset {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #999;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.btn-time-reset:hover { color: #e63946; border-color: #e63946; }
+
 /* Form actions */
 .form-actions { margin-top: 14px; display: flex; gap: 7px; flex-wrap: wrap; }
 .btn-download {
@@ -161,6 +217,96 @@ details[open] summary::before { content: "▼ "; }
   font-size: 12px; cursor: pointer;
 }
 .btn-reset:hover { background: #ddd; }
+.btn-save {
+  flex: 1; padding: 9px;
+  background: #2a9d8f; color: white;
+  border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-save:hover    { background: #21867a; }
+.btn-save:disabled { background: #aaa; cursor: not-allowed; }
+.btn-load {
+  flex: 1; padding: 9px;
+  background: #f4a261; color: white;
+  border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-load:hover { background: #e76f51; }
+
+/* Save status indicator */
+.form-header-right { display: flex; align-items: center; gap: 8px; }
+.save-status { font-size: 11px; white-space: nowrap; }
+.save-status.saved   { color: #2a9d8f; }
+.save-status.unsaved { color: #aaa; }
+
+/* Load Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  width: 420px; max-width: 92vw;
+  max-height: 80vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee;
+}
+.modal-header h3 { font-size: 15px; color: #1a1a2e; }
+.modal-close {
+  background: none; border: none; font-size: 16px;
+  cursor: pointer; color: #999;
+  padding: 2px 6px; border-radius: 4px;
+}
+.modal-close:hover { background: #f0f0f0; color: #333; }
+.modal-search {
+  display: flex; gap: 6px; align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+}
+.modal-search input[type="date"] {
+  flex: 1; padding: 5px 8px;
+  border: 1px solid #ccc; border-radius: 6px;
+  font-size: 13px;
+}
+.modal-search input[type="date"]:focus { outline: none; border-color: #e63946; }
+.btn-clear-filter {
+  padding: 5px 10px;
+  background: #f0f0f0; border: none; border-radius: 6px;
+  font-size: 12px; cursor: pointer; color: #555;
+}
+.btn-clear-filter:hover { background: #e0e0e0; }
+.agenda-list-body { overflow-y: auto; padding: 8px; }
+.agenda-list-empty { text-align: center; color: #aaa; padding: 24px; font-size: 13px; }
+.agenda-list-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid #f0f0f0;
+  margin-bottom: 6px;
+}
+.agenda-list-item:hover { background: #f7f9fc; }
+.ali-main { flex: 1; font-size: 13px; font-weight: 500; color: #1a1a2e; }
+.ali-meta { font-size: 11px; color: #aaa; white-space: nowrap; }
+.ali-del {
+  background: none; border: none;
+  font-size: 15px; cursor: pointer;
+  padding: 2px 4px; border-radius: 4px;
+  opacity: 0.5; transition: opacity 0.15s;
+}
+.ali-del:hover { opacity: 1; }
 
 /* ---- Preview Panel ---- */
 .preview-panel {

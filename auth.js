@@ -1,6 +1,6 @@
 'use strict';
 
-const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:8001' : '';
+const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'http://localhost:8001' : '';
 
 function getToken()    { return localStorage.getItem('auth_token'); }
 function getUsername() { return localStorage.getItem('auth_username'); }

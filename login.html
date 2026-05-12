@@ -115,6 +115,19 @@
 
     .btn-login-submit:hover { background: #c1121f; }
     .btn-login-submit:disabled { background: #ccc; cursor: not-allowed; }
+
+    .btn-login-submit .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -204,6 +217,7 @@
     errorEl.textContent = '';
     if (!username || !password) { errorEl.textContent = '請填寫帳號和密碼'; return; }
     btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>處理中...';
     try {
       const res  = await fetch(`${API_BASE}/api/auth/login`, {
         method:  'POST',
@@ -218,6 +232,7 @@
       errorEl.textContent = '無法連線到伺服器，請確認後端已啟動';
     } finally {
       btn.disabled = false;
+      btn.innerHTML = '登入';
     }
   }
 
@@ -233,6 +248,7 @@
     if (!name_en) { errorEl.textContent = '請輸入英文姓名'; return; }
     if (!name_zh) { errorEl.textContent = '請輸入中文姓名'; return; }
     btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>處理中...';
     try {
       const res  = await fetch(`${API_BASE}/api/auth/register`, {
         method:  'POST',
@@ -247,6 +263,7 @@
       errorEl.textContent = '無法連線到伺服器，請確認後端已啟動';
     } finally {
       btn.disabled = false;
+      btn.innerHTML = '註冊';
     }
   }
 

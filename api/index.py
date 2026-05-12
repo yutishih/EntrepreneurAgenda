@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import bcrypt
@@ -11,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from typing import Any, Dict
 
 load_dotenv()
 
@@ -59,6 +61,17 @@ def init_db():
             """)
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS name_en VARCHAR(100)")
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS name_zh VARCHAR(100)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS agendas (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+                    data JSONB NOT NULL,
+                    meeting_date DATE,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("ALTER TABLE agendas ADD COLUMN IF NOT EXISTS meeting_date DATE")
 
 
 init_db()
@@ -66,6 +79,7 @@ init_db()
 security = HTTPBearer()
 
 
+# ------------------------------------------------------------------ models
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -78,6 +92,11 @@ class RegisterRequest(BaseModel):
     name_zh: str
 
 
+class AgendaSaveRequest(BaseModel):
+    data: Dict[str, Any]
+
+
+# ------------------------------------------------------------------ helpers
 def make_token(username: str) -> str:
     payload = {
         "sub": username,
@@ -96,6 +115,13 @@ def decode_token(token: str) -> str:
         raise HTTPException(status_code=401, detail="無效的 Token")
 
 
+def parse_jsonb(val) -> dict:
+    if isinstance(val, str):
+        return json.loads(val)
+    return val or {}
+
+
+# ------------------------------------------------------------------ auth
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
     with get_db() as conn:
@@ -134,3 +160,101 @@ def register(req: RegisterRequest):
 def verify(credentials: HTTPAuthorizationCredentials = Depends(security)):
     username = decode_token(credentials.credentials)
     return {"username": username}
+
+
+# ------------------------------------------------------------------ agenda
+@app.get("/api/agendas")
+def list_agendas(
+    date: str = None,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    username = decode_token(credentials.credentials)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            if date:
+                cur.execute(
+                    "SELECT id, data, updated_at FROM agendas"
+                    " WHERE username = %s AND meeting_date = %s ORDER BY updated_at DESC",
+                    (username, date),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, data, updated_at FROM agendas"
+                    " WHERE username = %s ORDER BY updated_at DESC",
+                    (username,),
+                )
+            rows = cur.fetchall()
+    result = []
+    for r in rows:
+        d = parse_jsonb(r[1])
+        result.append({
+            "id":           r[0],
+            "meetingDate":  d.get("meetingDate", ""),
+            "meetingNo":    d.get("meetingNo", ""),
+            "meetingTheme": d.get("meetingTheme", ""),
+            "updatedAt":    r[2].isoformat() if r[2] else "",
+        })
+    return result
+
+
+@app.post("/api/agendas")
+def create_agenda(req: AgendaSaveRequest, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    username = decode_token(credentials.credentials)
+    meeting_date = req.data.get("meetingDate") or None
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO agendas (username, data, meeting_date) VALUES (%s, %s::jsonb, %s) RETURNING id",
+                (username, json.dumps(req.data), meeting_date),
+            )
+            new_id = cur.fetchone()[0]
+    return {"id": new_id}
+
+
+@app.put("/api/agendas/{agenda_id}")
+def update_agenda(
+    agenda_id: int,
+    req: AgendaSaveRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    username = decode_token(credentials.credentials)
+    meeting_date = req.data.get("meetingDate") or None
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE agendas SET data = %s::jsonb, meeting_date = %s, updated_at = NOW()"
+                " WHERE id = %s AND username = %s",
+                (json.dumps(req.data), meeting_date, agenda_id, username),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到此議程或無權限")
+    return {"ok": True}
+
+
+@app.get("/api/agendas/{agenda_id}")
+def get_agenda(agenda_id: int, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    username = decode_token(credentials.credentials)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT data FROM agendas WHERE id = %s AND username = %s",
+                (agenda_id, username),
+            )
+            row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="找不到此議程或無權限")
+    return parse_jsonb(row[0])
+
+
+@app.delete("/api/agendas/{agenda_id}")
+def delete_agenda(agenda_id: int, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    username = decode_token(credentials.credentials)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM agendas WHERE id = %s AND username = %s",
+                (agenda_id, username),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到此議程或無權限")
+    return {"ok": True}

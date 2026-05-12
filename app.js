@@ -60,6 +60,18 @@ let speeches = [
   { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
 ];
 
+let evaluators = ['', '', ''];
+
+const timeOverrides = {
+  openingStart: '',
+  speechStart:  '',
+  photoStart:   '',
+  topicsStart:  '',
+  evalStart:    '',
+  closingStart: '',
+  sharingStart: '',
+};
+
 const images = {
   logo:     'media/toastmasters_logo.png',
   themeImg: null,
@@ -131,6 +143,39 @@ function renderSpeechForms() {
     const sel = document.querySelector(`#speech-${i} select`);
     if (sel) sel.value = sp.pathwayCode || '';
   });
+
+  renderEvaluatorForms();
+
+  updatePreview();
+}
+
+function renderEvaluatorForms() {
+  const container = document.getElementById('evaluatorsList');
+  if (!container) return;
+  container.innerHTML = evaluators.map((ev, i) => `
+    <div class="speech-entry" style="padding:8px 10px">
+      <div class="speech-entry-header">
+        <span>講評 #${i + 1} <span class="time-hint">2'~3'</span></span>
+        <button class="btn-remove" onclick="removeEvaluator(${i})">✕ 移除</button>
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <input type="text" value="${esc(ev)}"
+               oninput="evaluators[${i}] = this.value; updatePreview()"
+               placeholder="Name, Title">
+      </div>
+    </div>
+  `).join('') + `<button class="btn-add" onclick="addEvaluator()">+ 新增講評</button>`;
+}
+
+function addEvaluator() {
+  evaluators.push('');
+  renderEvaluatorForms();
+  updatePreview();
+}
+
+function removeEvaluator(i) {
+  evaluators.splice(i, 1);
+  renderEvaluatorForms();
   updatePreview();
 }
 
@@ -147,6 +192,84 @@ function removeSpeech(i) {
 function updateSpeech(i, key, val) {
   speeches[i][key] = val;
   updatePreview();
+}
+
+// ================================================================
+// TIME HELPERS
+// ================================================================
+function parseDurationMax(str) {
+  const nums = (str || '').match(/\d+/g);
+  if (!nums || !nums.length) return 7;
+  return Math.max(...nums.map(Number));
+}
+
+function timeToMins(str) {
+  const parts = (str || '0:0').split(':').map(Number);
+  return (parts[0] || 0) * 60 + (parts[1] || 0);
+}
+
+function minsToTime(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function addMins(timeStr, delta) {
+  return minsToTime(timeToMins(timeStr) + delta);
+}
+
+function calcTimes(spList) {
+  const ov = timeOverrides;
+  const valid = s => /^\d{1,2}:\d{2}$/.test((s || '').trim());
+  const get   = (key, auto) => valid(ov[key]) ? ov[key].trim() : auto;
+
+  const openingStart = get('openingStart', '19:10');
+  const speechStart  = get('speechStart',  addMins(openingStart, 10));
+
+  // speech block: sum of max durations + 4 min transition buffer
+  const speechMins = spList.reduce((s, sp) => s + parseDurationMax(sp.duration), 0) + 4;
+  const photoStart   = get('photoStart',   addMins(speechStart, speechMins));
+  // photo (4') + intermission (15') = 19 min to table topics
+  const topicsStart  = get('topicsStart',  addMins(photoStart,  19));
+  const evalStart    = get('evalStart',    addMins(topicsStart, 20));
+  // eval: 3' per evaluator + timer(1) + ah(1) + LE(5) + GE(5)
+  const evalMins     = evaluators.length * 3 + 12;
+  const closingStart = get('closingStart', addMins(evalStart,   evalMins));
+  // closing: TME(3') + awards(3') = 6 min
+  const sharingStart = get('sharingStart', addMins(closingStart, 6));
+
+  return { openingStart, speechStart, photoStart, topicsStart, evalStart, closingStart, sharingStart };
+}
+
+function updateTimeOverride(key, value) {
+  timeOverrides[key] = value;
+  updatePreview();
+}
+
+function resetTimeOverride(key) {
+  timeOverrides[key] = '';
+  const el = document.getElementById(`to_${key}`);
+  if (el) el.value = '';
+  updatePreview();
+}
+
+function refreshAutoHints() {
+  const t = calcTimes(speeches);
+  [
+    ['openingStart', t.openingStart],
+    ['speechStart',  t.speechStart],
+    ['photoStart',   t.photoStart],
+    ['topicsStart',  t.topicsStart],
+    ['evalStart',    t.evalStart],
+    ['closingStart', t.closingStart],
+    ['sharingStart', t.sharingStart],
+  ].forEach(([key, val]) => {
+    const el = document.getElementById(`auto_${key}`);
+    if (el) el.textContent = `自動: ${val}`;
+    // highlight override inputs that are active
+    const input = document.getElementById(`to_${key}`);
+    if (input) input.classList.toggle('is-overridden', !!timeOverrides[key].trim());
+  });
 }
 
 // ================================================================
@@ -173,8 +296,8 @@ function esc(str) {
 function buildSpeechAgendaLine(sp) {
   let line = esc(sp.title) || 'TBD';
   const parts = [];
-  if (sp.pathwayCode) parts.push(sp.pathwayCode);
-  if (sp.pathwayLevel) parts.push(sp.pathwayLevel);
+  if (sp.pathwayCode)    parts.push(sp.pathwayCode);
+  if (sp.pathwayLevel)   parts.push(sp.pathwayLevel);
   if (sp.pathwayProject) parts.push(sp.pathwayProject);
   if (parts.length) line += `\n [${parts.join(' - ')}]`;
   return line;
@@ -258,8 +381,14 @@ function buildHeader(data) {
 // ================================================================
 function generateAgendaHTML(data) {
   const speechCount = data.speeches.length;
-  // row count: reception(1)+opening(5)+speechBlock(1+N)+photo(1)+intermission(1)+topics(1)+spacer(1)+eval(8)+closing(2)+sharing(1)
-  const totalRows = 22 + speechCount;
+  const evalCount   = data.evaluators.length;
+  const t = calcTimes(data.speeches);
+
+  // rows: reception(1) + opening(5) + speech_header(1) + speeches(N)
+  //       + photo(1) + intermission(1) + topics(1) + spacer(1)
+  //       + eval_header(1) + evaluators(M) + timer(1) + ah(1) + LE(1) + GE(1)
+  //       + closing(2) + sharing(1)  = 19 + N + M
+  const totalRows = 19 + speechCount + evalCount;
 
   const rightPanelHtml = buildRightPanel();
   const headerHtml = buildHeader(data);
@@ -276,10 +405,10 @@ function generateAgendaHTML(data) {
     <td class="rp-cell" rowspan="${totalRows}">${rightPanelHtml}</td>
   </tr>`;
 
-  // Opening block (19:10, 10') — both time and dur rowspan 5
+  // Opening block — time & dur rowspan 5
   tbody += `
   <tr>
-    <td class="time-cell" rowspan="5">19:10</td>
+    <td class="time-cell" rowspan="5">${t.openingStart}</td>
     <td class="dur-cell" rowspan="5">10'</td>
     <td class="agenda-cell">1' Calling Meeting to Order</td>
     <td class="taker-cell">${esc(data.callingToOrder)}</td>
@@ -305,7 +434,7 @@ function generateAgendaHTML(data) {
   const speechBlockSpan = 1 + speechCount;
   tbody += `
   <tr class="row-section">
-    <td class="time-cell" rowspan="${speechBlockSpan}">19:20</td>
+    <td class="time-cell" rowspan="${speechBlockSpan}">${t.speechStart}</td>
     <td class="dur-cell">25'</td>
     <td class="agenda-cell"><strong>Prepared Speech</strong></td>
     <td class="taker-cell">${esc(data.tme)}</td>
@@ -323,7 +452,7 @@ function generateAgendaHTML(data) {
   // Group Photo
   tbody += `
   <tr>
-    <td class="time-cell">19:45</td>
+    <td class="time-cell">${t.photoStart}</td>
     <td class="dur-cell">4'</td>
     <td class="agenda-cell">Group Photo</td>
     <td class="taker-cell">All Participants</td>
@@ -338,7 +467,7 @@ function generateAgendaHTML(data) {
   // Table Topics
   tbody += `
   <tr class="row-section">
-    <td class="time-cell">20:04</td>
+    <td class="time-cell">${t.topicsStart}</td>
     <td class="dur-cell">20'</td>
     <td class="agenda-cell"><strong>Table Topics Session</strong></td>
     <td class="taker-cell">${esc(data.tableTopicsMaster)}</td>
@@ -347,29 +476,26 @@ function generateAgendaHTML(data) {
   // Spacer
   tbody += `<tr class="row-spacer"><td colspan="4"></td></tr>`;
 
-  // Evaluation block — time rowspan 8
+  // Evaluation block — rowspan = 1 (header) + M (evaluators) + 4 (timer, ah, LE, GE)
+  const evalRowSpan = evalCount + 5;
   tbody += `
   <tr class="row-section">
-    <td class="time-cell" rowspan="8">20:24</td>
+    <td class="time-cell" rowspan="${evalRowSpan}">${t.evalStart}</td>
     <td class="dur-cell">25'</td>
     <td class="agenda-cell"><strong>Evaluation Session</strong></td>
     <td class="taker-cell">${esc(data.generalEvaluator)}</td>
-  </tr>
+  </tr>`;
+
+  data.evaluators.forEach((ev, i) => {
+    tbody += `
   <tr>
     <td class="dur-cell">2'~3'</td>
-    <td class="agenda-cell">Individual Evaluator for Speaker #1</td>
-    <td class="taker-cell">${esc(data.evaluator1)}</td>
-  </tr>
-  <tr>
-    <td class="dur-cell">2'~3'</td>
-    <td class="agenda-cell">Individual Evaluator for Speaker #2</td>
-    <td class="taker-cell">${esc(data.evaluator2)}</td>
-  </tr>
-  <tr>
-    <td class="dur-cell">2'~3'</td>
-    <td class="agenda-cell">Individual Evaluator for Speaker #3</td>
-    <td class="taker-cell">${esc(data.evaluator3)}</td>
-  </tr>
+    <td class="agenda-cell">Individual Evaluator for Speaker #${i + 1}</td>
+    <td class="taker-cell">${esc(ev)}</td>
+  </tr>`;
+  });
+
+  tbody += `
   <tr>
     <td class="dur-cell">1'</td>
     <td class="agenda-cell">Timer Report</td>
@@ -394,7 +520,7 @@ function generateAgendaHTML(data) {
   // Closing — time rowspan 2
   tbody += `
   <tr>
-    <td class="time-cell" rowspan="2">20:49</td>
+    <td class="time-cell" rowspan="2">${t.closingStart}</td>
     <td class="dur-cell">3'</td>
     <td class="agenda-cell">Toastmaster of the Evening</td>
     <td class="taker-cell">${esc(data.tme)}</td>
@@ -408,7 +534,7 @@ function generateAgendaHTML(data) {
   // Sharing & Feedback
   tbody += `
   <tr>
-    <td class="time-cell">21:00</td>
+    <td class="time-cell">${t.sharingStart}</td>
     <td class="dur-cell">5'</td>
     <td class="agenda-cell">Sharing &amp; Feedback</td>
     <td class="taker-cell">${esc(data.sharingFeedback)}</td>
@@ -468,11 +594,9 @@ function collectData() {
     timer:             val('timer'),
     ahCounter:         val('ahCounter'),
     speeches:          speeches,
+    evaluators:        evaluators.slice(),
     tableTopicsMaster: val('tableTopicsMaster'),
     generalEvaluator:  val('generalEvaluator'),
-    evaluator1:        val('evaluator1'),
-    evaluator2:        val('evaluator2'),
-    evaluator3:        val('evaluator3'),
     langEvaluator:     val('langEvaluator'),
     awardsPresenter:   val('awardsPresenter'),
     sharingFeedback:   val('sharingFeedback'),
@@ -496,6 +620,161 @@ function updatePreview() {
   const data = collectData();
   document.getElementById('agendaPreview').innerHTML = generateAgendaHTML(data);
   requestAnimationFrame(equalizeRowHeights);
+  refreshAutoHints();
+  setSaveStatus('unsaved');
+}
+
+// ================================================================
+// SAVE / LOAD
+// ================================================================
+let currentAgendaId = null;
+
+function collectSaveData() {
+  return { ...collectData(), timeOverrides: { ...timeOverrides } };
+}
+
+function applyAgendaData(d) {
+  const fields = [
+    'meetingDate', 'meetingNo', 'meetingTheme',
+    'receptionHost', 'callingToOrder', 'welcomeTME', 'tme', 'timer', 'ahCounter',
+    'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
+    'awardsPresenter', 'sharingFeedback',
+  ];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = d[id] || '';
+  });
+
+  speeches   = d.speeches   || [];
+  evaluators = d.evaluators || [];
+
+  if (d.timeOverrides) {
+    Object.assign(timeOverrides, d.timeOverrides);
+    Object.entries(timeOverrides).forEach(([key, val]) => {
+      const el = document.getElementById(`to_${key}`);
+      if (el) el.value = val || '';
+    });
+  }
+
+  renderSpeechForms();
+  renderEvaluatorForms();
+  updatePreview();
+}
+
+async function saveAgenda() {
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true;
+  btn.textContent = '儲存中...';
+  try {
+    const body = JSON.stringify({ data: collectSaveData() });
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`,
+    };
+    let res;
+    if (currentAgendaId) {
+      res = await fetch(`${API_BASE}/api/agendas/${currentAgendaId}`, { method: 'PUT', headers, body });
+    } else {
+      res = await fetch(`${API_BASE}/api/agendas`, { method: 'POST', headers, body });
+      if (res.ok) {
+        const json = await res.json();
+        currentAgendaId = json.id;
+      }
+    }
+    if (!res.ok) throw new Error((await res.json()).detail || '儲存失敗');
+    setSaveStatus('saved');
+    btn.textContent = '✓ 已儲存';
+    setTimeout(() => { btn.textContent = '💾 儲存'; }, 2000);
+  } catch (e) {
+    alert(e.message);
+    btn.textContent = '💾 儲存';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function openLoadModal() {
+  document.getElementById('loadModal').style.display = 'flex';
+  document.getElementById('agendaDateFilter').value = '';
+  await fetchAgendaList('');
+}
+
+async function fetchAgendaList(date) {
+  const list = document.getElementById('agendaListBody');
+  list.innerHTML = '<p class="agenda-list-empty">載入中...</p>';
+  try {
+    const url = date ? `${API_BASE}/api/agendas?date=${date}` : `${API_BASE}/api/agendas`;
+    const res  = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (!res.ok) throw new Error('無法取得列表');
+    const items = await res.json();
+    if (!items.length) {
+      list.innerHTML = '<p class="agenda-list-empty">找不到符合的議程</p>';
+      return;
+    }
+    list.innerHTML = items.map(item => {
+      const label = [
+        item.meetingDate || '—',
+        item.meetingNo   ? `No.${item.meetingNo}` : '',
+        item.meetingTheme || '',
+      ].filter(Boolean).join('  ·  ');
+      const ts = item.updatedAt ? new Date(item.updatedAt).toLocaleString('zh-TW') : '';
+      return `
+        <div class="agenda-list-item" onclick="loadAgenda(${item.id})">
+          <div class="ali-main">${label}</div>
+          <div class="ali-meta">${ts}</div>
+          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">🗑</button>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<p class="agenda-list-empty">${e.message}</p>`;
+  }
+}
+
+function closeLoadModal() {
+  document.getElementById('loadModal').style.display = 'none';
+}
+
+async function loadAgenda(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/agendas/${id}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new Error('載入失敗');
+    const data = await res.json();
+    applyAgendaData(data);
+    currentAgendaId = id;
+    setSaveStatus('saved');
+    closeLoadModal();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function deleteAgenda(id, btn) {
+  if (!confirm('確定要刪除這份議程嗎？')) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/agendas/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new Error('刪除失敗');
+    if (currentAgendaId === id) { currentAgendaId = null; setSaveStatus('unsaved'); }
+    btn.closest('.agenda-list-item').remove();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function setSaveStatus(state) {
+  const el = document.getElementById('saveStatus');
+  if (!el) return;
+  if (state === 'saved') {
+    el.textContent = '● 已儲存';
+    el.className = 'save-status saved';
+  } else {
+    el.textContent = '○ 未儲存';
+    el.className = 'save-status unsaved';
+  }
 }
 
 // ================================================================
@@ -505,7 +784,6 @@ function downloadPDF() {
   const data = collectData();
   const dateStr = formatDate(data.meetingDate) || 'agenda';
 
-  // Use the already-rendered preview element directly so html2canvas can capture it
   const element = document.getElementById('agendaPreview');
 
   const opt = {
@@ -529,8 +807,11 @@ function resetForm() {
       if (el.tagName === 'SELECT') el.selectedIndex = 0;
       else el.value = '';
     });
-  speeches = [{ title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' }];
+  speeches   = [{ title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' }];
+  evaluators = [];
+  Object.keys(timeOverrides).forEach(k => { timeOverrides[k] = ''; });
   Object.keys(images).forEach(k => { images[k] = null; });
+  currentAgendaId = null;
   renderSpeechForms();
 }
 

@@ -15,7 +15,10 @@
   <div class="form-panel">
     <div class="form-header">
       <h1>🎤 議程表產生器</h1>
-      <button id="logoutBtn" class="btn-logout" onclick="doLogout()"></button>
+      <div class="form-header-right">
+        <span id="saveStatus" class="save-status unsaved">○ 未儲存</span>
+        <button id="logoutBtn" class="btn-logout" onclick="doLogout()"></button>
+      </div>
     </div>
 
     <details open>
@@ -123,21 +126,80 @@
           <label>General Evaluator 總評 <span class="time-hint">3'~5'</span></label>
           <input type="text" id="generalEvaluator" placeholder="Name, Title">
         </div>
-        <div class="form-row">
-          <label>Evaluator for Speaker #1 <span class="time-hint">2'~3'</span></label>
-          <input type="text" id="evaluator1" placeholder="Name, Title">
-        </div>
-        <div class="form-row">
-          <label>Evaluator for Speaker #2 <span class="time-hint">2'~3'</span></label>
-          <input type="text" id="evaluator2" placeholder="Name, Title">
-        </div>
-        <div class="form-row">
-          <label>Evaluator for Speaker #3 <span class="time-hint">2'~3'</span></label>
-          <input type="text" id="evaluator3" placeholder="Name, Title">
-        </div>
+        <div id="evaluatorsList"></div>
         <div class="form-row">
           <label>Language Evaluator 語言評估 <span class="time-hint">3'~5'</span></label>
           <input type="text" id="langEvaluator" placeholder="Name, Title">
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>⏱ 時間設定 Time Settings</summary>
+      <div class="form-section">
+        <p class="time-override-hint">空白 = 自動計算｜輸入 HH:MM 手動覆蓋</p>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            開幕 Opening
+            <span id="auto_openingStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_openingStart" maxlength="5" placeholder="HH:MM"
+                 oninput="updateTimeOverride('openingStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('openingStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            演講開始 Speeches
+            <span id="auto_speechStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_speechStart" maxlength="5" placeholder="HH:MM"
+                 oninput="updateTimeOverride('speechStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('speechStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            拍照 Group Photo
+            <span id="auto_photoStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_photoStart" maxlength="5" placeholder="HH:MM"
+                 oninput="updateTimeOverride('photoStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('photoStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            即席演講 Table Topics
+            <span id="auto_topicsStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_topicsStart" maxlength="5" placeholder="HH:MM"
+                 oninput="updateTimeOverride('topicsStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('topicsStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            評估 Evaluation
+            <span id="auto_evalStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_evalStart" maxlength="5" placeholder="HH:MM"
+                 oninput="updateTimeOverride('evalStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('evalStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            結束 Closing
+            <span id="auto_closingStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_closingStart" maxlength="5" placeholder="HH:MM"
+                 oninput="updateTimeOverride('closingStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('closingStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            分享 Sharing
+            <span id="auto_sharingStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_sharingStart" maxlength="5" placeholder="HH:MM"
+                 oninput="updateTimeOverride('sharingStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('sharingStart')" title="還原自動">⟳</button>
         </div>
       </div>
     </details>
@@ -157,6 +219,8 @@
     </details>
 
     <div class="form-actions">
+      <button id="btnSave" class="btn-save" onclick="saveAgenda()">💾 儲存</button>
+      <button class="btn-load" onclick="openLoadModal()">📂 載入</button>
       <button class="btn-download" onclick="downloadPDF()">⬇ 下載 PDF</button>
       <button class="btn-print" onclick="window.print()">🖨 列印</button>
       <button class="btn-reset" onclick="resetForm()">↺ 重設</button>
@@ -175,6 +239,22 @@
   </div>
 
 </div>
+<!-- Load Modal -->
+<div id="loadModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeLoadModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>📂 載入議程</h3>
+      <button class="modal-close" onclick="closeLoadModal()">✕</button>
+    </div>
+    <div class="modal-search">
+      <input type="date" id="agendaDateFilter" placeholder="篩選日期"
+             onchange="fetchAgendaList(this.value)">
+      <button class="btn-clear-filter" onclick="document.getElementById('agendaDateFilter').value=''; fetchAgendaList('')">全部</button>
+    </div>
+    <div id="agendaListBody" class="agenda-list-body"></div>
+  </div>
+</div>
+
 <script src="auth.js"></script>
 <script src="app.js"></script>
 </body>

@@ -89,7 +89,7 @@ const TRANSLATIONS = {
     preparedSpeech: 'Prepared Speech',
     groupPhoto:     'Group Photo',
     allParticipants:'All Participants',
-    intermission:   '— Intermission & Social Time (15 mins) —',
+    intermission:   n => `— Intermission & Social Time (${n} min) —`,
     tableTopics:    'Table Topics Session',
     evaluation:     'Evaluation Session',
     evaluatorFor:   n => `Individual Evaluator for Speaker #${n}`,
@@ -116,6 +116,10 @@ const TRANSLATIONS = {
     trLEGE:         'LE&GE',
     fbLabel:        'Follow us on FB!',
     lineLabel:      'Connect us with LINE@',
+    foundedSince:    'Founded Since',
+    fee:             'Fee',
+    varietySession:  'Variety Session',
+    meetingSchedule: 'Meeting on every 1st (中文) and 3rd (English) Tuesday evening',
   },
   zh: {
     reception:      '報到 & 交誼',
@@ -127,7 +131,7 @@ const TRANSLATIONS = {
     preparedSpeech: '指定演講',
     groupPhoto:     '大合照',
     allParticipants:'所有與會者',
-    intermission:   '✂ ——— 休息 & 交誼時間（10 分鐘）——— ✂',
+    intermission:   n => ` ——— 休息 & 交誼時間（${n} 分鐘）——— `,
     tableTopics:    '即席問答',
     evaluation:     '講評時間',
     evaluatorFor:   n => `個別講評員 #${n}`,
@@ -148,12 +152,16 @@ const TRANSLATIONS = {
     missionTitle:   '——— 演講會宗旨 ———',
     missionText:    '訓練溝通及領導能力，強調終身學習。參加國際演講協會是增進溝通技巧的最佳方法，除了大幅增加公開演講的自信外，在這裡所學到的領導技巧，更是您邁向成功之路的必備基石。',
     timeRules:      '時間規則',
-    trPrepared:     '準備演講',
+    trPrepared:     '指定演講',
     trTopic:        '即席問答',
     trEval:         '個別講評',
     trLEGE:         '語言&總講評',
     fbLabel:        '追蹤我們的 FB！',
     lineLabel:      '加入企業家 LINE 群組！',
+    foundedSince:    '成立日期',
+    fee:             '入場費',
+    varietySession:  '多元單元',
+    meetingSchedule: '會議日期為每月第 1 個星期二 (中文) / 第 3 個星期二 (English)',
   },
 };
 
@@ -166,18 +174,81 @@ function toggleLang() {
   lang = lang === 'en' ? 'zh' : 'en';
   const btn = document.getElementById('langToggle');
   if (btn) btn.textContent = lang === 'en' ? '切換中文' : 'Switch to EN';
+  rebuildDatalist();
+  refreshInputsForLang();
   updatePreview();
 }
 
+function refreshInputsForLang() {
+  const staticFields = [
+    'receptionHost', 'callingToOrder', 'welcomeTME', 'tme', 'timer', 'ahCounter',
+    'tableTopicsMaster', 'generalEvaluator', 'langEvaluator', 'awardsPresenter', 'sharingFeedback',
+  ];
+  staticFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value) el.value = displayMember(el.value);
+  });
+
+  speeches.forEach(sp => {
+    if (sp.speaker) sp.speaker = displayMember(sp.speaker);
+  });
+  evaluators = evaluators.map(ev => ev ? displayMember(ev) : ev);
+
+  if (varietySession.host) {
+    varietySession.host = displayMember(varietySession.host);
+    const el = document.getElementById('varietyHost');
+    if (el) el.value = varietySession.host;
+  }
+
+  renderSpeechForms();
+  renderEvaluatorForms();
+}
+
 const timeOverrides = {
-  openingStart: '',
-  speechStart:  '',
-  photoStart:   '',
-  topicsStart:  '',
-  evalStart:    '',
-  closingStart: '',
-  sharingStart: '',
+  endTime:         '',
+  openingStart:    '',
+  speechStart:     '',
+  photoStart:      '',
+  intermissionMins:'',
+  topicsStart:     '',
+  evalStart:       '',
+  closingStart:    '',
+  sharingStart:    '',
 };
+
+const durationSettings = {
+  tmeMins: 4,
+  geMins:  4,
+};
+
+function updateDuration(key, value) {
+  const n = parseInt(value, 10);
+  durationSettings[key] = isNaN(n) || n < 0 ? 0 : n;
+  updatePreview();
+}
+
+const varietySession = {
+  enabled:  false,
+  duration: 15,
+  host:     '',
+};
+
+function toggleVariety(checked) {
+  varietySession.enabled = checked;
+  const fields = document.getElementById('varietyFields');
+  if (fields) fields.style.display = checked ? '' : 'none';
+  updatePreview();
+}
+
+function updateVariety(key, value) {
+  if (key === 'duration') {
+    const n = parseInt(value, 10);
+    varietySession[key] = isNaN(n) || n < 1 ? 1 : n;
+  } else {
+    varietySession[key] = value;
+  }
+  updatePreview();
+}
 
 const images = {
   logo:     'media/toastmasters_logo.png',
@@ -222,7 +293,7 @@ function renderSpeechForms() {
       </div>
       <div class="form-row">
         <label>講者 Speaker (姓名 + 頭銜)</label>
-        <input type="text" value="${sp.speaker}" oninput="updateSpeech(${i},'speaker',this.value)" placeholder="e.g. John Smith, TM">
+        <input type="text" class="member-ac" value="${sp.speaker}" oninput="updateSpeech(${i},'speaker',this.value)" placeholder="e.g. John Smith, TM">
       </div>
       <div class="form-row">
         <label>時長 Duration</label>
@@ -268,7 +339,7 @@ function renderEvaluatorForms() {
       <div class="form-row" style="margin-bottom:0">
         <input type="text" value="${esc(ev)}"
                oninput="evaluators[${i}] = this.value; updatePreview()"
-               placeholder="Name, Title">
+               placeholder="Name, Title" class="member-ac">
       </div>
     </div>
   `).join('') + `<button class="btn-add" onclick="addEvaluator()">+ 新增講評</button>`;
@@ -289,11 +360,13 @@ function removeEvaluator(i) {
 function addSpeech() {
   speeches.push({ title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' });
   renderSpeechForms();
+  updatePreview();
 }
 
 function removeSpeech(i) {
   speeches.splice(i, 1);
   renderSpeechForms();
+  updatePreview();
 }
 
 function updateSpeech(i, key, val) {
@@ -331,21 +404,46 @@ function calcTimes(spList) {
   const get   = (key, auto) => valid(ov[key]) ? ov[key].trim() : auto;
 
   const openingStart = get('openingStart', '19:10');
+  const endTime      = get('endTime',      '21:00');
   const speechStart  = get('speechStart',  addMins(openingStart, 10));
 
-  // speech block: sum of max durations + 4 min transition buffer
-  const speechMins = spList.reduce((s, sp) => s + parseDurationMax(sp.duration), 0) + 4;
-  const photoStart   = get('photoStart',   addMins(speechStart, speechMins));
-  // photo (4') + intermission (15') = 19 min to table topics
-  const topicsStart  = get('topicsStart',  addMins(photoStart,  19));
-  const evalStart    = get('evalStart',    addMins(topicsStart, 20));
-  // eval: 3' per evaluator + timer(1) + ah(1) + LE(5) + GE(5)
-  const evalMins     = evaluators.length * 3 + 12;
+  // variety session (optional, before prepared speeches)
+  const varietyMins = varietySession.enabled ? varietySession.duration : 0;
+  const preparedSpeechStart = addMins(speechStart, varietyMins);
+
+  // speech block: sum of max durations + 4 min transition + TME hosting
+  const speechMins = spList.reduce((s, sp) => s + parseDurationMax(sp.duration), 0) + 4 + durationSettings.tmeMins;
+  const photoStart = get('photoStart', addMins(preparedSpeechStart, speechMins));
+
+  // eval: 3' per evaluator + timer(1) + ah(1) + LE(5) + GE(5) + GE hosting
+  const evalMins = evaluators.length * 3 + 12 + durationSettings.geMins;
+
+  const ovIM = parseInt(timeOverrides.intermissionMins, 10);
+  const hasManualIM = !isNaN(ovIM) && String(timeOverrides.intermissionMins).trim() !== '';
+
+  const minIM   = hasManualIM ? ovIM : 5;
+  const fixedMins = 10 + varietyMins + speechMins + 4 + evalMins + 6 + 10 + minIM;
+  let   slack     = timeToMins(endTime) - timeToMins(openingStart) - fixedMins;
+
+  let topicsMins, intermissionMins;
+  if (hasManualIM) {
+    intermissionMins = ovIM;
+    topicsMins = 10 + Math.min(10, Math.max(0, slack));
+  } else {
+    const topicsExtra       = Math.min(10, Math.max(0, slack));
+    slack -= topicsExtra;
+    const intermissionExtra = Math.min(10, Math.max(0, slack));
+    topicsMins       = 10 + topicsExtra;
+    intermissionMins =  5 + intermissionExtra;
+  }
+
+  const topicsStart  = get('topicsStart',  addMins(photoStart,  5 + intermissionMins));
+  const evalStart    = get('evalStart',    addMins(topicsStart, topicsMins));
   const closingStart = get('closingStart', addMins(evalStart,   evalMins));
   // closing: TME(3') + awards(3') = 6 min
   const sharingStart = get('sharingStart', addMins(closingStart, 6));
 
-  return { openingStart, speechStart, photoStart, topicsStart, evalStart, closingStart, sharingStart };
+  return { openingStart, endTime, speechStart, varietyMins, preparedSpeechStart, speechMins, photoStart, topicsStart, evalStart, evalMins, closingStart, sharingStart, intermissionMins, topicsMins };
 }
 
 function updateTimeOverride(key, value) {
@@ -363,6 +461,7 @@ function resetTimeOverride(key) {
 function refreshAutoHints() {
   const times = calcTimes(speeches);
   [
+    ['endTime',      times.endTime],
     ['openingStart', times.openingStart],
     ['speechStart',  times.speechStart],
     ['photoStart',   times.photoStart],
@@ -373,10 +472,14 @@ function refreshAutoHints() {
   ].forEach(([key, val]) => {
     const el = document.getElementById(`auto_${key}`);
     if (el) el.textContent = `自動: ${val}`;
-    // highlight override inputs that are active
     const input = document.getElementById(`to_${key}`);
     if (input) input.classList.toggle('is-overridden', !!timeOverrides[key].trim());
   });
+
+  const imEl = document.getElementById('auto_intermissionMins');
+  if (imEl) imEl.textContent = `自動: ${times.intermissionMins} 分鐘`;
+  const imInput = document.getElementById('to_intermissionMins');
+  if (imInput) imInput.classList.toggle('is-overridden', !!String(timeOverrides.intermissionMins).trim());
 }
 
 // ================================================================
@@ -470,14 +573,14 @@ function buildHeader(data) {
   <div class="hg-img">${themeImgHtml}</div>
   <div class="hg-meta-left">
     <div>No. 4069930</div>
-    <div>Founded Since:</div>
+    <div>${t('foundedSince')}:</div>
     <div>2014.06.29</div>
     <div>&nbsp;</div>
-    <div>Fee : NTD150</div>
+    <div>${t('fee')} : NTD150</div>
   </div>
   <div class="hg-meta-right">
     <span class="hmr-icon">⏰</span><div class="hmr-text"><strong>Time : ${dateDisplay} ｜ ${esc(data.timeRange)}</strong></div>
-    <span class="hmr-icon">📅</span><div class="hmr-text">${esc(data.meetingSchedule).replace(/\n/g, '<br>')}</div>
+    <span class="hmr-icon">📅</span><div class="hmr-text">${t('meetingSchedule')}</div>
     <span class="hmr-icon">📍</span><div class="hmr-text">${esc(data.venueInfo).replace(/\n/g, '<br>')}</div>
   </div>
 </div>`;
@@ -508,7 +611,7 @@ function generateAgendaHTML(data) {
     <td class="time-cell">18:50</td>
     <td class="dur-cell">20'</td>
     <td class="agenda-cell">${t('reception')}</td>
-    <td class="taker-cell">${esc(data.receptionHost)}</td>
+    <td class="taker-cell">${esc(displayMember(data.receptionHost))}</td>
     <td class="rp-cell" rowspan="${totalRows}">${rightPanelHtml}</td>
   </tr>`;
 
@@ -518,33 +621,44 @@ function generateAgendaHTML(data) {
     <td class="time-cell" rowspan="5">${times.openingStart}</td>
     <td class="dur-cell" rowspan="5">10'</td>
     <td class="agenda-cell">${t('callingOrder')}</td>
-    <td class="taker-cell">${esc(data.callingToOrder)}</td>
+    <td class="taker-cell">${esc(displayMember(data.callingToOrder))}</td>
   </tr>
   <tr>
     <td class="agenda-cell">${t('welcomeGuests')}</td>
-    <td class="taker-cell">${esc(data.welcomeTME)}</td>
+    <td class="taker-cell">${esc(displayMember(data.welcomeTME))}</td>
   </tr>
   <tr>
     <td class="agenda-cell">${t('tmeIntro')}</td>
-    <td class="taker-cell">${esc(data.tme)}</td>
+    <td class="taker-cell">${esc(displayMember(data.tme))}</td>
   </tr>
   <tr>
     <td class="agenda-cell">${t('timerExplain')}</td>
-    <td class="taker-cell">${esc(data.timer)}</td>
+    <td class="taker-cell">${esc(displayMember(data.timer))}</td>
   </tr>
   <tr>
     <td class="agenda-cell">${t('ahExplain')}</td>
-    <td class="taker-cell">${esc(data.ahCounter)}</td>
+    <td class="taker-cell">${esc(displayMember(data.ahCounter))}</td>
   </tr>`;
+
+  // Variety Session (optional)
+  if (varietySession.enabled) {
+    tbody += `
+  <tr class="row-section">
+    <td class="time-cell">${times.speechStart}</td>
+    <td class="dur-cell">${times.varietyMins}'</td>
+    <td class="agenda-cell"><strong>${t('varietySession')}</strong></td>
+    <td class="taker-cell">${esc(displayMember(varietySession.host))}</td>
+  </tr>`;
+  }
 
   // Prepared Speech block — time rowspan = 1 + speechCount
   const speechBlockSpan = 1 + speechCount;
   tbody += `
   <tr class="row-section">
-    <td class="time-cell" rowspan="${speechBlockSpan}">${times.speechStart}</td>
-    <td class="dur-cell">25'</td>
+    <td class="time-cell" rowspan="${speechBlockSpan}">${times.preparedSpeechStart}</td>
+    <td class="dur-cell">${times.speechMins}'</td>
     <td class="agenda-cell"><strong>${t('preparedSpeech')}</strong></td>
-    <td class="taker-cell">${esc(data.tme)}</td>
+    <td class="taker-cell">${esc(displayMember(data.tme))}</td>
   </tr>`;
 
   data.speeches.forEach(sp => {
@@ -552,7 +666,7 @@ function generateAgendaHTML(data) {
   <tr>
     <td class="dur-cell">${esc(sp.duration || "5'-7'")}</td>
     <td class="agenda-cell">${buildSpeechAgendaLine(sp)}</td>
-    <td class="taker-cell">${esc(sp.speaker)}</td>
+    <td class="taker-cell">${esc(displayMember(sp.speaker))}</td>
   </tr>`;
   });
 
@@ -560,7 +674,7 @@ function generateAgendaHTML(data) {
   tbody += `
   <tr>
     <td class="time-cell">${times.photoStart}</td>
-    <td class="dur-cell">4'</td>
+    <td class="dur-cell">5'</td>
     <td class="agenda-cell">${t('groupPhoto')}</td>
     <td class="taker-cell">${t('allParticipants')}</td>
   </tr>`;
@@ -568,16 +682,16 @@ function generateAgendaHTML(data) {
   // Intermission
   tbody += `
   <tr class="row-intermission">
-    <td colspan="4">${t('intermission')}</td>
+    <td colspan="4">${t('intermission', times.intermissionMins)}</td>
   </tr>`;
 
   // Table Topics
   tbody += `
   <tr class="row-section">
     <td class="time-cell">${times.topicsStart}</td>
-    <td class="dur-cell">20'</td>
+    <td class="dur-cell">${times.topicsMins}'</td>
     <td class="agenda-cell"><strong>${t('tableTopics')}</strong></td>
-    <td class="taker-cell">${esc(data.tableTopicsMaster)}</td>
+    <td class="taker-cell">${esc(displayMember(data.tableTopicsMaster))}</td>
   </tr>`;
 
   // Spacer
@@ -588,9 +702,9 @@ function generateAgendaHTML(data) {
   tbody += `
   <tr class="row-section">
     <td class="time-cell" rowspan="${evalRowSpan}">${times.evalStart}</td>
-    <td class="dur-cell">25'</td>
+    <td class="dur-cell">${times.evalMins}'</td>
     <td class="agenda-cell"><strong>${t('evaluation')}</strong></td>
-    <td class="taker-cell">${esc(data.generalEvaluator)}</td>
+    <td class="taker-cell">${esc(displayMember(data.generalEvaluator))}</td>
   </tr>`;
 
   data.evaluators.forEach((ev, i) => {
@@ -598,7 +712,7 @@ function generateAgendaHTML(data) {
   <tr>
     <td class="dur-cell">2'~3'</td>
     <td class="agenda-cell">${t('evaluatorFor', i + 1)}</td>
-    <td class="taker-cell">${esc(ev)}</td>
+    <td class="taker-cell">${esc(displayMember(ev))}</td>
   </tr>`;
   });
 
@@ -606,22 +720,22 @@ function generateAgendaHTML(data) {
   <tr>
     <td class="dur-cell">1'</td>
     <td class="agenda-cell">${t('timerReport')}</td>
-    <td class="taker-cell">${esc(data.timer)}</td>
+    <td class="taker-cell">${esc(displayMember(data.timer))}</td>
   </tr>
   <tr>
     <td class="dur-cell">1'</td>
     <td class="agenda-cell">${t('ahReport')}</td>
-    <td class="taker-cell">${esc(data.ahCounter)}</td>
+    <td class="taker-cell">${esc(displayMember(data.ahCounter))}</td>
   </tr>
   <tr>
     <td class="dur-cell">3'~5'</td>
     <td class="agenda-cell">${t('langEval')}</td>
-    <td class="taker-cell">${esc(data.langEvaluator)}</td>
+    <td class="taker-cell">${esc(displayMember(data.langEvaluator))}</td>
   </tr>
   <tr>
     <td class="dur-cell">3'~5'</td>
     <td class="agenda-cell">${t('generalEval')}</td>
-    <td class="taker-cell">${esc(data.generalEvaluator)}</td>
+    <td class="taker-cell">${esc(displayMember(data.generalEvaluator))}</td>
   </tr>`;
 
   // Closing — time rowspan 2
@@ -630,12 +744,12 @@ function generateAgendaHTML(data) {
     <td class="time-cell" rowspan="2">${times.closingStart}</td>
     <td class="dur-cell">3'</td>
     <td class="agenda-cell">${t('tmeClosing')}</td>
-    <td class="taker-cell">${esc(data.tme)}</td>
+    <td class="taker-cell">${esc(displayMember(data.tme))}</td>
   </tr>
   <tr>
     <td class="dur-cell">3'</td>
     <td class="agenda-cell">${t('awards')}</td>
-    <td class="taker-cell">${esc(data.awardsPresenter)}</td>
+    <td class="taker-cell">${esc(displayMember(data.awardsPresenter))}</td>
   </tr>`;
 
   // Sharing & Feedback
@@ -644,7 +758,7 @@ function generateAgendaHTML(data) {
     <td class="time-cell">${times.sharingStart}</td>
     <td class="dur-cell">5'</td>
     <td class="agenda-cell">${t('sharing')}</td>
-    <td class="taker-cell">${esc(data.sharingFeedback)}</td>
+    <td class="taker-cell">${esc(displayMember(data.sharingFeedback))}</td>
   </tr>`;
 
   return `
@@ -694,7 +808,6 @@ function collectData() {
     meetingNo:         val('meetingNo'),
     meetingTheme:      val('meetingTheme'),
     timeRange:         val('timeRange'),
-    meetingSchedule:   val('meetingSchedule'),
     venueInfo:         val('venueInfo'),
     receptionHost:     val('receptionHost'),
     callingToOrder:    val('callingToOrder'),
@@ -727,7 +840,10 @@ function equalizeRowHeights() {
 
 function updatePreview() {
   const data = collectData();
-  document.getElementById('agendaPreview').innerHTML = generateAgendaHTML(data);
+  const preview = document.getElementById('agendaPreview');
+  preview.innerHTML = generateAgendaHTML(data);
+  preview.classList.toggle('lang-zh', lang === 'zh');
+  preview.classList.toggle('lang-en', lang === 'en');
   requestAnimationFrame(equalizeRowHeights);
   refreshAutoHints();
   setSaveStatus('unsaved');
@@ -739,13 +855,13 @@ function updatePreview() {
 let currentAgendaId = null;
 
 function collectSaveData() {
-  return { ...collectData(), timeOverrides: { ...timeOverrides } };
+  return { ...collectData(), timeOverrides: { ...timeOverrides }, lang };
 }
 
 function applyAgendaData(d) {
   const fields = [
     'meetingDate', 'meetingNo', 'meetingTheme',
-    'timeRange', 'meetingSchedule', 'venueInfo',
+    'timeRange', 'venueInfo',
     'receptionHost', 'callingToOrder', 'welcomeTME', 'tme', 'timer', 'ahCounter',
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
@@ -764,6 +880,12 @@ function applyAgendaData(d) {
       const el = document.getElementById(`to_${key}`);
       if (el) el.value = val || '';
     });
+  }
+
+  if (d.lang === 'zh' || d.lang === 'en') {
+    lang = d.lang;
+    const btn = document.getElementById('langToggle');
+    if (btn) btn.textContent = lang === 'en' ? '切換中文' : 'Switch to EN';
   }
 
   renderSpeechForms();
@@ -910,38 +1032,198 @@ function downloadPDF() {
 // ================================================================
 // RESET & INIT
 // ================================================================
-function resetForm() {
-  if (!confirm('確定要清除所有資料嗎？')) return;
-  document.querySelectorAll('.form-panel input[type="text"], .form-panel input[type="number"], .form-panel input[type="date"], .form-panel select, .form-panel textarea')
-    .forEach(el => {
-      if (el.tagName === 'SELECT') el.selectedIndex = 0;
-      else el.value = '';
-    });
-  speeches   = [{ title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' }];
-  evaluators = [];
+function applyDefaultState() {
+  const today = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fields = [
+    'meetingNo', 'meetingTheme',
+    'receptionHost', 'callingToOrder', 'welcomeTME', 'tme', 'timer', 'ahCounter',
+    'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
+    'awardsPresenter', 'sharingFeedback',
+  ];
+  fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('meetingDate').value     = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  document.getElementById('timeRange').value       = '19:10 ~ 21:00';
+  document.getElementById('venueInfo').value       = 'Venue: 鑫喜文創｜台北市信義區忠孝東路五段71巷11弄25號1樓\n（捷運板南線：市政府站4號出口，走路3分鐘）';
+  speeches = [
+    { title: 'TBD', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+    { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+    { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+  ];
+  evaluators = ['', '', ''];
   Object.keys(timeOverrides).forEach(k => { timeOverrides[k] = ''; });
-  Object.keys(images).forEach(k => { images[k] = null; });
-  currentAgendaId = null;
+  Object.keys(images).forEach(k => { if (k !== 'logo' && k !== 'fbQr' && k !== 'lineQr') images[k] = null; });
   renderSpeechForms();
+  renderEvaluatorForms();
+  updatePreview();
+}
+
+async function resetForm() {
+  if (currentAgendaId) {
+    if (!confirm('確定要還原成上次儲存的狀態嗎？')) return;
+    await loadAgenda(currentAgendaId);
+  } else {
+    if (!confirm('確定要還原成新建議程的預設狀態嗎？')) return;
+    applyDefaultState();
+  }
+}
+
+let memberRoster = [];
+
+async function fetchMemberDatalist() {
+  try {
+    const res = await fetch(`${API_BASE}/api/members`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) return;
+    memberRoster = await res.json();
+    rebuildDatalist();
+  } catch { /* silently ignore */ }
+}
+
+function rebuildDatalist() { /* no-op: replaced by custom autocomplete */ }
+
+function displayMember(val) {
+  if (!val) return val;
+  const m = memberRoster.find(m =>
+    `${m.nameZh} ${m.nameEn}` === val ||
+    (m.level ? `${m.nameZh}, ${m.level}` : m.nameZh) === val ||
+    (m.level ? `${m.nameEn}, ${m.level}` : m.nameEn) === val
+  );
+  if (!m) return val;
+  const name = lang === 'zh' ? m.nameZh : m.nameEn;
+  return m.level ? `${name}, ${m.level}` : name;
+}
+
+// ================================================================
+// MEMBER AUTOCOMPLETE
+// ================================================================
+let acActiveInput = null;
+let acHighlight   = -1;
+
+function acFilteredItems() {
+  const q = (acActiveInput?.value || '').trim().toLowerCase();
+  if (!q) return memberRoster;
+  return memberRoster.filter(m => {
+    const displayZh = m.level ? `${m.nameZh}, ${m.level}` : m.nameZh;
+    const displayEn = m.level ? `${m.nameEn}, ${m.level}` : m.nameEn;
+    return m.nameZh.toLowerCase().includes(q) ||
+           m.nameEn.toLowerCase().includes(q) ||
+           (m.level || '').toLowerCase().includes(q) ||
+           displayZh.toLowerCase().includes(q) ||
+           displayEn.toLowerCase().includes(q);
+  });
+}
+
+function acRender() {
+  const dd = document.getElementById('memberDropdown');
+  if (!dd || !acActiveInput) return;
+  const items = acFilteredItems();
+  if (!items.length) { dd.style.display = 'none'; return; }
+
+  dd.innerHTML = items.map((m, i) => {
+    const name = lang === 'zh' ? m.nameZh : m.nameEn;
+    const active = i === acHighlight ? ' ac-active' : '';
+    return `<div class="member-dd-item${active}" data-idx="${i}">
+      <span class="mdi-name">${esc(name)}</span>
+      ${m.level ? `<span class="mdi-level">${esc(m.level)}</span>` : ''}
+    </div>`;
+  }).join('');
+
+  const rect = acActiveInput.getBoundingClientRect();
+  dd.style.display  = 'block';
+  dd.style.left     = rect.left + 'px';
+  dd.style.top      = (rect.bottom + 4) + 'px';
+  dd.style.minWidth = rect.width + 'px';
+
+  // scroll highlighted item into view
+  if (acHighlight >= 0) {
+    const el = dd.querySelectorAll('.member-dd-item')[acHighlight];
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function acHide() {
+  const dd = document.getElementById('memberDropdown');
+  if (dd) dd.style.display = 'none';
+  acActiveInput = null;
+  acHighlight   = -1;
+}
+
+function acSelectItem(m) {
+  if (!acActiveInput) return;
+  const display = lang === 'zh'
+    ? (m.level ? `${m.nameZh}, ${m.level}` : m.nameZh)
+    : (m.level ? `${m.nameEn}, ${m.level}` : m.nameEn);
+  acActiveInput.value = display;
+  acActiveInput.dispatchEvent(new Event('input', { bubbles: true }));
+  acHide();
+}
+
+function initAutocomplete() {
+  document.addEventListener('focusin', e => {
+    if (!e.target.classList.contains('member-ac')) { acHide(); return; }
+    acActiveInput = e.target;
+    acHighlight   = -1;
+    acRender();
+  });
+
+  document.addEventListener('input', e => {
+    if (!e.target.classList.contains('member-ac')) return;
+    acActiveInput = e.target;
+    acHighlight   = -1;
+    acRender();
+  });
+
+  document.addEventListener('keydown', e => {
+    const dd = document.getElementById('memberDropdown');
+    if (!dd || dd.style.display === 'none') return;
+    const items = acFilteredItems();
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acHighlight = Math.min(acHighlight + 1, items.length - 1);
+      acRender();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acHighlight = Math.max(acHighlight - 1, -1);
+      acRender();
+    } else if (e.key === 'Enter' && acHighlight >= 0) {
+      e.preventDefault();
+      acSelectItem(items[acHighlight]);
+    } else if (e.key === 'Escape') {
+      acHide();
+    }
+  });
+
+  document.getElementById('memberDropdown').addEventListener('mousedown', e => {
+    e.preventDefault(); // keep focus on input
+    const item = e.target.closest('.member-dd-item');
+    if (!item) return;
+    const items = acFilteredItems();
+    const m = items[parseInt(item.dataset.idx, 10)];
+    if (m) acSelectItem(m);
+  });
+
+  document.addEventListener('focusout', e => {
+    if (!e.target.classList.contains('member-ac')) return;
+    setTimeout(() => {
+      const dd = document.getElementById('memberDropdown');
+      if (dd && !dd.contains(document.activeElement)) acHide();
+    }, 100);
+  });
 }
 
 async function init() {
   await checkAuth();
+  initAutocomplete();
+  fetchMemberDatalist();
 
   // 若 URL 帶 ?id=xxx，直接載入該議程；否則設預設日期
   const urlId = new URLSearchParams(window.location.search).get('id');
   if (urlId) {
     await loadAgenda(parseInt(urlId));
   } else {
-    const today = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    document.getElementById('meetingDate').value =
-      `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-    document.getElementById('timeRange').value        = '19:10 ~ 21:00';
-    document.getElementById('meetingSchedule').value  = 'Meeting on every 1st (中文) and 3rd (English) Tuesday evening';
-    document.getElementById('venueInfo').value        = 'Venue: 鑫喜文創｜台北市信義區忠孝東路五段71巷11弄25號1樓\n（捷運板南線：市政府站4號出口，走路3分鐘）';
-
-    renderSpeechForms();
+    applyDefaultState();
   }
 
   document.querySelector('.form-panel').addEventListener('input', updatePreview);

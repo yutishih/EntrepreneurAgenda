@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>企業家國際演講會｜議程表產生器</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,14 +17,7 @@
   <!-- ===== FORM PANEL ===== -->
   <div class="form-panel">
     <div class="form-header">
-      <div class="form-header-left">
-        <button class="btn-back" onclick="location.href='home.html'">← 首頁</button>
-        <h1>🎤 議程表產生器</h1>
-      </div>
-      <div class="form-header-right">
-        <span id="saveStatus" class="save-status unsaved">○ 未儲存</span>
-        <button id="logoutBtn" class="btn-logout" onclick="doLogout()"></button>
-      </div>
+      <h1>🎤 議程表產生器</h1>
     </div>
 
     <details open>
@@ -77,75 +73,8 @@
           <input type="text" id="timeRange" placeholder="19:10 ~ 21:00">
         </div>
         <div class="form-row">
-          <label>例會說明 Meeting Schedule</label>
-          <textarea rows="2" id="meetingSchedule"></textarea>
-        </div>
-        <div class="form-row">
           <label>場地 Venue</label>
           <textarea rows="3" id="venueInfo"></textarea>
-        </div>
-      </div>
-    </details>
-
-    <details open>
-      <summary>👤 角色分配</summary>
-      <div class="form-section">
-        <div class="form-row">
-          <label>Reception Host <span class="time-hint">18:50</span></label>
-          <input type="text" id="receptionHost" placeholder="Name, Title">
-        </div>
-        <div class="form-row">
-          <label>Calling Meeting to Order <span class="time-hint">1'</span></label>
-          <input type="text" id="callingToOrder" placeholder="Name, Title">
-        </div>
-        <div class="form-row">
-          <label>Welcome Guests &amp; TME 介紹者 <span class="time-hint">2'</span></label>
-          <input type="text" id="welcomeTME" placeholder="Name, Title">
-        </div>
-        <div class="form-row">
-          <label>Toastmaster of the Evening (TME) <span class="time-hint">3'</span></label>
-          <input type="text" id="tme" placeholder="Name, Title">
-        </div>
-        <div class="form-row">
-          <label>Timer 計時員 <span class="time-hint">2'</span></label>
-          <input type="text" id="timer" placeholder="Name, Title">
-        </div>
-        <div class="form-row">
-          <label>Ah-counter 贅語統計員 <span class="time-hint">2'</span></label>
-          <input type="text" id="ahCounter" placeholder="Name, Title">
-        </div>
-      </div>
-    </details>
-
-    <details open>
-      <summary>🎤 準備演講 Prepared Speeches</summary>
-      <div class="form-section">
-        <div id="speechesList"></div>
-        <button class="btn-add" onclick="addSpeech()">+ 新增演講</button>
-      </div>
-    </details>
-
-    <details open>
-      <summary>🎯 桌上即席 Table Topics</summary>
-      <div class="form-section">
-        <div class="form-row">
-          <label>Table Topics Master <span class="time-hint">20'</span></label>
-          <input type="text" id="tableTopicsMaster" placeholder="Name, Title">
-        </div>
-      </div>
-    </details>
-
-    <details open>
-      <summary>📝 評估環節 Evaluation</summary>
-      <div class="form-section">
-        <div class="form-row">
-          <label>General Evaluator 總評 <span class="time-hint">3'~5'</span></label>
-          <input type="text" id="generalEvaluator" placeholder="Name, Title">
-        </div>
-        <div id="evaluatorsList"></div>
-        <div class="form-row">
-          <label>Language Evaluator 語言評估 <span class="time-hint">3'~5'</span></label>
-          <input type="text" id="langEvaluator" placeholder="Name, Title">
         </div>
       </div>
     </details>
@@ -153,7 +82,27 @@
     <details>
       <summary>⏱ 時間設定 Time Settings</summary>
       <div class="form-section">
+        <div class="time-override-row">
+          <div class="time-override-label">總主持人串場 TME hosting</div>
+          <input type="number" id="dur_tmeMins" min="0" max="30" value="4" style="width:60px"
+                 oninput="updateDuration('tmeMins', this.value)"> 分鐘
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">總講評串場 GE hosting</div>
+          <input type="number" id="dur_geMins" min="0" max="30" value="4" style="width:60px"
+                 oninput="updateDuration('geMins', this.value)"> 分鐘
+        </div>
+        <hr style="margin:6px 0;border-color:#ddd">
         <p class="time-override-hint">空白 = 自動計算｜輸入 HH:MM 手動覆蓋</p>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            目標結束 End Time
+            <span id="auto_endTime" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_endTime" maxlength="5" placeholder="21:00"
+                 oninput="updateTimeOverride('endTime', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('endTime')" title="還原自動">⟳</button>
+        </div>
         <div class="time-override-row">
           <div class="time-override-label">
             開幕 Opening
@@ -183,6 +132,15 @@
         </div>
         <div class="time-override-row">
           <div class="time-override-label">
+            中場休息 Intermission
+            <span id="auto_intermissionMins" class="time-auto"></span>
+          </div>
+          <input type="number" id="to_intermissionMins" min="1" style="width:60px"
+                 placeholder="自動" oninput="updateTimeOverride('intermissionMins', this.value)"> 分鐘
+          <button class="btn-time-reset" onclick="resetTimeOverride('intermissionMins')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
             即席演講 Table Topics
             <span id="auto_topicsStart" class="time-auto"></span>
           </div>
@@ -192,7 +150,7 @@
         </div>
         <div class="time-override-row">
           <div class="time-override-label">
-            評估 Evaluation
+            講評 Evaluation
             <span id="auto_evalStart" class="time-auto"></span>
           </div>
           <input type="text" id="to_evalStart" maxlength="5" placeholder="HH:MM"
@@ -221,35 +179,133 @@
     </details>
 
     <details open>
+      <summary>👤 角色分配</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>Reception Host <span class="time-hint">18:50</span></label>
+          <input type="text" id="receptionHost" placeholder="Name, Title" class="member-ac">
+        </div>
+        <div class="form-row">
+          <label>Calling Meeting to Order <span class="time-hint">1'</span></label>
+          <input type="text" id="callingToOrder" placeholder="Name, Title" class="member-ac">
+        </div>
+        <div class="form-row">
+          <label>Welcome Guests &amp; TME 介紹者 <span class="time-hint">2'</span></label>
+          <input type="text" id="welcomeTME" placeholder="Name, Title" class="member-ac">
+        </div>
+        <div class="form-row">
+          <label>Toastmaster of the Evening (TME) <span class="time-hint">3'</span></label>
+          <input type="text" id="tme" placeholder="Name, Title" class="member-ac">
+        </div>
+        <div class="form-row">
+          <label>Timer 計時員 <span class="time-hint">2'</span></label>
+          <input type="text" id="timer" placeholder="Name, Title" class="member-ac">
+        </div>
+        <div class="form-row">
+          <label>Ah-counter 贅語統計員 <span class="time-hint">2'</span></label>
+          <input type="text" id="ahCounter" placeholder="Name, Title" class="member-ac">
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>🎭 多元單元 Variety Session</summary>
+      <div class="form-section">
+        <div class="form-row toggle-row">
+          <label class="toggle-label" for="varietyEnabled">啟用 Enable</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="varietyEnabled" onchange="toggleVariety(this.checked)">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+        <div id="varietyFields" style="display:none">
+          <div class="form-row">
+            <label>主持人 Host</label>
+            <input type="text" id="varietyHost" class="member-ac" placeholder="Name, Title"
+                   oninput="updateVariety('host', this.value)">
+          </div>
+          <div class="form-row">
+            <label>時長 Duration</label>
+            <input type="number" id="varietyDuration" min="1" max="60" value="15" style="width:60px"
+                   oninput="updateVariety('duration', this.value)"> 分鐘
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>🎤 指定演講 Prepared Speeches</summary>
+      <div class="form-section">
+        <div id="speechesList"></div>
+        <button class="btn-add" onclick="addSpeech()">+ 新增演講</button>
+      </div>
+    </details>
+
+    <details open>
+      <summary>🎯 即席問答 Table Topics</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>Table Topics Master <span class="time-hint">20'</span></label>
+          <input type="text" id="tableTopicsMaster" placeholder="Name, Title" class="member-ac">
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>📝 講評環節 Evaluation</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>General Evaluator 總評 <span class="time-hint">3'~5'</span></label>
+          <input type="text" id="generalEvaluator" placeholder="Name, Title" class="member-ac">
+        </div>
+        <div id="evaluatorsList"></div>
+        <div class="form-row" style="margin-top:10px">
+          <label>Language Evaluator 語言講評 <span class="time-hint">3'~5'</span></label>
+          <input type="text" id="langEvaluator" placeholder="Name, Title" class="member-ac">
+        </div>
+      </div>
+    </details>
+
+    <details open>
       <summary>🏆 結束環節 Closing</summary>
       <div class="form-section">
         <div class="form-row">
           <label>Awards Presentation 頒獎 <span class="time-hint">3'</span></label>
-          <input type="text" id="awardsPresenter" placeholder="Name, Title">
+          <input type="text" id="awardsPresenter" placeholder="Name, Title" class="member-ac">
         </div>
         <div class="form-row">
           <label>Sharing &amp; Feedback 分享 <span class="time-hint">5'</span></label>
-          <input type="text" id="sharingFeedback" placeholder="Name, Title">
+          <input type="text" id="sharingFeedback" placeholder="Name, Title" class="member-ac">
         </div>
       </div>
     </details>
 
     <div class="form-actions">
-      <button id="btnSave" class="btn-save" onclick="saveAgenda()">💾 儲存</button>
-      <button class="btn-load" onclick="openLoadModal()">📂 載入</button>
-      <button class="btn-download" onclick="downloadPDF()">⬇ 下載 PDF</button>
-      <button class="btn-print" onclick="window.print()">🖨 列印</button>
-      <button class="btn-reset" onclick="resetForm()">↺ 重設</button>
+      <div class="form-actions-row">
+        <button id="btnSave" class="btn-action btn-action-save" onclick="saveAgenda()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          儲存
+        </button>
+        <button class="btn-action btn-action-load" onclick="openLoadModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          載入
+        </button>
+      </div>
+      <button class="btn-action-reset" onclick="resetForm()">↺ 重設表單</button>
     </div>
   </div>
 
   <!-- ===== PREVIEW PANEL ===== -->
   <div class="preview-panel">
     <div class="preview-toolbar">
-      <span>預覽（即時更新）</span>
-      <div style="display:flex;gap:6px">
+      <span class="toolbar-label">預覽（即時更新）</span>
+      <div class="toolbar-right">
         <button id="langToggle" class="btn-lang" onclick="toggleLang()">切換中文</button>
         <button class="btn-download-sm" onclick="downloadPDF()">⬇ 下載 PDF</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn-toolbar-nav" onclick="location.href='home.html'">← 首頁</button>
+        <span id="saveStatus" class="save-status unsaved">○ 未儲存</span>
+        <button id="logoutBtn" class="btn-logout" onclick="doLogout()"></button>
       </div>
     </div>
     <div class="preview-scroll">
@@ -274,6 +330,7 @@
   </div>
 </div>
 
+<div id="memberDropdown" class="member-dropdown"></div>
 <script src="auth.js"></script>
 <script src="app.js"></script>
 </body>

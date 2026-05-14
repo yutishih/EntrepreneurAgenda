@@ -838,13 +838,27 @@ function equalizeRowHeights() {
   rows.forEach(tr => { tr.style.height = (tr.offsetHeight + addPerRow) + 'px'; });
 }
 
+const MM_TO_PX = 96 / 25.4;
+const PAGE_W_PX = 194 * MM_TO_PX;
+const PAGE_H_PX = 277 * MM_TO_PX;
+
+function applyPreviewScale() {
+  const scroll = document.querySelector('.preview-scroll');
+  const page   = document.getElementById('agendaPreview');
+  if (!scroll || !page) return;
+  const scale = Math.min(1, (scroll.clientWidth - 20) / PAGE_W_PX);
+  page.style.transformOrigin = 'top center';
+  page.style.transform       = scale < 1 ? `scale(${scale})` : '';
+  page.style.marginBottom    = scale < 1 ? `${PAGE_H_PX * (scale - 1)}px` : '';
+}
+
 function updatePreview() {
   const data = collectData();
   const preview = document.getElementById('agendaPreview');
   preview.innerHTML = generateAgendaHTML(data);
   preview.classList.toggle('lang-zh', lang === 'zh');
   preview.classList.toggle('lang-en', lang === 'en');
-  requestAnimationFrame(equalizeRowHeights);
+  requestAnimationFrame(() => { equalizeRowHeights(); applyPreviewScale(); });
   refreshAutoHints();
   setSaveStatus('unsaved');
 }
@@ -1130,6 +1144,14 @@ function downloadPDF() {
 
   const element = document.getElementById('agendaPreview');
 
+  // Remove mobile scale transform so PDF captures full A4 size
+  const savedTransform       = element.style.transform;
+  const savedMarginBottom    = element.style.marginBottom;
+  const savedTransformOrigin = element.style.transformOrigin;
+  element.style.transform       = '';
+  element.style.marginBottom    = '';
+  element.style.transformOrigin = '';
+
   const opt = {
     margin:      [8, 8, 8, 8],
     filename:    `Agenda_${dateStr}_No${data.meetingNo || ''}.pdf`,
@@ -1138,7 +1160,11 @@ function downloadPDF() {
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
   };
 
-  html2pdf().set(opt).from(element).save();
+  html2pdf().set(opt).from(element).save().then(() => {
+    element.style.transform       = savedTransform;
+    element.style.marginBottom    = savedMarginBottom;
+    element.style.transformOrigin = savedTransformOrigin;
+  });
 }
 
 // ================================================================
@@ -1342,6 +1368,35 @@ async function init() {
   document.querySelector('.form-panel').addEventListener('change', updatePreview);
 
   updatePreview();
+  window.addEventListener('resize', applyPreviewScale);
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+function toggleSettingsMenu() {
+  const dd = document.getElementById('settingsDropdown');
+  const btn = dd.querySelector('.btn-settings');
+  const panel = dd.querySelector('.settings-menu-panel');
+  const isOpen = dd.classList.toggle('open');
+  if (isOpen) {
+    const rect = btn.getBoundingClientRect();
+    const panelW = 160;
+    const left = Math.max(8, rect.right - panelW);
+    panel.style.top  = (rect.bottom + 6) + 'px';
+    panel.style.left = left + 'px';
+    panel.style.right = '';
+  }
+}
+
+document.addEventListener('click', e => {
+  const dd = document.getElementById('settingsDropdown');
+  if (dd && !dd.contains(e.target)) dd.classList.remove('open');
+});
+
+function toggleFormPanel() {
+  const panel = document.querySelector('.form-panel');
+  const backdrop = document.getElementById('panelBackdrop');
+  const isOpen = panel.classList.toggle('panel-open');
+  if (backdrop) backdrop.classList.toggle('open', isOpen);
+  setTimeout(applyPreviewScale, 380);
+}

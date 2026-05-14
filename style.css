@@ -19,10 +19,20 @@ body {
   min-width: 300px;
   background: #fff;
   border-right: 1px solid #ddd;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.form-scroll-body {
+  flex: 1;
   overflow-y: auto;
   padding: 14px 14px 0;
-  flex-shrink: 0;
 }
+
+/* Hidden on desktop, shown on mobile */
+.form-toggle-bar { display: none; }
 
 .form-panel h1 {
   font-size: 17px;
@@ -225,15 +235,13 @@ details[open] summary::before { content: "▼ "; }
 
 /* Form actions */
 .form-actions {
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
   padding: 12px 11px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   border-top: 1px solid #eee;
   background: #fafafa;
-  z-index: 10;
 }
 .form-actions-row {
   display: flex;
@@ -282,6 +290,10 @@ details[open] summary::before { content: "▼ "; }
   transition: color 0.15s;
 }
 .btn-action-reset:hover { color: #e63946; }
+
+/* Kept for potential future use; hidden by default */
+.btn-preview-toggle { display: none; }
+.btn-preview-close  { display: none; }
 
 /* ---- Form Header ---- */
 .form-header {
@@ -477,7 +489,8 @@ details[open] summary::before { content: "▼ "; }
   background: #3a3a4e;
   margin: 0 4px;
 }
-.btn-lang {
+.settings-dropdown { position: relative; }
+.btn-settings {
   padding: 4px 11px;
   background: #2a2a42; color: #ddd;
   border: 1px solid #3a3a52;
@@ -485,15 +498,35 @@ details[open] summary::before { content: "▼ "; }
   font-size: 11px; cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.btn-lang:hover { background: #e63946; border-color: #e63946; color: #fff; }
-.btn-download-sm {
-  padding: 4px 11px;
-  background: #e63946; color: #fff;
-  border: none; border-radius: 5px;
-  font-size: 11px; cursor: pointer;
-  transition: background 0.15s;
+.btn-settings:hover,
+.settings-dropdown.open .btn-settings { background: #3a3a52; color: #fff; }
+.settings-menu-panel {
+  display: none;
+  position: fixed;
+  background: #1e1e32;
+  border: 1px solid #3a3a52;
+  border-radius: 8px;
+  min-width: 160px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  z-index: 200;
+  overflow: hidden;
 }
-.btn-download-sm:hover { background: #c1121f; }
+.settings-dropdown.open .settings-menu-panel { display: block; }
+.settings-menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  gap: 16px;
+}
+.settings-menu-item:hover { background: #2a2a42; color: #fff; }
+.settings-menu-item + .settings-menu-item { border-top: 1px solid #2a2a42; }
 .btn-toolbar-nav {
   padding: 4px 11px;
   background: none;
@@ -925,6 +958,87 @@ details[open] summary::before { content: "▼ "; }
   border-radius: 4px;
   padding: 2px 7px;
   white-space: nowrap;
+}
+
+/* ============================================================
+   RESPONSIVE (RWD)
+   ============================================================ */
+@media (max-width: 860px) {
+  /* --- Layout: preview fills full area, panel is fixed overlay --- */
+  .app-layout { position: relative; }
+
+  /* --- Backdrop when panel is open --- */
+  .panel-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 49;
+  }
+  .panel-backdrop.open { display: block; }
+
+  /* --- Form panel: left-side fixed drawer --- */
+  .form-panel {
+    position: fixed;
+    left: 0;
+    top: 54px;
+    height: calc(100vh - 54px);
+    width: 300px;
+    max-width: 80vw;
+    min-width: 0;
+    border-right: 1px solid #ddd;
+    border-bottom: none;
+    flex-shrink: 0;
+    z-index: 50;
+    overflow: visible; /* allow toggle tab to stick out beyond panel edge */
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 16px rgba(0,0,0,0.12);
+  }
+  .form-panel.panel-open { transform: translateX(0); }
+
+  /* --- Toggle tab: sticks out to the right edge of the panel --- */
+  .form-toggle-bar {
+    display: flex;
+    position: absolute;
+    right: -40px;
+    top: 80px;
+    width: 40px;
+    height: 60px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    box-shadow: 3px 0 8px rgba(0,0,0,0.10);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    user-select: none;
+  }
+  .form-toggle-bar span { display: none; }
+  .toggle-chevron { color: #1a1a2e; transform: rotate(-90deg); transition: transform 0.3s ease; }
+  .form-panel.panel-open .toggle-chevron { transform: rotate(90deg); }
+
+  /* --- Scroll body --- */
+  .form-scroll-body { padding: 10px 14px 0; }
+
+  /* --- Preview: fill the entire content area --- */
+  .preview-panel { display: flex; position: static; flex: 1; min-height: 0; }
+  .preview-scroll { padding: 10px; }
+
+  /* --- Modal --- */
+  .modal-box { max-height: 92svh; }
+}
+
+@media (max-width: 480px) {
+  .toolbar-label   { display: none; }
+  .toolbar-sep     { display: none; }
+  .btn-toolbar-nav { display: none; }
+  .toolbar-right   { gap: 4px; }
+  .form-panel h1   { font-size: 15px; }
+  .form-actions-row { flex-direction: column; }
+  .img-upload-row label { width: 78px; font-size: 10px; }
+  .time-override-row input { width: 54px; }
 }
 
 /* ============================================================

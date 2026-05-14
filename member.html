@@ -249,6 +249,28 @@
       cursor: pointer;
     }
     .btn-modal-save:hover { background: #c1121f; }
+
+    @media (max-width: 860px) {
+      .navbar { padding: 0 16px; }
+      .main { padding: 24px 14px; }
+    }
+
+    @media (max-width: 480px) {
+      .navbar-left { gap: 10px; }
+      .navbar-title { font-size: 13px; }
+      .btn-nav-back { font-size: 11px; padding: 4px 8px; }
+      .navbar-user { display: none; }
+      .main { padding: 16px 12px; }
+      .section-header h2 { font-size: 16px; }
+      .member-card { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
+      .mc-actions {
+        width: 100%;
+        justify-content: flex-end;
+        border-top: 1px solid #f0f0f0;
+        padding-top: 8px;
+      }
+      .modal { padding: 22px 18px 18px; }
+    }
   </style>
 </head>
 <body>

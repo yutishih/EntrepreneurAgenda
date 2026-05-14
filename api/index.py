@@ -73,6 +73,41 @@ def init_db():
                 )
             """)
             cur.execute("ALTER TABLE agendas ADD COLUMN IF NOT EXISTS meeting_date DATE")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS members (
+                    id SERIAL PRIMARY KEY,
+                    name_zh VARCHAR(100) NOT NULL,
+                    name_en VARCHAR(100) NOT NULL,
+                    level   VARCHAR(100) NOT NULL DEFAULT 'TM',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            seed = [
+                ("蔡宜容", "Lia Tsai",      "IP5, PM2"),
+                ("郭家瑀", "Jade Kuo",       "DL5"),
+                ("盧柏昌", "Robert Lu",      "DTM"),
+                ("林昌賢", "Lachlan Lin",    "VC4"),
+                ("許耕銘", "Min Hsu",        "TM"),
+                ("蘇彥儒", "Scott Su",       "DTM"),
+                ("顏妙蓁", "Jennifer Yen",   "PM4"),
+                ("葉姵君", "Jill Ye",        "TM"),
+                ("陳凰櫻", "Gloria Chen",    "DTM"),
+                ("簡瑜君", "Jacey Chien",    "VC4"),
+                ("張建民", "Hayden Chang",   "DTM"),
+                ("蘇宇辰", "Tina Su",        "TM"),
+                ("高仲芸", "Phoebe Kao",     "PM5"),
+                ("施友棣", "Yuti Shih",      "IP4"),
+                ("陳婷怡", "Angel Chen",     "TM"),
+                ("張馳",   "Joseph Teo",     "TM"),
+                ("陳濬睿", "Ray Chen",       "TM"),
+            ]
+            for name_zh, name_en, level in seed:
+                cur.execute(
+                    "INSERT INTO members (name_zh, name_en, level)"
+                    " SELECT %s, %s, %s WHERE NOT EXISTS"
+                    " (SELECT 1 FROM members WHERE name_en = %s)",
+                    (name_zh, name_en, level, name_en),
+                )
 
 
 init_db()
@@ -96,6 +131,12 @@ class RegisterRequest(BaseModel):
 
 class AgendaSaveRequest(BaseModel):
     data: Dict[str, Any]
+
+
+class MemberRequest(BaseModel):
+    name_zh: str
+    name_en: str
+    level: str
 
 
 # ------------------------------------------------------------------ helpers
@@ -270,4 +311,69 @@ def delete_agenda(agenda_id: int, credentials: HTTPAuthorizationCredentials = De
             )
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="找不到此議程或無權限")
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ members
+@app.get("/api/members")
+def list_members(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    decode_token(credentials.credentials)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, name_zh, name_en, level FROM members ORDER BY id")
+            rows = cur.fetchall()
+    return [{"id": r[0], "nameZh": r[1], "nameEn": r[2], "level": r[3]} for r in rows]
+
+
+@app.post("/api/members")
+def create_member(req: MemberRequest, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    decode_token(credentials.credentials)
+    if not req.name_zh.strip() or not req.name_en.strip():
+        raise HTTPException(status_code=400, detail="姓名不得為空")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO members (name_zh, name_en, level) VALUES (%s, %s, %s) RETURNING id",
+                (req.name_zh.strip(), req.name_en.strip(), req.level.strip()),
+            )
+            new_id = cur.fetchone()[0]
+    return {"id": new_id}
+
+
+@app.put("/api/members/{member_id}")
+def update_member(member_id: int, req: MemberRequest, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    decode_token(credentials.credentials)
+    if not req.name_zh.strip() or not req.name_en.strip():
+        raise HTTPException(status_code=400, detail="姓名不得為空")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE members SET name_zh=%s, name_en=%s, level=%s WHERE id=%s",
+                (req.name_zh.strip(), req.name_en.strip(), req.level.strip(), member_id),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到此會員")
+    return {"ok": True}
+
+
+@app.delete("/api/members/{member_id}")
+def delete_member(member_id: int, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    decode_token(credentials.credentials)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM members WHERE id=%s", (member_id,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到此會員")
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ dev-only
+@app.delete("/api/dev/users/{username}")
+def delete_user(username: str, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    decode_token(credentials.credentials)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM users WHERE username = %s", (username,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到此使用者")
     return {"ok": True}

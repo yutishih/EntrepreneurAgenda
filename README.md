@@ -16,11 +16,9 @@ EntrepreneurAgenda/
 ├── media/             # 預設圖片（TM Logo、FB QR、LINE QR）
 ├── requirements.txt   # Vercel 用（根目錄）
 ├── vercel.json        # Vercel 路由設定
+├── .env               # 本地環境變數（不進版控）
 ├── api/
-│   └── index.py      # Vercel Serverless FastAPI（正式環境）
-└── backend/
-    ├── main.py        # 本地開發用 FastAPI（含 connection pool）
-    └── .env           # 本地環境變數（不進版控）
+│   └── index.py      # FastAPI（本地開發 & 正式環境共用）
 ```
 
 ## 正式部署（Vercel）
@@ -51,26 +49,31 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 之後每次啟動
 
 ```powershell
 .\venv\Scripts\Activate.ps1
-cd backend
-uvicorn main:app --reload --port 8001
+uvicorn api.index:app --reload --port 8001
 ```
 
 後端跑在 `http://localhost:8001`，啟動時自動建立 / 更新資料表。
 
+| 文件頁面 | 位址 |
+|----------|------|
+| Swagger UI（互動式 API 文件） | http://localhost:8001/docs |
+| ReDoc（純閱讀版 API 文件） | http://localhost:8001/redoc |
+
 ### 本地 .env 設定
 
-在 `backend/.env` 填入：
+在根目錄 `.env` 填入：
 
 ```env
 DATABASE_URL=postgresql://...
 JWT_SECRET=your-secret
+INVITE_CODE=your-invite-code
 ```
 
 ---

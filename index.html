@@ -321,10 +321,17 @@
       <h3>📂 載入議程</h3>
       <button class="modal-close" onclick="closeLoadModal()">✕</button>
     </div>
-    <div class="modal-search">
-      <input type="date" id="agendaDateFilter" placeholder="篩選日期"
-             onchange="fetchAgendaList(this.value)">
-      <button class="btn-clear-filter" onclick="document.getElementById('agendaDateFilter').value=''; fetchAgendaList('')">全部</button>
+    <div class="modal-cal">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calPrevMonth()">&#8249;</button>
+        <span id="calMonthLabel" class="cal-month-label"></span>
+        <button class="cal-nav-btn" onclick="calNextMonth()">&#8250;</button>
+        <button class="btn-cal-all" onclick="calClearFilter()">全部</button>
+      </div>
+      <div class="cal-weekdays">
+        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+      </div>
+      <div id="calendarGrid" class="cal-grid"></div>
     </div>
     <div id="agendaListBody" class="agenda-list-body"></div>
   </div>

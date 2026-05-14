@@ -171,6 +171,21 @@
       padding: 40px;
       font-size: 14px;
     }
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 0;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #e8e8e8;
+      border-top-color: #e63946;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ---- Modal ---- */
     .modal-overlay {
@@ -260,7 +275,7 @@
   </div>
 
   <div id="memberGrid" class="member-grid">
-    <p class="empty-msg">載入中…</p>
+    <div class="loading-spinner"><div class="spinner"></div></div>
   </div>
 </main>
 
@@ -312,6 +327,7 @@
   }
 
   async function fetchMembers() {
+    document.getElementById('memberGrid').innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
     try {
       const res = await fetch(`${API_BASE}/api/members`, {
         headers: { Authorization: `Bearer ${getToken()}` },

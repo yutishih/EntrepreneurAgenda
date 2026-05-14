@@ -925,15 +925,127 @@ async function saveAgenda() {
   }
 }
 
+// ================================================================
+// LOAD MODAL CALENDAR
+// ================================================================
+let calYear     = new Date().getFullYear();
+let calMonth    = new Date().getMonth(); // 0-based
+let calSelected = '';
+let calDates    = new Set(); // 'YYYY-MM-DD' strings with at least one agenda
+
+async function fetchCalDates() {
+  try {
+    const res = await fetch(`${API_BASE}/api/agendas?limit=500`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) return;
+    const { items } = await res.json();
+    calDates = new Set(items.map(i => i.meetingDate).filter(d => d && d.includes('-')));
+    renderCalendar();
+  } catch { /* ignore */ }
+}
+
+function renderCalendar() {
+  const label = document.getElementById('calMonthLabel');
+  const grid  = document.getElementById('calendarGrid');
+  if (!label || !grid) return;
+
+  label.textContent = `${calYear} 年 ${calMonth + 1} 月`;
+
+  const today       = new Date().toISOString().slice(0, 10);
+  const firstDow    = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  let html = '';
+  for (let i = 0; i < firstDow; i++) html += '<div class="cal-day cal-empty"></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds  = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dot = calDates.has(ds) ? '<span class="cal-dot"></span>' : '';
+    let cls   = 'cal-day';
+    if (ds === calSelected)   cls += ' cal-sel';
+    else if (ds === today)    cls += ' cal-today';
+    html += `<div class="${cls}" onclick="calSelectDate('${ds}')"><span>${d}</span>${dot}</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function calPrevMonth() {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  calSelected = '';
+  renderCalendar();
+  fetchAgendaListByMonth(calYear, calMonth);
+}
+
+function calNextMonth() {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  calSelected = '';
+  renderCalendar();
+  fetchAgendaListByMonth(calYear, calMonth);
+}
+
+function calSelectDate(dateStr) {
+  calSelected = dateStr;
+  renderCalendar();
+  fetchAgendaList(dateStr);
+}
+
+function calClearFilter() {
+  calSelected = '';
+  renderCalendar();
+  fetchAgendaListByMonth(calYear, calMonth);
+}
+
+async function fetchAgendaListByMonth(year, month) {
+  const list = document.getElementById('agendaListBody');
+  list.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+  try {
+    const res = await fetch(`${API_BASE}/api/agendas?limit=500`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new Error('無法取得列表');
+    const { items } = await res.json();
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const filtered = items.filter(i => (i.meetingDate || '').startsWith(prefix));
+    if (!filtered.length) {
+      list.innerHTML = '<p class="agenda-list-empty">本月尚無議程</p>';
+      return;
+    }
+    list.innerHTML = filtered.map(item => {
+      const label = [
+        item.meetingDate || '—',
+        item.meetingNo   ? `No.${item.meetingNo}` : '',
+        item.meetingTheme || '',
+      ].filter(Boolean).join('  ·  ');
+      const ts = item.updatedAt ? new Date(item.updatedAt).toLocaleString('zh-TW') : '';
+      return `
+        <div class="agenda-list-item" onclick="loadAgenda(${item.id})">
+          <div class="ali-main">${label}</div>
+          <div class="ali-meta">${ts}</div>
+          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">🗑</button>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<p class="agenda-list-empty">${e.message}</p>`;
+  }
+}
+
 async function openLoadModal() {
+  const now = new Date();
+  calYear    = now.getFullYear();
+  calMonth   = now.getMonth();
+  calSelected = '';
   document.getElementById('loadModal').style.display = 'flex';
-  document.getElementById('agendaDateFilter').value = '';
-  await fetchAgendaList('');
+  renderCalendar();
+  fetchCalDates(); // async, dots appear once loaded
+  await fetchAgendaListByMonth(calYear, calMonth);
 }
 
 async function fetchAgendaList(date) {
   const list = document.getElementById('agendaListBody');
-  list.innerHTML = '<p class="agenda-list-empty">載入中...</p>';
+  list.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
   try {
     const url = date ? `${API_BASE}/api/agendas?date=${date}&limit=100` : `${API_BASE}/api/agendas?limit=100`;
     const res  = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });

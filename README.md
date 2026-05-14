@@ -10,6 +10,7 @@ EntrepreneurAgenda/
 ├── login.html         # 登入 / 註冊頁面
 ├── home.html          # 議程管理首頁（列表、新增、刪除）
 ├── index.html         # 議程表產生器（需登入）
+├── member.html        # 會員管理頁面
 ├── app.js
 ├── style.css
 ├── media/             # 預設圖片（TM Logo、FB QR、LINE QR）
@@ -31,7 +32,8 @@ EntrepreneurAgenda/
 | Key | Value |
 |-----|-------|
 | `DATABASE_URL` | Neon PostgreSQL 連線字串 |
-| `JWT_SECRET` | 隨機產生的密鑰字串 |
+| `JWT_SECRET` | 隨機產生的密鑰字串（用於簽名與驗證 JWT token，勿外洩） |
+| `INVITE_CODE` | 註冊時需填入的邀請碼 |
 
 ### 2. 部署
 
@@ -80,6 +82,7 @@ JWT_SECRET=your-secret
 | `login.html` | 登入 / 註冊，成功後跳轉至 `home.html` |
 | `home.html` | 議程管理首頁，顯示所有已儲存議程，可新增或刪除 |
 | `index.html` | 議程表產生器，填寫內容後即時預覽並可匯出 PDF |
+| `member.html` | 會員管理，管理會議成員資料 |
 
 `auth.js` 會自動偵測環境：
 - **本地**（localhost）→ `http://localhost:8001`
@@ -107,6 +110,15 @@ JWT_SECRET=your-secret
 | PUT    | `/api/agendas/{id}` | 更新議程 |
 | DELETE | `/api/agendas/{id}` | 刪除議程 |
 
+### 會員管理（需 Bearer Token）
+
+| 方法 | 路徑 | 說明 |
+|------|------|------|
+| GET    | `/api/members` | 取得所有會員列表 |
+| POST   | `/api/members` | 新增會員（需填中英文姓名與職級） |
+| PUT    | `/api/members/{id}` | 更新會員資料 |
+| DELETE | `/api/members/{id}` | 刪除會員 |
+
 ---
 
 ## 資料庫 Schema
@@ -128,5 +140,13 @@ CREATE TABLE agendas (
     meeting_date DATE,
     created_at   TIMESTAMPTZ DEFAULT NOW(),
     updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE members (
+    id         SERIAL PRIMARY KEY,
+    name_zh    VARCHAR(100) NOT NULL,
+    name_en    VARCHAR(100) NOT NULL,
+    level      VARCHAR(100) NOT NULL DEFAULT 'TM',
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```

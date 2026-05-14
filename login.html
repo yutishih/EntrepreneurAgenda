@@ -176,6 +176,11 @@
     <div class="login-field">
       <label>密碼（至少 6 字元）</label>
       <input type="password" id="registerPassword" placeholder="請輸入密碼"
+             onkeydown="if(event.key==='Enter') document.getElementById('registerInviteCode').focus()">
+    </div>
+    <div class="login-field">
+      <label>邀請碼</label>
+      <input type="text" id="registerInviteCode" placeholder="請輸入邀請碼"
              onkeydown="if(event.key==='Enter') doRegister()">
     </div>
     <div id="registerError" class="login-error"></div>
@@ -237,23 +242,25 @@
   }
 
   async function doRegister() {
-    const username = document.getElementById('registerUsername').value.trim();
-    const name_en  = document.getElementById('registerNameEn').value.trim();
-    const name_zh  = document.getElementById('registerNameZh').value.trim();
-    const password = document.getElementById('registerPassword').value;
-    const errorEl  = document.getElementById('registerError');
-    const btn      = document.getElementById('btnRegister');
+    const username    = document.getElementById('registerUsername').value.trim();
+    const name_en     = document.getElementById('registerNameEn').value.trim();
+    const name_zh     = document.getElementById('registerNameZh').value.trim();
+    const password    = document.getElementById('registerPassword').value;
+    const invite_code = document.getElementById('registerInviteCode').value.trim();
+    const errorEl     = document.getElementById('registerError');
+    const btn         = document.getElementById('btnRegister');
     errorEl.textContent = '';
     if (!username || !password) { errorEl.textContent = '請填寫帳號和密碼'; return; }
     if (!name_en) { errorEl.textContent = '請輸入英文姓名'; return; }
     if (!name_zh) { errorEl.textContent = '請輸入中文姓名'; return; }
+    if (!invite_code) { errorEl.textContent = '請輸入邀請碼'; return; }
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>處理中...';
     try {
       const res  = await fetch(`${API_BASE}/api/auth/register`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ username, password, name_en, name_zh }),
+        body:    JSON.stringify({ username, password, name_en, name_zh, invite_code }),
       });
       const data = await res.json();
       if (!res.ok) { errorEl.textContent = data.detail || '註冊失敗'; return; }

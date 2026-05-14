@@ -20,6 +20,7 @@ load_dotenv()
 _raw_url = os.getenv("DATABASE_URL", "")
 DATABASE_URL = re.sub(r"[&?]channel_binding=[^&]*", "", _raw_url)
 JWT_SECRET = os.getenv("JWT_SECRET", "please-change-this-secret")
+INVITE_CODE = os.getenv("INVITE_CODE", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
 
@@ -90,6 +91,7 @@ class RegisterRequest(BaseModel):
     password: str
     name_en: str
     name_zh: str
+    invite_code: str
 
 
 class AgendaSaveRequest(BaseModel):
@@ -135,6 +137,8 @@ def login(req: LoginRequest):
 
 @app.post("/api/auth/register")
 def register(req: RegisterRequest):
+    if not INVITE_CODE or req.invite_code != INVITE_CODE:
+        raise HTTPException(status_code=403, detail="邀請碼錯誤")
     if len(req.username) < 3:
         raise HTTPException(status_code=400, detail="帳號至少需要 3 個字元")
     if len(req.password) < 6:

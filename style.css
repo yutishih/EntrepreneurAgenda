@@ -984,7 +984,7 @@ details[open] summary::before { content: "▼ "; }
     left: 0;
     top: 54px;
     height: calc(100vh - 54px);
-    width: 300px;
+    width: 280px;
     max-width: 80vw;
     min-width: 0;
     border-right: 1px solid #ddd;

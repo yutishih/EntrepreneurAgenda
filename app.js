@@ -1038,7 +1038,7 @@ async function fetchAgendaListByMonth(year, month) {
         <div class="agenda-list-item" onclick="loadAgenda(${item.id})">
           <div class="ali-main">${label}</div>
           <div class="ali-meta">${ts}</div>
-          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">刪</button>
+          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)" title="刪除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
         </div>`;
     }).join('');
   } catch (e) {
@@ -1080,7 +1080,7 @@ async function fetchAgendaList(date) {
         <div class="agenda-list-item" onclick="loadAgenda(${item.id})">
           <div class="ali-main">${label}</div>
           <div class="ali-meta">${ts}</div>
-          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">刪</button>
+          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)" title="刪除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
         </div>`;
     }).join('');
   } catch (e) {
@@ -1372,6 +1372,10 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+function toggleActionsMenu() {
+  document.querySelector('.form-actions').classList.toggle('actions-open');
+}
 
 function toggleSettingsMenu() {
   const dd = document.getElementById('settingsDropdown');

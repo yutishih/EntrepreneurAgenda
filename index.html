@@ -289,17 +289,23 @@
 
     </div><!-- /.form-scroll-body -->
     <div class="form-actions">
-      <div class="form-actions-row">
-        <button id="btnSave" class="btn-action btn-action-save" onclick="saveAgenda()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          儲存
-        </button>
-        <button class="btn-action btn-action-load" onclick="openLoadModal()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          載入
-        </button>
+      <div class="form-actions-menu">
+        <div class="form-actions-row">
+          <button id="btnSave" class="btn-action btn-action-save" onclick="saveAgenda()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            儲存
+          </button>
+          <button class="btn-action btn-action-load" onclick="openLoadModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            載入
+          </button>
+        </div>
+        <button class="btn-action-reset" onclick="resetForm()">↺ 重設表單</button>
       </div>
-      <button class="btn-action-reset" onclick="resetForm()">↺ 重設表單</button>
+      <div class="form-actions-trigger" onclick="toggleActionsMenu()">
+        <span>功能列表</span>
+        <svg class="actions-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+      </div>
     </div>
   </div>
 

@@ -238,13 +238,16 @@ details[open] summary::before { content: "▼ "; }
 /* Form actions */
 .form-actions {
   flex-shrink: 0;
-  padding: 12px 11px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   border-top: 1px solid #eee;
   background: #fafafa;
 }
+.form-actions-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 11px 14px;
+}
+.form-actions-trigger { display: none; }
 .form-actions-row {
   display: flex;
   gap: 8px;
@@ -983,7 +986,7 @@ details[open] summary::before { content: "▼ "; }
     position: fixed;
     left: 0;
     top: 54px;
-    height: calc(100vh - 54px);
+    height: calc(100dvh - 54px);
     width: 280px;
     max-width: 80vw;
     min-width: 0;
@@ -1024,9 +1027,42 @@ details[open] summary::before { content: "▼ "; }
   /* --- Scroll body --- */
   .form-scroll-body { padding: 10px 14px 0; }
 
+  /* --- Form actions: collapsible upward menu --- */
+  .form-actions-menu {
+    overflow: hidden;
+    max-height: 0;
+    padding: 0 11px;
+    gap: 0;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                padding   0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                gap       0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .form-actions.actions-open .form-actions-menu {
+    max-height: 180px;
+    padding: 10px 11px 8px;
+    gap: 8px;
+  }
+  .form-actions-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 46px;
+    padding: 0 14px;
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+    user-select: none;
+    border-top: 1px solid #eee;
+  }
+  .actions-chevron { color: #aaa; transition: transform 0.3s ease; }
+  .form-actions.actions-open .actions-chevron { transform: rotate(180deg); }
+
   /* --- Preview: fill the entire content area --- */
   .preview-panel { display: flex; position: static; flex: 1; min-height: 0; }
   .preview-scroll { padding: 10px; overflow-x: hidden; }
+  .preview-toolbar { position: sticky; top: 0; z-index: 11; }
 
   /* --- Modal --- */
   .modal-box { max-height: 92svh; }
@@ -1039,7 +1075,8 @@ details[open] summary::before { content: "▼ "; }
   .toolbar-right   { gap: 4px; }
   .form-panel h1   { font-size: 15px; }
   .form-actions-row { flex-direction: column; }
-  .img-upload-row label { width: 78px; font-size: 10px; }
+  .img-upload-row { flex-wrap: wrap; }
+  .img-upload-row label { width: 100%; font-size: 11px; margin-bottom: 2px; }
   .time-override-row input { width: 54px; }
 }
 

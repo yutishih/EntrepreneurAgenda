@@ -3,6 +3,8 @@
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { overflow-x: hidden; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei",
                "PingFang TC", sans-serif;
@@ -1024,7 +1026,7 @@ details[open] summary::before { content: "▼ "; }
 
   /* --- Preview: fill the entire content area --- */
   .preview-panel { display: flex; position: static; flex: 1; min-height: 0; }
-  .preview-scroll { padding: 10px; }
+  .preview-scroll { padding: 10px; overflow-x: hidden; }
 
   /* --- Modal --- */
   .modal-box { max-height: 92svh; }

@@ -579,9 +579,9 @@ function buildHeader(data) {
     <div>${t('fee')} : NTD150</div>
   </div>
   <div class="hg-meta-right">
-    <span class="hmr-icon">⏰</span><div class="hmr-text"><strong>Time : ${dateDisplay} ｜ ${esc(data.timeRange)}</strong></div>
-    <span class="hmr-icon">📅</span><div class="hmr-text">${t('meetingSchedule')}</div>
-    <span class="hmr-icon">📍</span><div class="hmr-text">${esc(data.venueInfo).replace(/\n/g, '<br>')}</div>
+    <div class="hmr-text" style="grid-column:span 2"><strong>Time : ${dateDisplay} ｜ ${esc(data.timeRange)}</strong></div>
+    <div class="hmr-text" style="grid-column:span 2">${t('meetingSchedule')}</div>
+    <div class="hmr-text" style="grid-column:span 2">${esc(data.venueInfo).replace(/\n/g, '<br>')}</div>
   </div>
 </div>`;
 }
@@ -916,10 +916,10 @@ async function saveAgenda() {
     if (!res.ok) throw new Error((await res.json()).detail || '儲存失敗');
     setSaveStatus('saved');
     btn.textContent = '✓ 已儲存';
-    setTimeout(() => { btn.textContent = '💾 儲存'; }, 2000);
+    setTimeout(() => { btn.textContent = '儲存'; }, 2000);
   } catch (e) {
     alert(e.message);
-    btn.textContent = '💾 儲存';
+    btn.textContent = '儲存';
   } finally {
     btn.disabled = false;
   }
@@ -1024,7 +1024,7 @@ async function fetchAgendaListByMonth(year, month) {
         <div class="agenda-list-item" onclick="loadAgenda(${item.id})">
           <div class="ali-main">${label}</div>
           <div class="ali-meta">${ts}</div>
-          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">🗑</button>
+          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">刪</button>
         </div>`;
     }).join('');
   } catch (e) {
@@ -1066,7 +1066,7 @@ async function fetchAgendaList(date) {
         <div class="agenda-list-item" onclick="loadAgenda(${item.id})">
           <div class="ali-main">${label}</div>
           <div class="ali-meta">${ts}</div>
-          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">🗑</button>
+          <button class="ali-del" onclick="event.stopPropagation(); deleteAgenda(${item.id}, this)">刪</button>
         </div>`;
     }).join('');
   } catch (e) {

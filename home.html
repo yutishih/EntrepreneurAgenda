@@ -311,7 +311,7 @@
 <body>
 
 <nav class="navbar">
-  <div class="navbar-title">🎤 <span>企業家</span>國際演講會｜議程表產生器</div>
+  <div class="navbar-title"><span>企業家</span>國際演講會｜議程表產生器</div>
   <div class="navbar-right">
     <span id="navUser" class="navbar-user"></span>
     <button class="btn-nav-logout" onclick="doLogout()">登出</button>
@@ -334,7 +334,7 @@
       <h2>會員管理</h2>
       <p>新增、編輯或移除俱樂部會員名單</p>
     </div>
-    <button class="btn-new" style="background:#2a9d8f" onmouseover="this.style.background='#21867a'" onmouseout="this.style.background='#2a9d8f'" onclick="location.href='member.html'">👥 會員管理</button>
+    <button class="btn-new" style="background:#2a9d8f" onmouseover="this.style.background='#21867a'" onmouseout="this.style.background='#2a9d8f'" onclick="location.href='member.html'">會員管理</button>
   </div>
 
   <!-- Past Agendas -->
@@ -498,7 +498,7 @@
             </div>
             <div class="ac-actions">
               <button class="btn-edit" onclick="event.stopPropagation(); editAgenda(${item.id})">編輯</button>
-              <button class="btn-del"  onclick="event.stopPropagation(); deleteItem(${item.id}, this)">🗑</button>
+              <button class="btn-del"  onclick="event.stopPropagation(); deleteItem(${item.id}, this)">刪除</button>
             </div>
           </div>`;
       }).join('');

@@ -1,6 +1,6 @@
 # EntrepreneurAgenda
 
-企業家國際演講會議程表產生器，含登入系統與議程雲端管理。
+企業家國際演講會 Club Management 系統，含登入、議程管理、會員管理與圖片雲端儲存。
 
 ## 專案結構
 
@@ -8,13 +8,13 @@
 EntrepreneurAgenda/
 ├── auth.js            # 共用 auth 工具（API_BASE 自動偵測環境）
 ├── login.html         # 登入 / 註冊頁面
-├── home.html          # 議程管理首頁（列表、新增、刪除）
+├── home.html          # 會務管理首頁（Dashboard 版型）
 ├── index.html         # 議程表產生器（需登入）
 ├── member.html        # 會員管理頁面
-├── app.js
-├── style.css
-├── media/             # 預設圖片（TM Logo、FB QR、LINE QR）
-├── requirements.txt   # Vercel 用（根目錄）
+├── app.js             # 議程產生器主邏輯
+├── style.css          # 議程產生器樣式
+├── media/             # 靜態圖片（TM Logo、FB QR、LINE QR）
+├── requirements.txt   # Python 套件（Vercel 用）
 ├── vercel.json        # Vercel 路由設定
 ├── .env               # 本地環境變數（不進版控）
 ├── api/
@@ -30,12 +30,17 @@ EntrepreneurAgenda/
 | Key | Value |
 |-----|-------|
 | `DATABASE_URL` | Neon PostgreSQL 連線字串 |
-| `JWT_SECRET` | 隨機產生的密鑰字串（用於簽名與驗證 JWT token，勿外洩） |
+| `JWT_SECRET` | 隨機產生的密鑰字串 |
 | `INVITE_CODE` | 註冊時需填入的邀請碼 |
+| `R2_ACCOUNT_ID` | Cloudflare 帳號 ID |
+| `R2_ACCESS_KEY_ID` | R2 API Token Access Key ID |
+| `R2_SECRET_ACCESS_KEY` | R2 API Token Secret |
+| `R2_BUCKET_NAME` | R2 Bucket 名稱 |
+| `R2_PUBLIC_URL` | R2 Public Development URL（`https://pub-xxx.r2.dev`） |
 
 ### 2. 部署
 
-Push 到 GitHub，Vercel 自動部署。`/api/*` 的請求會透過 `vercel.json` 路由至 `api/index.py`。
+Push 到 GitHub，Vercel 自動部署。`/api/*` 的請求透過 `vercel.json` 路由至 `api/index.py`。
 
 ---
 
@@ -44,9 +49,7 @@ Push 到 GitHub，Vercel 自動部署。`/api/*` 的請求會透過 `vercel.json
 ### 第一次設定
 
 ```powershell
-# 若 PowerShell 不允許執行 .ps1，先執行一次：
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -59,22 +62,49 @@ pip install -r requirements.txt
 uvicorn api.index:app --reload --port 8001
 ```
 
-後端跑在 `http://localhost:8001`，啟動時自動建立 / 更新資料表。
+後端跑在 `http://localhost:8001`。
 
 | 文件頁面 | 位址 |
 |----------|------|
-| Swagger UI（互動式 API 文件） | http://localhost:8001/docs |
-| ReDoc（純閱讀版 API 文件） | http://localhost:8001/redoc |
+| Swagger UI | http://localhost:8001/docs |
+| ReDoc | http://localhost:8001/redoc |
 
 ### 本地 .env 設定
-
-在根目錄 `.env` 填入：
 
 ```env
 DATABASE_URL=postgresql://...
 JWT_SECRET=your-secret
 INVITE_CODE=your-invite-code
+R2_ACCOUNT_ID=your-account-id
+R2_ACCESS_KEY_ID=your-access-key
+R2_SECRET_ACCESS_KEY=your-secret-key
+R2_BUCKET_NAME=your-bucket-name
+R2_PUBLIC_URL=https://pub-xxx.r2.dev
 ```
+
+---
+
+## Cloudflare R2 設定
+
+主題圖片透過 R2 儲存，需完成以下設定：
+
+1. 建立 R2 Bucket，開啟 **Public Development URL**
+2. 建立 R2 API Token（權限：**Object Read & Write**）
+3. 在 Bucket **Settings → CORS Policy** 加入：
+
+```json
+[
+  {
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+圖片命名規則：`media/{會議日期}_No{編號}_{時間}.{副檔名}`
+（例：`media/2026-05-20_No280_213022.jpg`）
 
 ---
 
@@ -83,9 +113,9 @@ INVITE_CODE=your-invite-code
 | 頁面 | 說明 |
 |------|------|
 | `login.html` | 登入 / 註冊，成功後跳轉至 `home.html` |
-| `home.html` | 議程管理首頁，顯示所有已儲存議程，可新增或刪除 |
-| `index.html` | 議程表產生器，填寫內容後即時預覽並可匯出 PDF |
-| `member.html` | 會員管理，管理會議成員資料 |
+| `home.html` | 會務管理 Dashboard，含統計卡片、議程列表、日期篩選 |
+| `index.html` | 議程表產生器，即時預覽並可匯出 PDF / JPG |
+| `member.html` | 會員管理，新增、編輯、搜尋、移除會員 |
 
 `auth.js` 會自動偵測環境：
 - **本地**（localhost）→ `http://localhost:8001`
@@ -99,17 +129,17 @@ INVITE_CODE=your-invite-code
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
-| POST | `/api/auth/register` | 註冊（帳號 ≥ 3 字元，密碼 ≥ 6 字元，需填英中文姓名） |
+| POST | `/api/auth/register` | 註冊（需邀請碼） |
 | POST | `/api/auth/login` | 登入，回傳 JWT token（有效期 24 小時） |
-| GET  | `/api/auth/verify` | 驗證 token 是否有效 |
+| GET  | `/api/auth/verify` | 驗證 token |
 
 ### 議程管理（需 Bearer Token）
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
-| GET    | `/api/agendas` | 取得議程列表（支援 `date`、`page`、`limit` 查詢參數） |
+| GET    | `/api/agendas` | 取得議程列表（支援 `date`、`page`、`limit`） |
 | POST   | `/api/agendas` | 新增議程 |
-| GET    | `/api/agendas/{id}` | 取得單一議程完整資料 |
+| GET    | `/api/agendas/{id}` | 取得單一議程 |
 | PUT    | `/api/agendas/{id}` | 更新議程 |
 | DELETE | `/api/agendas/{id}` | 刪除議程 |
 
@@ -117,10 +147,16 @@ INVITE_CODE=your-invite-code
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
-| GET    | `/api/members` | 取得所有會員列表 |
-| POST   | `/api/members` | 新增會員（需填中英文姓名與職級） |
-| PUT    | `/api/members/{id}` | 更新會員資料 |
+| GET    | `/api/members` | 取得所有會員 |
+| POST   | `/api/members` | 新增會員 |
+| PUT    | `/api/members/{id}` | 更新會員 |
 | DELETE | `/api/members/{id}` | 刪除會員 |
+
+### 圖片上傳（需 Bearer Token）
+
+| 方法 | 路徑 | 說明 |
+|------|------|------|
+| POST | `/api/upload/presign` | 取得 R2 Presigned URL（前端直傳） |
 
 ---
 
@@ -153,3 +189,5 @@ CREATE TABLE members (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
+
+議程的 `data` JSONB 欄位包含 `themeImgUrl`，用於儲存 R2 主題圖片的公開網址。

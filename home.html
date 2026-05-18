@@ -474,17 +474,35 @@
       .sidebar-user { padding: 6px; justify-content: center; }
       .btn-logout-sidebar { display: none; }
       .main-area { margin-left: 64px; }
+      .topbar { padding: 0 20px; }
+      .content { padding: 20px; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      table.agenda-list th { padding: 10px 12px; }
+      table.agenda-list td { padding: 12px 12px; }
     }
 
     @media (max-width: 640px) {
       .stats-row { grid-template-columns: 1fr; }
       .content { padding: 16px; }
-      .topbar { padding: 0 16px; }
-      .topbar-title { font-size: 14px; }
+      .topbar { padding: 0 12px; height: 50px; }
+      .topbar-title { font-size: 13px; }
+      .btn-primary { padding: 6px 12px; font-size: 12px; gap: 4px; }
       table.agenda-list th:nth-child(3),
       table.agenda-list td:nth-child(3),
       table.agenda-list th:nth-child(4),
       table.agenda-list td:nth-child(4) { display: none; }
+      table.agenda-list td { padding: 10px 10px; }
+      .td-theme { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .btn-edit-row { padding: 4px 10px; font-size: 11px; margin-right: 4px; }
+      .pg-btn { min-width: 28px; height: 28px; font-size: 11px; }
+      .cal-panel { width: min(224px, 88vw) !important; }
+    }
+
+    @media (max-width: 480px) {
+      .stat-card { padding: 14px 16px; }
+      .stat-value { font-size: 22px; }
+      .pg-info { display: none; }
+      .pagination { justify-content: center; }
     }
   </style>
 </head>
@@ -747,8 +765,10 @@
     const open  = !panel.classList.contains('open');
     if (open) {
       const rect = btn.getBoundingClientRect();
-      panel.style.top  = (rect.bottom + 6) + 'px';
-      panel.style.right = (window.innerWidth - rect.right) + 'px';
+      const panelW = Math.min(224, window.innerWidth * 0.88);
+      panel.style.top   = (rect.bottom + 6) + 'px';
+      panel.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+      panel.style.left  = 'auto';
     }
     panel.classList.toggle('open', open);
     btn.classList.toggle('active', open);

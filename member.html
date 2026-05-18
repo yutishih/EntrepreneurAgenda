@@ -131,7 +131,7 @@
     ================================================================ */
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 16px;
       margin-bottom: 28px;
     }
@@ -153,6 +153,40 @@
     .stat-body { flex: 1; }
     .stat-value { font-size: 26px; font-weight: 700; color: #0f172a; line-height: 1; }
     .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+    /* ================================================================
+       LEVEL CHART CARD
+    ================================================================ */
+    .chart-card {
+      background: #fff; border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      overflow: hidden;
+      margin-bottom: 28px;
+    }
+    .chart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .chart-title { font-size: 14px; font-weight: 700; color: #0f172a; }
+    .chart-subtitle { font-size: 12px; color: #94a3b8; }
+    .chart-body {
+      padding: 20px 24px 16px;
+      height: 220px;
+      position: relative;
+    }
+    .level-legend {
+      display: flex; flex-wrap: wrap; gap: 10px 20px;
+      padding: 0 24px 18px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: #64748b;
+    }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+    }
 
     /* ================================================================
        MEMBER TABLE CARD
@@ -335,13 +369,34 @@
       .sidebar-user { padding: 6px; justify-content: center; }
       .btn-logout-sidebar { display: none; }
       .main-area { margin-left: 64px; }
+      .topbar { padding: 0 20px; }
+      .content { padding: 20px; }
+      table.member-list th { padding: 10px 12px; }
+      table.member-list td { padding: 12px 12px; }
     }
     @media (max-width: 640px) {
       .stats-row { grid-template-columns: 1fr; }
       .content { padding: 16px; }
-      .topbar { padding: 0 16px; }
+      .topbar { padding: 0 12px; height: 50px; }
+      .topbar-title { font-size: 13px; }
+      .btn-primary { padding: 6px 12px; font-size: 12px; gap: 4px; }
       table.member-list th:nth-child(3),
       table.member-list td:nth-child(3) { display: none; }
+      table.member-list td { padding: 10px 10px; }
+      .search-input { max-width: 100%; }
+      .chart-body { height: 160px; }
+      .level-legend { gap: 8px 12px; padding: 0 16px 12px; }
+      .legend-item { font-size: 10px; }
+      .level-badge { white-space: normal; word-break: break-word; }
+      .mc-name-zh { font-size: 12px; }
+      .mc-name-en { font-size: 11px; }
+    }
+    @media (max-width: 480px) {
+      .stat-card { padding: 14px 16px; }
+      .stat-value { font-size: 22px; }
+      .modal { padding: 20px 16px 16px; }
+      .modal-actions { flex-direction: column; }
+      .btn-modal-cancel, .btn-modal-save { width: 100%; text-align: center; }
     }
   </style>
 </head>
@@ -419,15 +474,18 @@
           <div class="stat-label">DTM 會員</div>
         </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon red">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div class="stat-body">
-          <div class="stat-value" id="statTm">—</div>
-          <div class="stat-label">一般 TM</div>
-        </div>
+    </div>
+
+    <!-- Level Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">等級分布</span>
+        <span class="chart-subtitle" id="chartSubtitle"></span>
       </div>
+      <div class="chart-body">
+        <canvas id="levelChart"></canvas>
+      </div>
+      <div class="level-legend" id="levelLegend"></div>
     </div>
 
     <!-- Member table -->
@@ -489,10 +547,30 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="auth.js"></script>
 <script>
   let members = [];
   let editingId = null;
+  let levelChart = null;
+
+  const LEVEL_CONFIG = [
+    { key: 'TM',  label: 'TM',      color: '#a9b2b1' },
+    { key: 'L1',  label: 'Level 1', color: '#93c5fd' },
+    { key: 'L2',  label: 'Level 2', color: '#60a5fa' },
+    { key: 'L3',  label: 'Level 3', color: '#3b82f6' },
+    { key: 'L4',  label: 'Level 4', color: '#004165' },
+    { key: 'L5',  label: 'Level 5', color: '#f2df74' },
+    { key: 'DTM', label: 'DTM',     color: '#772432' },
+  ];
+
+  function parseLevel(level) {
+    const s = level.toUpperCase();
+    if (s.includes('DTM')) return 'DTM';
+    const nums = s.match(/[1-5]/g);
+    if (nums) return 'L' + Math.max(...nums.map(Number));
+    return 'TM';
+  }
 
   async function init() {
     const token = getToken();
@@ -535,8 +613,75 @@
     document.getElementById('statTotal').textContent = members.length;
     document.getElementById('statDtm').textContent =
       members.filter(m => m.level.toUpperCase().includes('DTM')).length;
-    document.getElementById('statTm').textContent =
-      members.filter(m => m.level.toUpperCase() === 'TM').length;
+
+    const counts = Object.fromEntries(LEVEL_CONFIG.map(c => [c.key, 0]));
+    members.forEach(m => {
+      const k = parseLevel(m.level);
+      if (counts[k] !== undefined) counts[k]++;
+    });
+
+    const labels = LEVEL_CONFIG.map(c => c.label);
+    const data   = LEVEL_CONFIG.map(c => counts[c.key]);
+    const colors = LEVEL_CONFIG.map(c => c.color);
+
+    document.getElementById('chartSubtitle').textContent =
+      LEVEL_CONFIG.filter(c => counts[c.key] > 0)
+        .map(c => `${c.label} ${counts[c.key]}`)
+        .join('　');
+
+    document.getElementById('levelLegend').innerHTML = LEVEL_CONFIG.map(c => `
+      <div class="legend-item">
+        <div class="legend-dot" style="background:${c.color}"></div>
+        ${c.label} <strong>${counts[c.key]}</strong>
+      </div>`).join('');
+
+    if (levelChart) {
+      levelChart.data.datasets[0].data = data;
+      levelChart.update();
+      return;
+    }
+
+    const ctx = document.getElementById('levelChart').getContext('2d');
+    levelChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: 'rgba(0, 65, 101, 0.08)',
+          borderColor: '#004165',
+          borderWidth: 2.5,
+          pointBackgroundColor: colors,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 7,
+          pointHoverRadius: 9,
+          fill: true,
+          tension: 0.35,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: c => ` ${c.raw} 位` }
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1, font: { size: 11 } },
+            grid: { color: '#f1f5f9' },
+          },
+          x: {
+            ticks: { font: { size: 12 } },
+            grid: { display: false },
+          },
+        },
+      },
+    });
   }
 
   function renderList() {

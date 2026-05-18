@@ -42,6 +42,15 @@ EntrepreneurAgenda/
 
 Push 到 GitHub，Vercel 自動部署。`/api/*` 的請求透過 `vercel.json` 路由至 `api/index.py`。
 
+### 3. URL 路由規則（vercel.json）
+
+| 規則 | 說明 |
+|------|------|
+| `cleanUrls: true` | 自動去除頁面 URL 的 `.html`，例如 `/login.html` → `/login` |
+| `/` redirect → `/login` | 訪問根路徑自動跳轉至登入頁 |
+
+> 本地開發（Live Server）不支援 clean URLs，請直接用 `http://127.0.0.1:5500/login.html` 存取。
+
 ---
 
 ## 本地開發（FastAPI）
@@ -110,12 +119,12 @@ R2_PUBLIC_URL=https://pub-xxx.r2.dev
 
 ## 前端頁面
 
-| 頁面 | 說明 |
-|------|------|
-| `login.html` | 登入 / 註冊，成功後跳轉至 `home.html` |
-| `home.html` | 會務管理 Dashboard，含統計卡片、議程列表、日期篩選 |
-| `index.html` | 議程表產生器，即時預覽並可匯出 PDF / JPG |
-| `member.html` | 會員管理，新增、編輯、搜尋、移除會員 |
+| 頁面（Vercel URL） | 檔案 | 說明 |
+|--------------------|------|------|
+| `/login` | `login.html` | 登入 / 註冊，成功後跳轉至 `/home` |
+| `/home` | `home.html` | 會務管理 Dashboard，含統計卡片、議程列表、日期篩選 |
+| `/index` | `index.html` | 議程表產生器，即時預覽並可匯出 PDF / JPG |
+| `/member` | `member.html` | 會員管理，新增、編輯、搜尋、移除會員 |
 
 `auth.js` 會自動偵測環境：
 - **本地**（localhost）→ `http://localhost:8001`

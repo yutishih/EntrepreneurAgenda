@@ -939,7 +939,14 @@ function applyAgendaData(d) {
 
   images.themeImg = d.themeImgUrl || null;
   const statusEl = document.getElementById('themeImgStatus');
-  if (statusEl) statusEl.textContent = images.themeImg ? '✓ 已載入雲端圖片' : '';
+  if (statusEl) {
+    if (images.themeImg) {
+      const filename = images.themeImg.split('/').pop();
+      statusEl.textContent = `✓ 雲端圖片：${filename}`;
+    } else {
+      statusEl.textContent = '';
+    }
+  }
   const fileInput = document.getElementById('img_themeImg');
   if (fileInput) fileInput.value = '';
 

@@ -130,7 +130,10 @@ def init_db():
                 )
 
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"[init_db] warning: {e}")
 
 security = HTTPBearer()
 

@@ -9,302 +9,467 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
       min-height: 100vh;
-      background: #f4f6f9;
-      color: #1a1a2e;
+      display: flex;
     }
 
-    /* ---- Navbar ---- */
-    .navbar {
-      background: #1a1a2e;
-      color: #fff;
-      padding: 0 28px;
-      height: 54px;
+    /* ================================================================
+       SIDEBAR
+    ================================================================ */
+    .sidebar {
+      width: 220px;
+      min-height: 100vh;
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+    .sidebar-brand {
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid #1e293b;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-    .navbar-left { display: flex; align-items: center; gap: 16px; }
-    .navbar-title { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
-    .navbar-title span { color: #772432; }
-    .btn-nav-back {
-      background: none;
-      border: 1px solid #555;
-      color: #ccc;
-      padding: 4px 12px;
-      border-radius: 5px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-    }
-    .btn-nav-back:hover { border-color: #772432; color: #772432; }
-    .navbar-right { display: flex; align-items: center; gap: 12px; }
-    .navbar-user { font-size: 12px; color: #aaa; }
-    .btn-nav-logout {
-      background: none;
-      border: 1px solid #555;
-      color: #ccc;
-      padding: 4px 12px;
-      border-radius: 5px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
-    }
-    .btn-nav-logout:hover { border-color: #772432; color: #772432; }
-
-    /* ---- Main ---- */
-    .main { max-width: 860px; margin: 0 auto; padding: 36px 20px; }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
       gap: 10px;
     }
-    .section-header h2 { font-size: 18px; font-weight: 700; }
-
-    .btn-add-member {
-      padding: 9px 20px;
-      background: #772432;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .btn-add-member:hover { background: #5a1a25; }
-
-    /* ---- Search ---- */
-    .search-row { margin-bottom: 14px; }
-    .search-row input {
-      width: 100%;
-      padding: 9px 14px;
-      border: 1px solid #ddd;
-      border-radius: 9px;
-      font-size: 13px;
-      background: #fff;
-    }
-    .search-row input:focus { outline: none; border-color: #772432; }
-
-    /* ---- Member list ---- */
-    .member-grid { display: flex; flex-direction: column; gap: 8px; }
-
-    .member-card {
-      background: #fff;
-      border-radius: 10px;
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      box-shadow: 0 1px 5px rgba(0,0,0,0.06);
-      border: 1px solid transparent;
-      transition: box-shadow 0.15s;
-    }
-    .member-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.10); }
-
-    .mc-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #1a1a2e;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 700;
+    .sidebar-brand-logo {
+      width: 36px; height: 36px;
+      object-fit: contain;
       flex-shrink: 0;
     }
-    .mc-body { flex: 1; min-width: 0; }
-    .mc-names {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      flex-wrap: wrap;
+    .sidebar-brand-text { min-width: 0; }
+    .sidebar-brand-name {
+      font-size: 13px; font-weight: 700;
+      color: #f8fafc; letter-spacing: 0.3px; line-height: 1.4;
     }
-    .mc-name-zh { font-size: 14px; font-weight: 700; }
-    .mc-name-en { font-size: 13px; color: #555; }
-    .mc-level {
-      display: inline-block;
-      margin-top: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #004165;
-      background: #e6f0f7;
-      border-radius: 5px;
-      padding: 2px 7px;
-    }
-    .mc-actions { display: flex; gap: 6px; flex-shrink: 0; }
-    .btn-edit-m {
-      padding: 5px 13px;
-      background: #f0f4ff;
-      border: 1px solid #c5d0f0;
-      border-radius: 6px;
-      font-size: 12px;
-      color: #4a6cf7;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .btn-edit-m:hover { background: #e0e8ff; }
-    .btn-del-m {
-      padding: 5px 10px;
-      background: #f5f5f5;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      color: #aaa;
-    }
-    .btn-del-m:hover { background: #ffe0e0; color: #772432; }
+    .sidebar-brand-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
 
-    .empty-msg {
-      text-align: center;
-      color: #bbb;
-      padding: 40px;
-      font-size: 14px;
+    .sidebar-nav { padding: 12px 10px; flex: 1; }
+    .nav-section-label {
+      font-size: 10px; font-weight: 600; color: #475569;
+      letter-spacing: 0.8px; text-transform: uppercase;
+      padding: 8px 10px 4px;
     }
-    .loading-spinner {
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border-radius: 8px;
+      color: #94a3b8; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: background 0.15s, color 0.15s;
+      text-decoration: none; margin-bottom: 2px;
+    }
+    .nav-item:hover { background: #1e293b; color: #f1f5f9; }
+    .nav-item.active { background: #1e3a5f; color: #60a5fa; }
+    .nav-item svg { flex-shrink: 0; opacity: 0.8; }
+    .nav-item.active svg { opacity: 1; }
+
+    .sidebar-footer {
+      padding: 14px 10px;
+      border-top: 1px solid #1e293b;
+    }
+    .sidebar-user {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 8px;
+    }
+    .user-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: #1e3a5f;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #60a5fa;
+      flex-shrink: 0;
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-name { font-size: 12px; font-weight: 600; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-role { font-size: 10px; color: #64748b; }
+    .btn-logout-sidebar {
+      background: none; border: none; color: #64748b;
+      cursor: pointer; padding: 4px; border-radius: 4px;
+      display: flex; align-items: center;
+      transition: color 0.15s; flex-shrink: 0;
+    }
+    .btn-logout-sidebar:hover { color: #f87171; }
+
+    /* ================================================================
+       MAIN AREA
+    ================================================================ */
+    .main-area {
+      margin-left: 220px;
+      flex: 1;
       display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 40px 0;
+      flex-direction: column;
+      min-height: 100vh;
     }
+    .topbar {
+      height: 58px;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px;
+      flex-shrink: 0;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-title { font-size: 16px; font-weight: 700; color: #0f172a; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .btn-primary {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 18px;
+      background: #772432; color: #fff;
+      border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary:hover { background: #5a1a25; }
+
+    .content { padding: 28px; flex: 1; }
+
+    /* ================================================================
+       STAT CARD
+    ================================================================ */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: #fff; border-radius: 12px;
+      padding: 20px 22px;
+      display: flex; align-items: center; gap: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0;
+    }
+    .stat-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .stat-icon.blue  { background: #e6f0f7; color: #004165; }
+    .stat-icon.gold  { background: #fdf9e8; color: #a07800; }
+    .stat-icon.red   { background: #f5eced; color: #772432; }
+    .stat-body { flex: 1; }
+    .stat-value { font-size: 26px; font-weight: 700; color: #0f172a; line-height: 1; }
+    .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+    /* ================================================================
+       MEMBER TABLE CARD
+    ================================================================ */
+    .table-card {
+      background: #fff; border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      overflow: hidden;
+    }
+    .table-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      gap: 12px; flex-wrap: wrap;
+    }
+    .table-header-left { display: flex; align-items: center; gap: 12px; }
+    .table-title { font-size: 14px; font-weight: 700; color: #0f172a; }
+    .badge-count {
+      font-size: 11px; font-weight: 600;
+      background: #f1f5f9; color: #64748b;
+      padding: 2px 8px; border-radius: 20px;
+    }
+
+    .search-wrap {
+      padding: 12px 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .search-input {
+      width: 100%; max-width: 320px;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #f8fafc;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .search-input:focus { outline: none; border-color: #004165; background: #fff; }
+
+    /* Table */
+    .member-table-wrap { overflow-x: auto; }
+    table.member-list {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    table.member-list thead tr {
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    table.member-list th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 11px; font-weight: 600;
+      color: #64748b; letter-spacing: 0.4px;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    table.member-list tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+      transition: background 0.1s;
+    }
+    table.member-list tbody tr:hover { background: #f8fafc; }
+    table.member-list tbody tr:last-child { border-bottom: none; }
+    table.member-list td { padding: 12px 16px; vertical-align: middle; }
+
+    .td-member { display: flex; align-items: center; gap: 12px; }
+    .mc-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #0f172a; color: #f2df74;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
+    }
+    .mc-name-zh { font-weight: 600; color: #0f172a; font-size: 13px; }
+    .mc-name-en { font-size: 12px; color: #64748b; margin-top: 1px; }
+
+    .level-badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 600;
+      color: #004165; background: #e6f0f7;
+      border-radius: 5px; padding: 3px 9px;
+      white-space: nowrap;
+    }
+
+    .td-actions { text-align: right; white-space: nowrap; }
+    .btn-edit-row {
+      padding: 5px 14px;
+      background: #e6f0f7; color: #004165;
+      border: 1px solid #b3cfe0;
+      border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; margin-right: 6px;
+    }
+    .btn-edit-row:hover { background: #004165; color: #fff; border-color: #004165; }
+    .btn-del-row {
+      padding: 5px 8px; background: none;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      cursor: pointer; color: #94a3b8;
+      display: inline-flex; align-items: center;
+      transition: all 0.15s;
+    }
+    .btn-del-row:hover { background: #f5eced; border-color: #d4a0a8; color: #772432; }
+
+    .table-empty {
+      text-align: center; padding: 48px;
+      color: #94a3b8; font-size: 13px;
+    }
+    .loading-spinner { display: flex; justify-content: center; padding: 40px; }
     .spinner {
-      width: 28px;
-      height: 28px;
-      border: 3px solid #e8e8e8;
+      width: 28px; height: 28px;
+      border: 3px solid #e2e8f0;
       border-top-color: #772432;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ---- Modal ---- */
+    /* ================================================================
+       MODAL
+    ================================================================ */
     .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
+      display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.4);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
+      z-index: 200; align-items: center; justify-content: center;
     }
     .modal-overlay.open { display: flex; }
     .modal {
-      background: #fff;
-      border-radius: 14px;
+      background: #fff; border-radius: 14px;
       padding: 28px 28px 24px;
-      width: 380px;
-      max-width: 92vw;
+      width: 380px; max-width: 92vw;
       box-shadow: 0 8px 32px rgba(0,0,0,0.18);
     }
-    .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
-    .modal-field { margin-bottom: 13px; }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .modal h3 { font-size: 16px; font-weight: 700; color: #0f172a; }
+    .modal-close {
+      background: none; border: none; font-size: 18px;
+      cursor: pointer; color: #94a3b8; padding: 2px 6px;
+      border-radius: 4px; line-height: 1;
+    }
+    .modal-close:hover { background: #f1f5f9; color: #0f172a; }
+    .modal-field { margin-bottom: 14px; }
     .modal-field label {
-      display: block;
-      font-size: 11px;
-      color: #666;
-      margin-bottom: 4px;
-      font-weight: 600;
+      display: block; font-size: 11px; font-weight: 600;
+      color: #64748b; margin-bottom: 5px;
     }
     .modal-field input {
-      width: 100%;
-      padding: 8px 11px;
-      border: 1px solid #ddd;
-      border-radius: 7px;
-      font-size: 13px;
+      width: 100%; padding: 9px 12px;
+      border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 13px; transition: border-color 0.2s;
     }
-    .modal-field input:focus { outline: none; border-color: #772432; }
+    .modal-field input:focus { outline: none; border-color: #004165; }
     .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 20px;
+      display: flex; justify-content: flex-end;
+      gap: 8px; margin-top: 22px;
     }
     .btn-modal-cancel {
-      padding: 8px 18px;
-      background: #f0f0f0;
-      border: none;
-      border-radius: 7px;
-      font-size: 13px;
-      cursor: pointer;
-      color: #555;
+      padding: 8px 18px; background: #f1f5f9;
+      border: none; border-radius: 8px;
+      font-size: 13px; cursor: pointer; color: #64748b;
+      transition: background 0.15s;
     }
-    .btn-modal-cancel:hover { background: #e0e0e0; }
+    .btn-modal-cancel:hover { background: #e2e8f0; }
     .btn-modal-save {
-      padding: 8px 22px;
-      background: #772432;
-      color: #fff;
-      border: none;
-      border-radius: 7px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
+      padding: 8px 22px; background: #772432;
+      color: #fff; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
     }
     .btn-modal-save:hover { background: #5a1a25; }
 
-    @media (max-width: 860px) {
-      .navbar { padding: 0 16px; }
-      .main { padding: 24px 14px; }
+    /* ================================================================
+       RESPONSIVE
+    ================================================================ */
+    @media (max-width: 900px) {
+      .sidebar { width: 64px; }
+      .sidebar-brand-name, .sidebar-brand-sub,
+      .nav-section-label, .nav-item span,
+      .user-info { display: none; }
+      .nav-item { justify-content: center; padding: 10px; }
+      .sidebar-footer { padding: 10px 8px; }
+      .sidebar-user { padding: 6px; justify-content: center; }
+      .btn-logout-sidebar { display: none; }
+      .main-area { margin-left: 64px; }
     }
-
-    @media (max-width: 480px) {
-      .navbar-left { gap: 10px; }
-      .navbar-title { font-size: 13px; }
-      .btn-nav-back { font-size: 11px; padding: 4px 8px; }
-      .navbar-user { display: none; }
-      .main { padding: 16px 12px; }
-      .section-header h2 { font-size: 16px; }
-      .member-card { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
-      .mc-actions {
-        width: 100%;
-        justify-content: flex-end;
-        border-top: 1px solid #f0f0f0;
-        padding-top: 8px;
-      }
-      .modal { padding: 22px 18px 18px; }
+    @media (max-width: 640px) {
+      .stats-row { grid-template-columns: 1fr; }
+      .content { padding: 16px; }
+      .topbar { padding: 0 16px; }
+      table.member-list th:nth-child(3),
+      table.member-list td:nth-child(3) { display: none; }
     }
   </style>
 </head>
 <body>
 
-<nav class="navbar">
-  <div class="navbar-left">
-    <div class="navbar-title"><span>企業家</span>國際演講會</div>
-    <a class="btn-nav-back" href="home.html">← 返回</a>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <img src="media/toastmasters_logo.png" class="sidebar-brand-logo" alt="TM Logo">
+    <div class="sidebar-brand-text">
+      <div class="sidebar-brand-name">企業家國際演講會</div>
+      <div class="sidebar-brand-sub">Entrepreneur TMC</div>
+    </div>
   </div>
-  <div class="navbar-right">
-    <span id="navUser" class="navbar-user"></span>
-    <button class="btn-nav-logout" onclick="doLogout()">登出</button>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">主選單</div>
+    <a class="nav-item" href="home.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>總覽</span>
+    </a>
+    <a class="nav-item" href="index.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span>新建議程</span>
+    </a>
+    <a class="nav-item active" href="member.html">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>會員管理</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="user-avatar" id="userAvatar">—</div>
+      <div class="user-info">
+        <div class="user-name" id="navUser">—</div>
+        <div class="user-role">成員</div>
+      </div>
+      <button class="btn-logout-sidebar" onclick="doLogout()" title="登出">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
   </div>
-</nav>
+</aside>
 
-<main class="main">
-  <div class="section-header">
-    <h2>會員管理</h2>
-    <button class="btn-add-member" onclick="openModal()">＋ 新增會員</button>
-  </div>
+<!-- MAIN AREA -->
+<div class="main-area">
+  <header class="topbar">
+    <div class="topbar-title">會員管理</div>
+    <div class="topbar-actions">
+      <button class="btn-primary" onclick="openModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        新增會員
+      </button>
+    </div>
+  </header>
 
-  <div class="search-row">
-    <input type="text" id="searchInput" placeholder="搜尋姓名…" oninput="renderList()">
-  </div>
+  <div class="content">
 
-  <div id="memberGrid" class="member-grid">
-    <div class="loading-spinner"><div class="spinner"></div></div>
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon blue">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value" id="statTotal">—</div>
+          <div class="stat-label">會員總數</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon gold">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value" id="statDtm">—</div>
+          <div class="stat-label">DTM 會員</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value" id="statTm">—</div>
+          <div class="stat-label">一般 TM</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Member table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-header-left">
+          <span class="table-title">會員名單</span>
+          <span class="badge-count" id="badgeCount">0 位</span>
+        </div>
+      </div>
+
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="searchInput"
+               placeholder="搜尋姓名或等級…" oninput="renderList()">
+      </div>
+
+      <div class="member-table-wrap">
+        <table class="member-list">
+          <thead>
+            <tr>
+              <th>會員</th>
+              <th>等級</th>
+              <th style="text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="memberTableBody">
+            <tr><td colspan="3"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
-</main>
+</div>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
-    <h3 id="modalTitle">新增會員</h3>
+    <div class="modal-header">
+      <h3 id="modalTitle">新增會員</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
     <div class="modal-field">
       <label>中文姓名</label>
       <input type="text" id="fNameZh" placeholder="蔡宜容">
@@ -339,6 +504,7 @@
       if (res.ok) {
         const data = await res.json();
         document.getElementById('navUser').textContent = data.username;
+        document.getElementById('userAvatar').textContent = data.username.slice(0,1).toUpperCase();
       } else {
         clearAuth(); location.href = 'login.html'; return;
       }
@@ -349,17 +515,28 @@
   }
 
   async function fetchMembers() {
-    document.getElementById('memberGrid').innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+    document.getElementById('memberTableBody').innerHTML =
+      '<tr><td colspan="3"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>';
     try {
       const res = await fetch(`${API_BASE}/api/members`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) throw new Error();
       members = await res.json();
+      updateStats();
       renderList();
     } catch {
-      document.getElementById('memberGrid').innerHTML = '<p class="empty-msg">載入失敗</p>';
+      document.getElementById('memberTableBody').innerHTML =
+        '<tr><td colspan="3"><div class="table-empty">載入失敗</div></td></tr>';
     }
+  }
+
+  function updateStats() {
+    document.getElementById('statTotal').textContent = members.length;
+    document.getElementById('statDtm').textContent =
+      members.filter(m => m.level.toUpperCase().includes('DTM')).length;
+    document.getElementById('statTm').textContent =
+      members.filter(m => m.level.toUpperCase() === 'TM').length;
   }
 
   function renderList() {
@@ -371,26 +548,32 @@
           m.level.toLowerCase().includes(q))
       : members;
 
-    const grid = document.getElementById('memberGrid');
+    document.getElementById('badgeCount').textContent = `${filtered.length} 位`;
+
+    const tbody = document.getElementById('memberTableBody');
     if (!filtered.length) {
-      grid.innerHTML = '<p class="empty-msg">沒有符合的會員</p>';
+      tbody.innerHTML = '<tr><td colspan="3"><div class="table-empty">沒有符合的會員</div></td></tr>';
       return;
     }
-    grid.innerHTML = filtered.map(m => `
-      <div class="member-card">
-        <div class="mc-avatar">${m.nameZh.charAt(0)}</div>
-        <div class="mc-body">
-          <div class="mc-names">
-            <span class="mc-name-zh">${m.nameZh}</span>
-            <span class="mc-name-en">${m.nameEn}</span>
+    tbody.innerHTML = filtered.map(m => `
+      <tr>
+        <td>
+          <div class="td-member">
+            <div class="mc-avatar">${m.nameZh.charAt(0)}</div>
+            <div>
+              <div class="mc-name-zh">${m.nameZh}</div>
+              <div class="mc-name-en">${m.nameEn}</div>
+            </div>
           </div>
-          <span class="mc-level">${m.level}</span>
-        </div>
-        <div class="mc-actions">
-          <button class="btn-edit-m" onclick="openModal(${m.id})">編輯</button>
-          <button class="btn-del-m" onclick="deleteMember(${m.id})">刪除</button>
-        </div>
-      </div>`).join('');
+        </td>
+        <td><span class="level-badge">${m.level}</span></td>
+        <td class="td-actions">
+          <button class="btn-edit-row" onclick="openModal(${m.id})">編輯</button>
+          <button class="btn-del-row" onclick="deleteMember(${m.id})" title="刪除">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+          </button>
+        </td>
+      </tr>`).join('');
   }
 
   function openModal(id = null) {
@@ -447,6 +630,7 @@
       });
       if (!res.ok) throw new Error();
       members = members.filter(m => m.id !== id);
+      updateStats();
       renderList();
     } catch {
       alert('刪除失敗');

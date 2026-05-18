@@ -26,7 +26,8 @@
       text-align: center;
     }
 
-    .login-logo { font-size: 40px; margin-bottom: 10px; }
+    .login-logo { margin-bottom: 12px; }
+    .login-logo img { width: 64px; height: 64px; object-fit: contain; }
 
     .login-card h2 {
       font-size: 17px;
@@ -61,7 +62,7 @@
     }
 
     .login-tab.active {
-      background: #e63946;
+      background: #004165;
       color: #fff;
       font-weight: 600;
     }
@@ -89,7 +90,7 @@
 
     .login-field input:focus {
       outline: none;
-      border-color: #e63946;
+      border-color: #004165;
     }
 
     .login-error {
@@ -103,7 +104,7 @@
     .btn-login-submit {
       width: 100%;
       padding: 11px;
-      background: #e63946;
+      background: #772432;
       color: #fff;
       border: none;
       border-radius: 7px;
@@ -113,8 +114,8 @@
       transition: background 0.2s;
     }
 
-    .btn-login-submit:hover { background: #c1121f; }
-    .btn-login-submit:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-login-submit:hover { background: #5a1a25; }
+    .btn-login-submit:disabled { background: #a9b2b1; cursor: not-allowed; }
 
     .btn-login-submit .spinner {
       display: inline-block;
@@ -133,9 +134,11 @@
 <body>
 
 <div class="login-card">
-  <div class="login-logo">🎤</div>
+  <div class="login-logo">
+    <img src="media/toastmasters_logo.png" alt="TM Logo">
+  </div>
   <h2>企業家國際演講會</h2>
-  <p class="login-subtitle">議程表產生器</p>
+  <p class="login-subtitle">Club Management</p>
 
   <div class="login-tabs">
     <button class="login-tab active" id="tabLogin" onclick="switchTab('login')">登入</button>

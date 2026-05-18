@@ -1215,6 +1215,36 @@ function downloadPDF() {
   });
 }
 
+async function downloadJPG() {
+  const data = collectData();
+  const dateStr = formatDate(data.meetingDate) || 'agenda';
+  const element = document.getElementById('agendaPreview');
+
+  const savedTransform       = element.style.transform;
+  const savedMarginBottom    = element.style.marginBottom;
+  const savedTransformOrigin = element.style.transformOrigin;
+  element.style.transform       = '';
+  element.style.marginBottom    = '';
+  element.style.transformOrigin = '';
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    scrollX: 0,
+    scrollY: 0,
+  });
+
+  element.style.transform       = savedTransform;
+  element.style.marginBottom    = savedMarginBottom;
+  element.style.transformOrigin = savedTransformOrigin;
+
+  const link = document.createElement('a');
+  link.download = `Agenda_${dateStr}_No${data.meetingNo || ''}.jpg`;
+  link.href = canvas.toDataURL('image/jpeg', 0.95);
+  link.click();
+}
+
 // ================================================================
 // RESET & INIT
 // ================================================================
@@ -1401,6 +1431,8 @@ function initAutocomplete() {
       if (dd && !dd.contains(document.activeElement)) acHide();
     }, 100);
   });
+
+  document.addEventListener('scroll', acHide, true);
 }
 
 async function init() {

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>企業家國際演講會｜議程表產生器</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -301,6 +302,7 @@
               <span>語言</span><span id="langToggle">切換中文</span>
             </button>
             <button class="settings-menu-item" onclick="downloadPDF()">下載 PDF</button>
+            <button class="settings-menu-item" onclick="downloadJPG()">下載 JPG</button>
           </div>
         </div>
         <div class="toolbar-sep"></div>

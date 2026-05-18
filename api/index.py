@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import uuid
+import boto3
 import bcrypt
 import jwt
 import psycopg2
@@ -12,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 load_dotenv()
 
@@ -23,6 +25,24 @@ JWT_SECRET = os.getenv("JWT_SECRET", "please-change-this-secret")
 INVITE_CODE = os.getenv("INVITE_CODE", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
+
+R2_ACCOUNT_ID        = os.getenv("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY_ID     = os.getenv("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET_NAME       = os.getenv("R2_BUCKET_NAME", "")
+R2_PUBLIC_URL        = os.getenv("R2_PUBLIC_URL", "").rstrip("/")
+
+
+def _r2():
+    if not all([R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME]):
+        raise HTTPException(status_code=503, detail="R2 未設定，請聯絡管理員")
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name="auto",
+    )
 
 app = FastAPI()
 app.add_middleware(
@@ -137,6 +157,13 @@ class MemberRequest(BaseModel):
     name_zh: str
     name_en: str
     level: str
+
+
+class PresignRequest(BaseModel):
+    filename: str
+    content_type: str
+    meeting_date: Optional[str] = None
+    meeting_no: Optional[str] = None
 
 
 # ------------------------------------------------------------------ helpers
@@ -365,6 +392,29 @@ def delete_member(member_id: int, credentials: HTTPAuthorizationCredentials = De
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="找不到此會員")
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ upload
+@app.post("/api/upload/presign")
+def presign_upload(req: PresignRequest, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    decode_token(credentials.credentials)
+    ext = req.filename.rsplit(".", 1)[-1].lower() if "." in req.filename else "jpg"
+    tw_tz = timezone(timedelta(hours=8))
+    ts = datetime.now(tw_tz).strftime("%H%M%S")
+    if req.meeting_date and req.meeting_no:
+        key = f"media/{req.meeting_date}_No{req.meeting_no}_{ts}.{ext}"
+    elif req.meeting_date:
+        key = f"media/{req.meeting_date}_{ts}.{ext}"
+    else:
+        key = f"media/{ts}_{uuid.uuid4()}.{ext}"
+    client = _r2()
+    upload_url = client.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": R2_BUCKET_NAME, "Key": key, "ContentType": req.content_type},
+        ExpiresIn=300,
+    )
+    public_url = f"{R2_PUBLIC_URL}/{key}"
+    return {"uploadUrl": upload_url, "publicUrl": public_url}
 
 
 # ------------------------------------------------------------------ dev-only

@@ -260,20 +260,55 @@ const images = {
 // ================================================================
 // IMAGE HANDLING
 // ================================================================
-function handleImageUpload(key, input) {
+async function uploadThemeImage(input) {
   const file = input.files[0];
-  if (!file) { images[key] = null; updatePreview(); return; }
-  const reader = new FileReader();
-  reader.onload = e => { images[key] = e.target.result; updatePreview(); };
-  reader.readAsDataURL(file);
+  if (!file) return;
+
+  const statusEl = document.getElementById('themeImgStatus');
+  if (statusEl) statusEl.textContent = '上傳中...';
+
+  try {
+    const presignRes = await fetch(`${API_BASE}/api/upload/presign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        content_type: file.type,
+        meeting_date: val('meetingDate') || null,
+        meeting_no: val('meetingNo') || null,
+      }),
+    });
+    if (!presignRes.ok) throw new Error((await presignRes.json()).detail || '取得上傳網址失敗');
+    const { uploadUrl, publicUrl } = await presignRes.json();
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+    if (!uploadRes.ok) throw new Error('上傳至 R2 失敗');
+
+    images.themeImg = publicUrl;
+    if (statusEl) statusEl.textContent = '✓ 上傳成功';
+    updatePreview();
+    setSaveStatus('unsaved');
+  } catch (e) {
+    if (statusEl) statusEl.textContent = `✕ ${e.message}`;
+    input.value = '';
+  }
 }
 
-function clearImage(key) {
-  images[key] = null;
-  const inputId = 'img_' + key;
-  const el = document.getElementById(inputId);
+function clearThemeImage() {
+  images.themeImg = null;
+  const el = document.getElementById('img_themeImg');
   if (el) el.value = '';
+  const statusEl = document.getElementById('themeImgStatus');
+  if (statusEl) statusEl.textContent = '';
   updatePreview();
+  setSaveStatus('unsaved');
 }
 
 // ================================================================
@@ -869,7 +904,7 @@ function updatePreview() {
 let currentAgendaId = null;
 
 function collectSaveData() {
-  return { ...collectData(), timeOverrides: { ...timeOverrides }, lang };
+  return { ...collectData(), timeOverrides: { ...timeOverrides }, lang, themeImgUrl: images.themeImg || null };
 }
 
 function applyAgendaData(d) {
@@ -901,6 +936,12 @@ function applyAgendaData(d) {
     const btn = document.getElementById('langToggle');
     if (btn) btn.textContent = lang === 'en' ? '切換中文' : 'Switch to EN';
   }
+
+  images.themeImg = d.themeImgUrl || null;
+  const statusEl = document.getElementById('themeImgStatus');
+  if (statusEl) statusEl.textContent = images.themeImg ? '✓ 已載入雲端圖片' : '';
+  const fileInput = document.getElementById('img_themeImg');
+  if (fileInput) fileInput.value = '';
 
   renderSpeechForms();
   renderEvaluatorForms();
@@ -1191,6 +1232,10 @@ function applyDefaultState() {
   evaluators = ['', '', ''];
   Object.keys(timeOverrides).forEach(k => { timeOverrides[k] = ''; });
   Object.keys(images).forEach(k => { if (k !== 'logo' && k !== 'fbQr' && k !== 'lineQr') images[k] = null; });
+  const themeStatusEl = document.getElementById('themeImgStatus');
+  if (themeStatusEl) themeStatusEl.textContent = '';
+  const themeFileInput = document.getElementById('img_themeImg');
+  if (themeFileInput) themeFileInput.value = '';
   renderSpeechForms();
   renderEvaluatorForms();
   updatePreview();

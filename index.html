@@ -28,35 +28,15 @@
     </div>
 
     <details open>
-      <summary>圖片上傳 Images</summary>
+      <summary>主題圖片 Theme Image</summary>
       <div class="form-section">
-        <p class="img-hint">上傳後即時更新預覽</p>
-
-        <div class="img-upload-row">
-          <label>TM Logo</label>
-          <input type="file" id="img_logo" accept="image/*"
-                 onchange="handleImageUpload('logo', this)">
-          <button class="img-clear-btn" onclick="clearImage('logo')">✕</button>
-        </div>
         <div class="img-upload-row">
           <label>主題圖片 (右上)</label>
           <input type="file" id="img_themeImg" accept="image/*"
-                 onchange="handleImageUpload('themeImg', this)">
-          <button class="img-clear-btn" onclick="clearImage('themeImg')">✕</button>
+                 onchange="uploadThemeImage(this)">
+          <button class="img-clear-btn" onclick="clearThemeImage()">✕</button>
         </div>
-        <p class="img-warning">⚠ 主題圖片不會儲存至雲端，刷新頁面後需重新上傳。若要保留請先下載 PDF。</p>
-        <div class="img-upload-row">
-          <label>FB QR Code</label>
-          <input type="file" id="img_fbQr" accept="image/*"
-                 onchange="handleImageUpload('fbQr', this)">
-          <button class="img-clear-btn" onclick="clearImage('fbQr')">✕</button>
-        </div>
-        <div class="img-upload-row">
-          <label>LINE@ QR Code</label>
-          <input type="file" id="img_lineQr" accept="image/*"
-                 onchange="handleImageUpload('lineQr', this)">
-          <button class="img-clear-btn" onclick="clearImage('lineQr')">✕</button>
-        </div>
+        <p id="themeImgStatus" class="img-hint"></p>
       </div>
     </details>
 

@@ -1068,7 +1068,6 @@ details[open] summary::before { content: "▼ "; }
   .preview-panel { display: flex; position: static; flex: 1; min-height: 0; }
   .preview-scroll { padding: 10px; overflow-x: hidden; }
   .preview-toolbar { position: sticky; top: 0; z-index: 11; }
-  .btn-home-rwd { display: block; }
   .btn-settings-icon  { display: block; }
   .btn-settings-label { display: none; }
   .btn-settings { padding: 4px 8px; background: none; color: #bbb; }
@@ -1082,7 +1081,6 @@ details[open] summary::before { content: "▼ "; }
 @media (max-width: 480px) {
   .toolbar-label   { display: none; }
   .toolbar-sep     { display: none; }
-  .btn-toolbar-nav { display: none; }
   .toolbar-right   { gap: 4px; }
   .form-panel h1   { font-size: 15px; }
   .form-actions-row { flex-direction: column; }

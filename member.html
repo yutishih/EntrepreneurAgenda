@@ -66,6 +66,9 @@
     .nav-item svg { flex-shrink: 0; opacity: 0.8; }
     .nav-item.active svg { opacity: 1; }
 
+    .sidebar-toggle-tab { display: none; }
+    .sidebar-backdrop { display: none; }
+
     .sidebar-footer {
       padding: 14px 10px;
       border-top: 1px solid #1e293b;
@@ -375,21 +378,86 @@
       table.member-list td { padding: 12px 12px; }
     }
     @media (max-width: 640px) {
+      /* Prevent page-level horizontal scroll */
+      html, body { overflow-x: hidden; max-width: 100%; }
+      .main-area { overflow-x: hidden; min-width: 0; }
+
       .stats-row { grid-template-columns: 1fr; }
-      .content { padding: 16px; }
+      .content { padding: 12px; overflow-x: hidden; }
       .topbar { padding: 0 12px; height: 50px; }
       .topbar-title { font-size: 13px; }
-      .btn-primary { padding: 6px 12px; font-size: 12px; gap: 4px; }
-      table.member-list th:nth-child(3),
-      table.member-list td:nth-child(3) { display: none; }
-      table.member-list td { padding: 10px 10px; }
+      .btn-primary { padding: 6px 10px; font-size: 12px; gap: 4px; }
       .search-input { max-width: 100%; }
       .chart-body { height: 160px; }
       .level-legend { gap: 8px 12px; padding: 0 16px 12px; }
       .legend-item { font-size: 10px; }
-      .level-badge { white-space: normal; word-break: break-word; }
-      .mc-name-zh { font-size: 12px; }
-      .mc-name-en { font-size: 11px; }
+
+      /* Table: all 3 cols visible, fixed layout to fit viewport */
+      .member-table-wrap { overflow-x: hidden; }
+      table.member-list { table-layout: fixed; width: 100%; }
+      table.member-list th,
+      table.member-list td { padding: 10px 8px; }
+      /* col 2 等級: fixed; col 3 操作: fixed; col 1 會員: fills remaining */
+      table.member-list th:nth-child(2),
+      table.member-list td:nth-child(2) { width: 80px; }
+      table.member-list th:nth-child(3),
+      table.member-list td:nth-child(3) { width: 70px; }
+      .mc-avatar { width: 28px; height: 28px; font-size: 11px; flex-shrink: 0; }
+      .td-member { gap: 8px; overflow: hidden; }
+      .mc-name-zh { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mc-name-en { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .level-badge { font-size: 10px; padding: 2px 6px; white-space: normal; word-break: break-word; }
+
+      /* Sidebar drawer */
+      .sidebar {
+        width: 220px;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+        z-index: 200;
+      }
+      .sidebar-brand-name, .sidebar-brand-sub,
+      .nav-section-label, .nav-item span,
+      .user-info { display: revert; }
+      .nav-item { justify-content: flex-start; padding: 9px 10px; }
+      .sidebar-footer { padding: 14px 10px; }
+      .sidebar-user { padding: 8px 10px; justify-content: flex-start; }
+      .btn-logout-sidebar { display: flex; }
+      .sidebar.sidebar-open { transform: translateX(0); }
+
+      .sidebar-toggle-tab {
+        display: flex;
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 56px;
+        background: #0f172a;
+        border-radius: 0 8px 8px 0;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 201;
+        transition: left 0.3s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+      }
+      .sidebar-toggle-tab.open { left: 220px; }
+      .sidebar-toggle-tab svg { color: #94a3b8; transition: transform 0.3s ease; }
+      .sidebar-toggle-tab.open svg { transform: rotate(180deg); }
+
+      .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 199;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      .sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+      .main-area { margin-left: 0; }
     }
     @media (max-width: 480px) {
       .stat-card { padding: 14px 16px; }
@@ -403,7 +471,11 @@
 <body>
 
 <!-- SIDEBAR -->
-<aside class="sidebar">
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+<div class="sidebar-toggle-tab" id="sidebarToggleTab" onclick="toggleSidebar()">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+</div>
+<aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     <img src="media/toastmasters_logo.png" class="sidebar-brand-logo" alt="TM Logo">
     <div class="sidebar-brand-text">
@@ -780,6 +852,15 @@
     } catch {
       alert('刪除失敗');
     }
+  }
+
+  function toggleSidebar() {
+    const sidebar  = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    const tab      = document.getElementById('sidebarToggleTab');
+    const open = sidebar.classList.toggle('sidebar-open');
+    backdrop.classList.toggle('visible', open);
+    tab.classList.toggle('open', open);
   }
 
   function doLogout() {

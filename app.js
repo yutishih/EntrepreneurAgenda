@@ -1151,7 +1151,18 @@ function closeLoadModal() {
   document.getElementById('loadModal').style.display = 'none';
 }
 
-async function loadAgenda(id) {
+function showLoading() {
+  const el = document.getElementById('loadingOverlay');
+  if (el) el.classList.remove('hidden');
+}
+
+function hideLoading() {
+  const el = document.getElementById('loadingOverlay');
+  if (el) el.classList.add('hidden');
+}
+
+async function loadAgenda(id, { ownLoading = true } = {}) {
+  if (ownLoading) showLoading();
   try {
     const res = await fetch(`${API_BASE}/api/agendas/${id}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
@@ -1164,6 +1175,8 @@ async function loadAgenda(id) {
     closeLoadModal();
   } catch (e) {
     alert(e.message);
+  } finally {
+    if (ownLoading) hideLoading();
   }
 }
 
@@ -1530,23 +1543,27 @@ function initAutocomplete() {
 }
 
 async function init() {
-  await checkAuth();
-  initAutocomplete();
-  fetchMemberDatalist();
+  showLoading();
+  try {
+    await checkAuth();
+    initAutocomplete();
+    fetchMemberDatalist();
 
-  // 若 URL 帶 ?id=xxx，直接載入該議程；否則設預設日期
-  const urlId = new URLSearchParams(window.location.search).get('id');
-  if (urlId) {
-    await loadAgenda(parseInt(urlId));
-  } else {
-    applyDefaultState();
+    const urlId = new URLSearchParams(window.location.search).get('id');
+    if (urlId) {
+      await loadAgenda(parseInt(urlId), { ownLoading: false });
+    } else {
+      applyDefaultState();
+    }
+
+    document.querySelector('.form-panel').addEventListener('input', updatePreview);
+    document.querySelector('.form-panel').addEventListener('change', updatePreview);
+
+    updatePreview();
+    window.addEventListener('resize', applyPreviewScale);
+  } finally {
+    hideLoading();
   }
-
-  document.querySelector('.form-panel').addEventListener('input', updatePreview);
-  document.querySelector('.form-panel').addEventListener('change', updatePreview);
-
-  updatePreview();
-  window.addEventListener('resize', applyPreviewScale);
 }
 
 document.addEventListener('DOMContentLoaded', init);

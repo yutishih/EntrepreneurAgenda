@@ -293,10 +293,14 @@
   <!-- ===== PREVIEW PANEL ===== -->
   <div class="preview-panel">
     <div class="preview-toolbar">
+      <button class="btn-home-rwd" onclick="location.href='home.html'">← 首頁</button>
       <span class="toolbar-label">預覽（即時更新）</span>
       <div class="toolbar-right">
         <div class="settings-dropdown" id="settingsDropdown">
-          <button class="btn-settings" onclick="toggleSettingsMenu()">設定 ▾</button>
+          <button class="btn-settings" onclick="toggleSettingsMenu()">
+            <svg class="btn-settings-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="btn-settings-label">設定 ▾</span>
+          </button>
           <div class="settings-menu-panel">
             <button class="settings-menu-item" onclick="toggleLang()">
               <span>語言</span><span id="langToggle">切換中文</span>
@@ -341,6 +345,11 @@
 </div>
 
 <div id="memberDropdown" class="member-dropdown"></div>
+
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="page-loading-spinner"></div>
+</div>
+
 <script src="auth.js"></script>
 <script src="app.js"></script>
 </body>

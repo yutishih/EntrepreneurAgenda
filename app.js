@@ -1460,8 +1460,19 @@ function acRender() {
   const rect = acActiveInput.getBoundingClientRect();
   dd.style.display  = 'block';
   dd.style.left     = rect.left + 'px';
-  dd.style.top      = (rect.bottom + 4) + 'px';
   dd.style.minWidth = rect.width + 'px';
+
+  // Decide whether to open upward or downward
+  const ddHeight = Math.min(dd.scrollHeight, 220); // max-height capped at 220
+  const spaceBelow = window.innerHeight - rect.bottom - 8;
+  const spaceAbove = rect.top - 8;
+  if (spaceBelow >= ddHeight || spaceBelow >= spaceAbove) {
+    dd.style.top    = (rect.bottom + 4) + 'px';
+    dd.style.bottom = 'auto';
+  } else {
+    dd.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    dd.style.top    = 'auto';
+  }
 
   // scroll highlighted item into view
   if (acHighlight >= 0) {
@@ -1490,6 +1501,7 @@ function acSelectItem(m) {
 function initAutocomplete() {
   document.addEventListener('focusin', e => {
     if (!e.target.classList.contains('member-ac')) { acHide(); return; }
+    e.target.setAttribute('autocomplete', 'off');
     acActiveInput = e.target;
     acHighlight   = -1;
     acRender();
@@ -1539,7 +1551,24 @@ function initAutocomplete() {
     }, 100);
   });
 
-  document.addEventListener('scroll', acHide, true);
+  // Disable browser autocomplete on all member inputs
+  document.querySelectorAll('.member-ac').forEach(el => {
+    el.setAttribute('autocomplete', 'off');
+  });
+
+  // Reposition dropdown when form scrolls; hide only if input is out of view
+  const formScrollBody = document.querySelector('.form-scroll-body');
+  if (formScrollBody) {
+    formScrollBody.addEventListener('scroll', () => {
+      if (!acActiveInput) return;
+      const rect = acActiveInput.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        acHide();
+      } else {
+        acRender();
+      }
+    });
+  }
 }
 
 async function init() {

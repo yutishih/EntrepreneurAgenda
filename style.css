@@ -930,6 +930,8 @@ details[open] summary::before { content: "▼ "; }
    ============================================================ */
 .member-dropdown {
   position: fixed;
+  top: auto;
+  bottom: auto;
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 10px;

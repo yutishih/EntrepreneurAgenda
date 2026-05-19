@@ -251,10 +251,11 @@ function updateVariety(key, value) {
 }
 
 const images = {
-  logo:     'media/toastmasters_logo.png',
-  themeImg: null,
-  fbQr:     'media/FacebookQR.png',
-  lineQr:   'media/LINEQR.png',
+  logo:          'media/toastmasters_logo.png',
+  themeImg:      null,
+  themeImgBase64: null,  // local base64, avoids CORS when rendering to canvas
+  fbQr:          'media/FacebookQR.png',
+  lineQr:        'media/LINEQR.png',
 };
 
 // ================================================================
@@ -268,6 +269,14 @@ async function uploadThemeImage(input) {
   if (statusEl) statusEl.textContent = '上傳中...';
 
   try {
+    // Read local base64 first so download works even if R2 CORS blocks fetch
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
     const presignRes = await fetch(`${API_BASE}/api/upload/presign`, {
       method: 'POST',
       headers: {
@@ -292,6 +301,7 @@ async function uploadThemeImage(input) {
     if (!uploadRes.ok) throw new Error('上傳至 R2 失敗');
 
     images.themeImg = publicUrl;
+    images.themeImgBase64 = base64;
     if (statusEl) statusEl.textContent = '✓ 上傳成功';
     updatePreview();
     setSaveStatus('unsaved');
@@ -303,6 +313,7 @@ async function uploadThemeImage(input) {
 
 function clearThemeImage() {
   images.themeImg = null;
+  images.themeImgBase64 = null;
   const el = document.getElementById('img_themeImg');
   if (el) el.value = '';
   const statusEl = document.getElementById('themeImgStatus');
@@ -1186,19 +1197,20 @@ function setSaveStatus(state) {
 // ================================================================
 // PDF DOWNLOAD
 // ================================================================
-function downloadPDF() {
+async function downloadPDF() {
   const data = collectData();
   const dateStr = formatDate(data.meetingDate) || 'agenda';
-
   const element = document.getElementById('agendaPreview');
 
-  // Remove mobile scale transform so PDF captures full A4 size
+  // Remove transform first so container dimensions reflect full A4 size
   const savedTransform       = element.style.transform;
   const savedMarginBottom    = element.style.marginBottom;
   const savedTransformOrigin = element.style.transformOrigin;
   element.style.transform       = '';
   element.style.marginBottom    = '';
   element.style.transformOrigin = '';
+
+  const restoreTheme = await swapThemeImgForCapture(element);
 
   const opt = {
     margin:      [8, 8, 8, 8],
@@ -1212,7 +1224,85 @@ function downloadPDF() {
     element.style.transform       = savedTransform;
     element.style.marginBottom    = savedMarginBottom;
     element.style.transformOrigin = savedTransformOrigin;
+    restoreTheme();
   });
+}
+
+async function getThemeImgBase64() {
+  if (images.themeImgBase64) return images.themeImgBase64;
+  if (!images.themeImg) return null;
+  // Fetch via backend proxy to bypass R2 CORS restriction
+  const proxyUrl = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(images.themeImg)}`;
+  const res = await fetch(proxyUrl, { headers: { Authorization: `Bearer ${getToken()}` } });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// html2canvas does not support object-fit:cover, so we manually crop the image
+// to exactly fill the container (cover behaviour) before passing to html2canvas.
+async function getThemeImgCovered(containerEl) {
+  const b64 = await getThemeImgBase64();
+  if (!b64) return null;
+
+  const img = new Image();
+  await new Promise(r => { img.onload = r; img.src = b64; });
+
+  const w = containerEl.offsetWidth;
+  const h = containerEl.offsetHeight;
+  if (!w || !h) return b64;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = w * 2;  // match html2canvas scale:2
+  canvas.height = h * 2;
+  const ctx = canvas.getContext('2d');
+
+  // Replicate object-fit:cover: crop source so it fills the box without stretching
+  const imgRatio = img.naturalWidth / img.naturalHeight;
+  const boxRatio = w / h;
+  let sx, sy, sw, sh;
+  if (imgRatio > boxRatio) {
+    sh = img.naturalHeight;
+    sw = sh * boxRatio;
+    sx = (img.naturalWidth - sw) / 2;
+    sy = 0;
+  } else {
+    sw = img.naturalWidth;
+    sh = sw / boxRatio;
+    sx = 0;
+    sy = (img.naturalHeight - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.95);
+}
+
+// Swap theme image src to a cover-cropped data URL, return a restore function
+async function swapThemeImgForCapture(element) {
+  const themeImgEl = element.querySelector('.hg-theme-img');
+  const hgImgEl    = element.querySelector('.hg-img');
+  if (!themeImgEl || !hgImgEl) return () => {};
+
+  try {
+    const covered = await getThemeImgCovered(hgImgEl);
+    if (!covered) return () => {};
+    const savedSrc       = themeImgEl.src;
+    const savedObjectFit = themeImgEl.style.objectFit;
+    themeImgEl.src = covered;
+    themeImgEl.style.objectFit = 'fill'; // already cropped, fill the box
+    await new Promise(r => { themeImgEl.onload = r; themeImgEl.onerror = r; });
+    return () => {
+      themeImgEl.src = savedSrc;
+      themeImgEl.style.objectFit = savedObjectFit;
+    };
+  } catch (e) {
+    console.warn('主題圖片處理失敗，略過:', e);
+    return () => {};
+  }
 }
 
 async function downloadJPG() {
@@ -1220,12 +1310,15 @@ async function downloadJPG() {
   const dateStr = formatDate(data.meetingDate) || 'agenda';
   const element = document.getElementById('agendaPreview');
 
+  // Remove transform first so container dimensions reflect full A4 size
   const savedTransform       = element.style.transform;
   const savedMarginBottom    = element.style.marginBottom;
   const savedTransformOrigin = element.style.transformOrigin;
   element.style.transform       = '';
   element.style.marginBottom    = '';
   element.style.transformOrigin = '';
+
+  const restoreTheme = await swapThemeImgForCapture(element);
 
   const canvas = await html2canvas(element, {
     scale: 2,
@@ -1238,6 +1331,7 @@ async function downloadJPG() {
   element.style.transform       = savedTransform;
   element.style.marginBottom    = savedMarginBottom;
   element.style.transformOrigin = savedTransformOrigin;
+  restoreTheme();
 
   const link = document.createElement('a');
   link.download = `Agenda_${dateStr}_No${data.meetingNo || ''}.jpg`;

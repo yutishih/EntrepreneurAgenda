@@ -10,8 +10,9 @@ import psycopg2.errors
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
@@ -418,6 +419,27 @@ def presign_upload(req: PresignRequest, credentials: HTTPAuthorizationCredential
     )
     public_url = f"{R2_PUBLIC_URL}/{key}"
     return {"uploadUrl": upload_url, "publicUrl": public_url}
+
+
+# ------------------------------------------------------------------ image proxy
+@app.get("/api/image-proxy")
+def image_proxy(
+    url: str = Query(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    decode_token(credentials.credentials)
+    prefix = R2_PUBLIC_URL + "/"
+    if not R2_PUBLIC_URL or not url.startswith(prefix):
+        raise HTTPException(status_code=400, detail="Invalid image URL")
+    key = url[len(prefix):]
+    client = _r2()
+    try:
+        obj = client.get_object(Bucket=R2_BUCKET_NAME, Key=key)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Image not found")
+    data = obj["Body"].read()
+    content_type = obj.get("ContentType", "image/jpeg")
+    return Response(content=data, media_type=content_type, headers={"Cache-Control": "max-age=3600"})
 
 
 # ------------------------------------------------------------------ dev-only

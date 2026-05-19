@@ -247,12 +247,12 @@ def list_agendas(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     import math
-    username = decode_token(credentials.credentials)
+    decode_token(credentials.credentials)
     offset = (page - 1) * limit
     with get_db() as conn:
         with conn.cursor() as cur:
-            where  = "WHERE username = %s"
-            params: list = [username]
+            where  = "WHERE 1=1"
+            params: list = []
             if date:
                 where += " AND meeting_date = %s"
                 params.append(date)
@@ -302,46 +302,40 @@ def update_agenda(
     req: AgendaSaveRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    username = decode_token(credentials.credentials)
+    decode_token(credentials.credentials)
     meeting_date = req.data.get("meetingDate") or None
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "UPDATE agendas SET data = %s::jsonb, meeting_date = %s, updated_at = NOW()"
-                " WHERE id = %s AND username = %s",
-                (json.dumps(req.data), meeting_date, agenda_id, username),
+                " WHERE id = %s",
+                (json.dumps(req.data), meeting_date, agenda_id),
             )
             if cur.rowcount == 0:
-                raise HTTPException(status_code=404, detail="找不到此議程或無權限")
+                raise HTTPException(status_code=404, detail="找不到此議程")
     return {"ok": True}
 
 
 @app.get("/api/agendas/{agenda_id}")
 def get_agenda(agenda_id: int, credentials: HTTPAuthorizationCredentials = Depends(security)):
-    username = decode_token(credentials.credentials)
+    decode_token(credentials.credentials)
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT data FROM agendas WHERE id = %s AND username = %s",
-                (agenda_id, username),
-            )
+            cur.execute("SELECT data FROM agendas WHERE id = %s", (agenda_id,))
             row = cur.fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="找不到此議程或無權限")
+        raise HTTPException(status_code=404, detail="找不到此議程")
     return parse_jsonb(row[0])
 
 
 @app.delete("/api/agendas/{agenda_id}")
 def delete_agenda(agenda_id: int, credentials: HTTPAuthorizationCredentials = Depends(security)):
-    username = decode_token(credentials.credentials)
+    decode_token(credentials.credentials)
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM agendas WHERE id = %s AND username = %s",
-                (agenda_id, username),
-            )
+            cur.execute("DELETE FROM agendas WHERE id = %s", (agenda_id,))
             if cur.rowcount == 0:
-                raise HTTPException(status_code=404, detail="找不到此議程或無權限")
+                raise HTTPException(status_code=404, detail="找不到此議程")
     return {"ok": True}
 
 

@@ -625,7 +625,7 @@ function buildHeader(data) {
     <div>${t('fee')} : NTD150</div>
   </div>
   <div class="hg-meta-right">
-    <div class="hmr-text" style="grid-column:span 2"><strong>Time : ${dateDisplay} ｜ ${esc(data.timeRange)}</strong></div>
+    <div class="hmr-text" style="grid-column:span 2"><strong>${t('thTime')} : ${dateDisplay} ｜ ${esc(data.timeRange)}</strong></div>
     <div class="hmr-text" style="grid-column:span 2">${t('meetingSchedule')}</div>
     <div class="hmr-text" style="grid-column:span 2">${esc(data.venueInfo).replace(/\n/g, '<br>')}</div>
   </div>

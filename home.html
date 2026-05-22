@@ -606,17 +606,17 @@
   <nav class="sidebar-nav">
     <div class="nav-section-label">主選單</div>
 
-    <a class="nav-item active" href="home.html">
+    <a class="nav-item active" href="/home">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <span>總覽</span>
     </a>
 
-    <a class="nav-item" href="index.html">
+    <a class="nav-item" href="/index">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
       <span>新建議程</span>
     </a>
 
-    <a class="nav-item" href="member.html">
+    <a class="nav-item" href="/member">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span>會員管理</span>
     </a>
@@ -645,7 +645,7 @@
   <header class="topbar">
     <div class="topbar-title">議程管理</div>
     <div class="topbar-actions">
-      <button class="btn-primary" onclick="location.href='index.html'">
+      <button class="btn-primary" onclick="location.href='/index'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         新建議程
       </button>
@@ -746,7 +746,7 @@
 <script>
   async function checkHomeAuth() {
     const token = getToken();
-    if (!token) { location.href = 'login.html'; return; }
+    if (!token) { location.href = '/login'; return; }
     try {
       const res = await fetch(`${API_BASE}/api/auth/verify`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -756,10 +756,10 @@
         document.getElementById('navUser').textContent = data.username;
         document.getElementById('userAvatar').textContent = data.username.slice(0, 1).toUpperCase();
       } else {
-        clearAuth(); location.href = 'login.html';
+        clearAuth(); location.href = '/login';
       }
     } catch {
-      clearAuth(); location.href = 'login.html';
+      clearAuth(); location.href = '/login';
     }
   }
 
@@ -954,7 +954,7 @@
     pgBtns.innerHTML = html;
   }
 
-  function editAgenda(id) { location.href = `index.html?id=${id}`; }
+  function editAgenda(id) { location.href = `/index?id=${id}`; }
 
   async function deleteItem(id, btn) {
     if (!confirm('確定要刪除這份議程嗎？')) return;
@@ -981,7 +981,7 @@
   function doLogout() {
     if (!confirm('確定要登出嗎？')) return;
     clearAuth();
-    location.href = 'login.html';
+    location.href = '/login';
   }
 
   async function init() {

@@ -458,3 +458,26 @@ def delete_user(username: str, credentials: HTTPAuthorizationCredentials = Depen
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="找不到此使用者")
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ local dev static serving
+if not os.getenv("VERCEL"):
+    import pathlib
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse as _FileResponse
+
+    _root = pathlib.Path(__file__).parent.parent
+
+    @app.get("/login")
+    def page_login(): return _FileResponse(_root / "login.html")
+
+    @app.get("/home")
+    def page_home(): return _FileResponse(_root / "home.html")
+
+    @app.get("/index")
+    def page_index_html(): return _FileResponse(_root / "index.html")
+
+    @app.get("/member")
+    def page_member(): return _FileResponse(_root / "member.html")
+
+    app.mount("/", StaticFiles(directory=str(_root)), name="static")

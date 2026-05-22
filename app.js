@@ -5,7 +5,7 @@
 // ================================================================
 async function checkAuth() {
   const token = getToken();
-  if (!token) { window.location.href = 'login.html'; return; }
+  if (!token) { window.location.href = '/login'; return; }
   try {
     const res = await fetch(`${API_BASE}/api/auth/verify`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -16,18 +16,18 @@ async function checkAuth() {
       if (btn) btn.textContent = `登出（${getUsername()}）`;
     } else {
       clearAuth();
-      window.location.href = 'login.html';
+      window.location.href = '/login';
     }
   } catch {
     clearAuth();
-    window.location.href = 'login.html';
+    window.location.href = '/login';
   }
 }
 
 function doLogout() {
   if (!confirm('確定要登出嗎？')) return;
   clearAuth();
-  window.location.href = 'login.html';
+  window.location.href = '/login';
 }
 
 // ================================================================

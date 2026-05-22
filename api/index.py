@@ -2,11 +2,11 @@ import json
 import os
 import re
 import uuid
-import boto3
 import bcrypt
 import jwt
 import psycopg2
 import psycopg2.errors
+import psycopg2.pool
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
@@ -35,6 +35,7 @@ R2_PUBLIC_URL        = os.getenv("R2_PUBLIC_URL", "").rstrip("/")
 
 
 def _r2():
+    import boto3
     if not all([R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME]):
         raise HTTPException(status_code=503, detail="R2 未設定，請聯絡管理員")
     return boto3.client(
@@ -55,9 +56,19 @@ app.add_middleware(
 )
 
 
+_pool: Optional[psycopg2.pool.SimpleConnectionPool] = None
+
+
+def _get_pool() -> psycopg2.pool.SimpleConnectionPool:
+    global _pool
+    if _pool is None or _pool.closed:
+        _pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
+    return _pool
+
+
 @contextmanager
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = _get_pool().getconn()
     try:
         yield conn
         conn.commit()
@@ -65,7 +76,7 @@ def get_db():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        _get_pool().putconn(conn)
 
 
 def init_db():
@@ -131,10 +142,11 @@ def init_db():
                 )
 
 
-try:
-    init_db()
-except Exception as e:
-    print(f"[init_db] warning: {e}")
+if os.getenv("RUN_INIT_DB") == "1":
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[init_db] warning: {e}")
 
 security = HTTPBearer()
 

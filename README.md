@@ -29,7 +29,7 @@ EntrepreneurAgenda/
 
 | Key | Value |
 |-----|-------|
-| `DATABASE_URL` | Neon PostgreSQL 連線字串 |
+| `DATABASE_URL` | Neon PostgreSQL **Pooled** 連線字串（見下方說明） |
 | `JWT_SECRET` | 隨機產生的密鑰字串 |
 | `INVITE_CODE` | 註冊時需填入的邀請碼 |
 | `R2_ACCOUNT_ID` | Cloudflare 帳號 ID |
@@ -37,6 +37,21 @@ EntrepreneurAgenda/
 | `R2_SECRET_ACCESS_KEY` | R2 API Token Secret |
 | `R2_BUCKET_NAME` | R2 Bucket 名稱 |
 | `R2_PUBLIC_URL` | R2 Public Development URL（`https://pub-xxx.r2.dev`） |
+
+#### DATABASE_URL：使用 Neon Connection Pooler
+
+為降低 serverless 冷啟動時的 DB 連線延遲，請使用 Neon 的 **Pooled connection string**：
+
+1. Neon Dashboard → 選 Project → **Branches** → 點 branch（`main`）
+2. Connection string 區塊將 **Connection type** 切換為 **Pooled connection**
+3. 複製連線字串（hostname 中含 `-pooler`），貼入 Vercel `DATABASE_URL`
+
+```
+# Pooled 連線字串範例（hostname 含 -pooler）
+postgresql://user:pass@ep-xxx-pooler.ap-southeast-1.aws.neon.tech/dbname?sslmode=require
+```
+
+> `channel_binding` 參數會由程式碼自動移除，不影響連線。
 
 ### 2. 部署
 
@@ -89,7 +104,12 @@ R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
 R2_BUCKET_NAME=your-bucket-name
 R2_PUBLIC_URL=https://pub-xxx.r2.dev
+# 本地開發需執行 DB 初始化時設為 1，正式環境留空
+RUN_INIT_DB=1
 ```
+
+> `RUN_INIT_DB=1` 會在啟動時執行 `init_db()`（建立 Table、執行 ALTER、seed 資料）。
+> 正式部署（Vercel）不設此變數，避免每次冷啟動都執行 migration 造成延遲。
 
 ---
 

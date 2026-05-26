@@ -16,9 +16,16 @@ EntrepreneurAgenda/
 ├── media/             # 靜態圖片（TM Logo、FB QR、LINE QR）
 ├── requirements.txt   # Python 套件（Vercel 用）
 ├── vercel.json        # Vercel 路由設定
+├── alembic.ini        # Alembic 設定
 ├── .env               # 本地環境變數（不進版控）
 ├── api/
 │   └── index.py      # FastAPI（本地開發 & 正式環境共用）
+└── migrations/
+    ├── env.py         # Alembic 環境設定（讀取 DATABASE_URL）
+    ├── script.py.mako # Migration 模板
+    └── versions/
+        ├── 0001_initial_schema.py   # 建立 users / agendas / members
+        └── 0002_seed_admin_user.py  # 初始 admin 帳號
 ```
 
 ## 正式部署（Vercel）
@@ -104,12 +111,73 @@ R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
 R2_BUCKET_NAME=your-bucket-name
 R2_PUBLIC_URL=https://pub-xxx.r2.dev
-# 本地開發需執行 DB 初始化時設為 1，正式環境留空
-RUN_INIT_DB=1
 ```
 
-> `RUN_INIT_DB=1` 會在啟動時執行 `init_db()`（建立 Table、執行 ALTER、seed 資料）。
-> 正式部署（Vercel）不設此變數，避免每次冷啟動都執行 migration 造成延遲。
+---
+
+## Database Migration（Alembic）
+
+Schema 版本管理使用 **Alembic**，取代舊有的 `init_db()` 手動執行方式。
+
+### 部署新環境 / 第一次初始化
+
+```powershell
+.\venv\Scripts\Activate.ps1
+alembic upgrade head
+```
+
+這個指令會依序執行所有 migration：
+1. `0001` — 建立 `users`、`agendas`、`members` 資料表
+2. `0002` — 新增預設 `admin` 帳號
+
+### 常用指令
+
+| 指令 | 說明 |
+|------|------|
+| `alembic history` | 查看所有 migration 版本 |
+| `alembic current` | 查看 DB 目前在哪個版本 |
+| `alembic upgrade head` | 執行全部尚未套用的 migration |
+| `alembic downgrade -1` | 回滾上一個版本 |
+| `alembic revision -m "描述"` | 建立新 migration 檔 |
+
+### 新增欄位的流程
+
+```powershell
+# 1. 建立新 migration
+alembic revision -m "add_avatar_to_members"
+
+# 2. 編輯產生的檔案，填入 upgrade / downgrade
+#    migrations/versions/xxxx_add_avatar_to_members.py
+
+# 3. 套用
+alembic upgrade head
+```
+
+### 測試 Migration（上正式 DB 前）
+
+建議先用獨立的測試 DB 驗證，確認無誤再套用正式環境。
+
+**1. 在 Neon 建立新的測試 Project**
+> [console.neon.tech](https://console.neon.tech) → New Project → 取得 Pooled connection string
+
+**2. 暫時替換 `.env` 的 `DATABASE_URL`**
+```env
+DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
+```
+
+**3. 跑 migration 並驗證**
+```powershell
+.\venv\Scripts\alembic.exe upgrade head
+.\venv\Scripts\alembic.exe current   # 應顯示 0002 (head)
+```
+
+**4. 確認無誤後，將 `.env` 改回正式 DB，再執行一次**
+```powershell
+.\venv\Scripts\alembic.exe upgrade head
+```
+
+> **Rollback**：若需要回滾，`alembic downgrade -1` 回一版，`alembic downgrade base` 全部清除。
+> 正式 DB 執行 downgrade 前請務必備份，`DROP TABLE` 無法復原。
 
 ---
 

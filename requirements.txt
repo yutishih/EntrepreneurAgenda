@@ -6,3 +6,5 @@ pyjwt
 python-dotenv
 boto3
 aiofiles
+alembic
+sqlalchemy

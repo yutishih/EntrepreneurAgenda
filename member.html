@@ -116,16 +116,6 @@
     }
     .topbar-title { font-size: 16px; font-weight: 700; color: #0f172a; }
     .topbar-actions { display: flex; align-items: center; gap: 10px; }
-    .btn-primary {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 18px;
-      background: #772432; color: #fff;
-      border: none; border-radius: 8px;
-      font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: background 0.15s;
-      white-space: nowrap;
-    }
-    .btn-primary:hover { background: #5a1a25; }
 
     .content { padding: 28px; flex: 1; }
 
@@ -152,7 +142,6 @@
     }
     .stat-icon.blue  { background: #e6f0f7; color: #004165; }
     .stat-icon.gold  { background: #fdf9e8; color: #a07800; }
-    .stat-icon.red   { background: #f5eced; color: #772432; }
     .stat-body { flex: 1; }
     .stat-value { font-size: 26px; font-weight: 700; color: #0f172a; line-height: 1; }
     .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
@@ -262,6 +251,7 @@
     }
     .mc-name-zh { font-weight: 600; color: #0f172a; font-size: 13px; }
     .mc-name-en { font-size: 12px; color: #64748b; margin-top: 1px; }
+    .mc-username { font-size: 11px; color: #94a3b8; margin-top: 1px; }
 
     .level-badge {
       display: inline-block;
@@ -277,19 +267,11 @@
       background: #e6f0f7; color: #004165;
       border: 1px solid #b3cfe0;
       border-radius: 6px; font-size: 12px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s; margin-right: 6px;
+      cursor: pointer; transition: all 0.15s;
       display: inline-flex; align-items: center; gap: 5px;
     }
     .btn-edit-row:hover { background: #004165; color: #fff; border-color: #004165; }
     .btn-edit-icon { display: none; flex-shrink: 0; }
-    .btn-del-row {
-      padding: 5px 8px; background: none;
-      border: 1px solid #e2e8f0; border-radius: 6px;
-      cursor: pointer; color: #94a3b8;
-      display: inline-flex; align-items: center;
-      transition: all 0.15s;
-    }
-    .btn-del-row:hover { background: #f5eced; border-color: #d4a0a8; color: #772432; }
 
     .table-empty {
       text-align: center; padding: 48px;
@@ -304,6 +286,32 @@
       animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ================================================================
+       CLUB PICKER BAR (system_admin only)
+    ================================================================ */
+    .picker-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      padding: 14px 20px;
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 20px;
+    }
+    .picker-label {
+      font-size: 13px; font-weight: 600; color: #475569;
+      white-space: nowrap; flex-shrink: 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .picker-select {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 13px; background: #f8fafc;
+      cursor: pointer; min-width: 200px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .picker-select:focus { outline: none; border-color: #004165; background: #fff; }
 
     /* ================================================================
        MODAL
@@ -380,7 +388,6 @@
       table.member-list td { padding: 12px 12px; }
     }
     @media (max-width: 640px) {
-      /* Prevent page-level horizontal scroll */
       html, body { overflow-x: hidden; max-width: 100%; }
       .main-area { overflow-x: hidden; min-width: 0; }
 
@@ -388,28 +395,28 @@
       .content { padding: 12px; overflow-x: hidden; }
       .topbar { padding: 0 12px; height: 50px; }
       .topbar-title { font-size: 13px; }
-      .btn-primary { padding: 6px 10px; font-size: 12px; gap: 4px; }
       .search-input { max-width: 100%; }
       .chart-body { height: 160px; }
       .level-legend { gap: 8px 12px; padding: 0 16px 12px; }
       .legend-item { font-size: 10px; }
 
-      /* Table: all 3 cols visible, fixed layout to fit viewport */
       .member-table-wrap { overflow-x: hidden; }
       table.member-list { table-layout: fixed; width: 100%; }
       table.member-list th,
       table.member-list td { padding: 10px 8px; }
-      /* col 2 等級: fixed; col 3 操作: fixed; col 1 會員: fills remaining */
       table.member-list th:nth-child(2),
       table.member-list td:nth-child(2) { width: 80px; }
       table.member-list th:nth-child(3),
       table.member-list td:nth-child(3) { width: 80px; }
+      table.member-list th:nth-child(4),
+      table.member-list td:nth-child(4) { width: 56px; }
       .mc-avatar { width: 28px; height: 28px; font-size: 11px; flex-shrink: 0; }
       .td-member { gap: 8px; overflow: hidden; }
       .mc-name-zh { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .mc-name-en { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mc-username { display: none; }
       .level-badge { font-size: 10px; padding: 2px 6px; white-space: normal; word-break: break-word; }
-      .btn-edit-row { padding: 5px 8px; margin-right: 2px; }
+      .btn-edit-row { padding: 5px 8px; }
       .btn-edit-icon { display: block; }
       .btn-edit-label { display: none; }
 
@@ -432,17 +439,13 @@
       .sidebar-toggle-tab {
         display: flex;
         position: fixed;
-        left: 0;
-        top: 50%;
+        left: 0; top: 50%;
         transform: translateY(-50%);
-        width: 20px;
-        height: 56px;
+        width: 20px; height: 56px;
         background: #0f172a;
         border-radius: 0 8px 8px 0;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        z-index: 201;
+        align-items: center; justify-content: center;
+        cursor: pointer; z-index: 201;
         transition: left 0.3s cubic-bezier(0.4,0,0.2,1);
         box-shadow: 2px 0 8px rgba(0,0,0,0.3);
       }
@@ -452,12 +455,9 @@
 
       .sidebar-backdrop {
         display: block;
-        position: fixed;
-        inset: 0;
+        position: fixed; inset: 0;
         background: rgba(0,0,0,0.4);
-        z-index: 199;
-        opacity: 0;
-        pointer-events: none;
+        z-index: 199; opacity: 0; pointer-events: none;
         transition: opacity 0.3s ease;
       }
       .sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
@@ -471,6 +471,96 @@
       .modal-actions { flex-direction: column; }
       .btn-modal-cancel, .btn-modal-save { width: 100%; text-align: center; }
     }
+    /* ---- topbar add button ---- */
+    .btn-add {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 16px; background: #772432; color: #fff;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .btn-add:hover { background: #5a1a25; }
+
+    /* ---- add member modal ---- */
+    .modal-wide { width: 480px; }
+    .modal-tabs {
+      display: flex; margin-bottom: 18px;
+      border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;
+    }
+    .modal-tab {
+      flex: 1; padding: 8px; background: #f8fafc;
+      border: none; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: #64748b; transition: all 0.15s;
+    }
+    .modal-tab.active { background: #0f172a; color: #fff; }
+    .modal-tab:hover:not(.active) { background: #f1f5f9; }
+    .bulk-hint {
+      font-size: 12px; color: #64748b;
+      background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; line-height: 1.7;
+    }
+    .bulk-hint code {
+      background: #e2e8f0; padding: 1px 5px; border-radius: 3px;
+      font-size: 11px; font-family: monospace;
+    }
+    .bulk-textarea {
+      width: 100%; height: 140px; padding: 10px 12px;
+      border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 13px; font-family: monospace; resize: vertical;
+      background: #f8fafc; transition: border-color 0.2s;
+    }
+    .bulk-textarea:focus { outline: none; border-color: #004165; background: #fff; }
+    .bulk-results { margin-top: 14px; max-height: 180px; overflow-y: auto; }
+    .bulk-result-summary { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+    .bulk-result-head { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+    .bulk-result-head code { background: #f1f5f9; padding: 1px 6px; border-radius: 3px; font-family: monospace; }
+    .bulk-result-row { font-size: 12px; padding: 2px 0; }
+    .bulk-result-row.ok  { color: #166534; }
+    .bulk-result-row.err { color: #991b1b; }
+
+    /* ---- sortable column headers ---- */
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { background: #f1f5f9; color: #0f172a; }
+    .sort-icon { margin-left: 4px; font-style: normal; font-size: 10px; opacity: 0.4; }
+    th.sort-asc .sort-icon, th.sort-desc .sort-icon { opacity: 1; color: #004165; }
+
+    /* ---- filter tabs ---- */
+    .filter-tabs { display: flex; padding: 0 20px; border-bottom: 1px solid #f1f5f9; }
+    .filter-tab {
+      padding: 10px 16px; background: none; border: none;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      font-size: 13px; font-weight: 500; color: #64748b;
+      cursor: pointer; display: flex; align-items: center; gap: 7px;
+      transition: color 0.15s;
+    }
+    .filter-tab.active { color: #004165; border-bottom-color: #004165; font-weight: 600; }
+    .filter-tab:hover:not(.active) { color: #0f172a; }
+    .pending-badge {
+      background: #fef3c7; color: #92400e;
+      font-size: 11px; font-weight: 700;
+      border-radius: 10px; padding: 1px 7px; min-width: 18px; text-align: center;
+    }
+    .pending-badge.zero { background: #f1f5f9; color: #94a3b8; }
+
+    /* ---- approve / reject buttons ---- */
+    .btn-approve-row {
+      padding: 5px 13px; background: #dcfce7; color: #166534;
+      border: 1px solid #86efac; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-approve-row:hover { background: #166534; color: #fff; border-color: #166534; }
+    .btn-reject-row {
+      padding: 5px 10px; background: none; color: #94a3b8;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      font-size: 12px; cursor: pointer; transition: all 0.15s; margin-left: 5px;
+    }
+    .btn-reject-row:hover { background: #f5eced; border-color: #d4a0a8; color: #772432; }
+    .btn-del-row {
+      padding: 5px 8px; background: none; color: #94a3b8;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      font-size: 12px; cursor: pointer; transition: all 0.15s; margin-left: 5px;
+      display: inline-flex; align-items: center;
+    }
+    .btn-del-row:hover { background: #f5eced; border-color: #d4a0a8; color: #772432; }
   </style>
 </head>
 <body>
@@ -502,6 +592,14 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span>會員管理</span>
     </a>
+    <a class="nav-item system-admin-only" href="/club" style="display:none">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>分會管理</span>
+    </a>
+    <a class="nav-item system-admin-only" href="/admin" style="display:none">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l1.5 1.5L21 9"/></svg>
+      <span>用戶管理</span>
+    </a>
   </nav>
   <div class="sidebar-footer">
     <div class="sidebar-user">
@@ -522,7 +620,7 @@
   <header class="topbar">
     <div class="topbar-title">會員管理</div>
     <div class="topbar-actions">
-      <button class="btn-primary" onclick="openModal()">
+      <button class="btn-add write-action" onclick="openAddModal()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         新增會員
       </button>
@@ -530,6 +628,19 @@
   </header>
 
   <div class="content">
+
+    <!-- Club Picker (system_admin only) -->
+    <div id="clubPickerBar" style="display:none">
+      <div class="picker-card">
+        <span class="picker-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          查看分會
+        </span>
+        <select id="clubPickerSelect" class="picker-select" onchange="onClubPickerChange()">
+          <option value="">— 請選擇分會 —</option>
+        </select>
+      </div>
+    </div>
 
     <!-- Stats -->
     <div class="stats-row">
@@ -574,22 +685,31 @@
         </div>
       </div>
 
+      <!-- Filter tabs -->
+      <div class="filter-tabs write-action">
+        <button class="filter-tab active" id="filterActive" onclick="setFilter('active')">正式會員</button>
+        <button class="filter-tab" id="filterPending" onclick="setFilter('pending')">
+          待審核申請 <span class="pending-badge zero" id="pendingBadge">0</span>
+        </button>
+      </div>
+
       <div class="search-wrap">
         <input type="text" class="search-input" id="searchInput"
-               placeholder="搜尋姓名或等級…" oninput="renderList()">
+               placeholder="搜尋帳號、姓名或等級…" oninput="renderList()">
       </div>
 
       <div class="member-table-wrap">
         <table class="member-list">
           <thead>
             <tr>
-              <th>會員</th>
-              <th>等級</th>
+              <th class="sortable" data-key="nameZh" onclick="sortBy('nameZh')">會員 <i class="sort-icon">↕</i></th>
+              <th class="sortable" data-key="level"   onclick="sortBy('level')">等級 <i class="sort-icon">↕</i></th>
+              <th class="sortable" data-key="clubName" onclick="sortBy('clubName')">分會 <i class="sort-icon">↕</i></th>
               <th style="text-align:right">操作</th>
             </tr>
           </thead>
           <tbody id="memberTableBody">
-            <tr><td colspan="3"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
+            <tr><td colspan="4"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -598,11 +718,67 @@
   </div>
 </div>
 
-<!-- Modal -->
+<!-- Add Member Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3>新增會員</h3>
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-tab="single" onclick="switchAddTab('single')">單筆</button>
+      <button class="modal-tab" data-tab="bulk" onclick="switchAddTab('bulk')">多筆匯入</button>
+    </div>
+    <!-- Single -->
+    <div id="addSingle">
+      <div class="modal-field">
+        <label>中文姓名</label>
+        <input type="text" id="addNameZh" placeholder="蔡宜容">
+      </div>
+      <div class="modal-field">
+        <label>英文姓名</label>
+        <input type="text" id="addNameEn" placeholder="Lia Tsai" oninput="autoUsername()">
+      </div>
+      <div class="modal-field">
+        <label>等級</label>
+        <input type="text" id="addLevel" placeholder="TM" value="TM">
+      </div>
+      <div class="modal-field">
+        <label>帳號（自動產生，可修改）</label>
+        <input type="text" id="addUsername" placeholder="liatsai">
+      </div>
+      <div class="modal-field">
+        <label>預設密碼</label>
+        <input type="text" id="addPassword" value="Toastmasters1">
+      </div>
+    </div>
+    <!-- Bulk -->
+    <div id="addBulk" style="display:none">
+      <div class="bulk-hint">
+        每行一筆：<code>中文姓名,英文姓名,等級</code><br>
+        等級可省略（預設 TM）。帳號自動依英文姓名產生。
+      </div>
+      <textarea id="bulkText" class="bulk-textarea"
+        placeholder="李大明,David Li,L2&#10;王小明,Xiao Ming Wang,TM&#10;陳美麗,Mary Chen"></textarea>
+      <div class="modal-field" style="margin-top:10px">
+        <label>預設密碼（所有人相同）</label>
+        <input type="text" id="bulkPassword" value="Toastmasters1">
+      </div>
+    </div>
+    <!-- Results -->
+    <div id="addResults" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeAddModal()">取消</button>
+      <button class="btn-modal-save" id="addSubmitBtn" onclick="submitAdd()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-header">
-      <h3 id="modalTitle">新增會員</h3>
+      <h3>編輯會員資料</h3>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-field">
@@ -615,7 +791,7 @@
     </div>
     <div class="modal-field">
       <label>等級</label>
-      <input type="text" id="fLevel" placeholder="TM / CC / DTM / IP4 …">
+      <input type="text" id="fLevel" placeholder="TM / L1 / L2 / L3 / L4 / L5 / DTM">
     </div>
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeModal()">取消</button>
@@ -628,8 +804,13 @@
 <script src="auth.js"></script>
 <script>
   let members = [];
-  let editingId = null;
+  let editingUsername = null;
   let levelChart = null;
+  let allClubs = [];
+  let selectedClubId = null;
+  let sortKey = null;
+  let sortDir = 'asc';
+  let filterStatus = 'active'; // 'active' | 'pending'
 
   const LEVEL_CONFIG = [
     { key: 'TM',  label: 'TM',      color: '#a9b2b1' },
@@ -642,7 +823,7 @@
   ];
 
   function parseLevel(level) {
-    const s = level.toUpperCase();
+    const s = (level || '').toUpperCase();
     if (s.includes('DTM')) return 'DTM';
     const nums = s.match(/[1-5]/g);
     if (nums) return 'L' + Math.max(...nums.map(Number));
@@ -650,6 +831,7 @@
   }
 
   async function init() {
+    applyRoleUI();
     const token = getToken();
     if (!token) { location.href = '/login'; return; }
     try {
@@ -658,22 +840,67 @@
       });
       if (res.ok) {
         const data = await res.json();
+        setAuth(getToken(), data.username, data.role, data.club_id, data.must_change_pw);
+        if (data.must_change_pw) { location.href = '/change-password'; return; }
         document.getElementById('navUser').textContent = data.username;
         document.getElementById('userAvatar').textContent = data.username.slice(0,1).toUpperCase();
+        applyRoleUI();
       } else {
         clearAuth(); location.href = '/login'; return;
       }
     } catch {
       clearAuth(); location.href = '/login'; return;
     }
-    await fetchMembers();
+
+    if (isSystemAdmin()) {
+      await loadClubs();   // populate picker dropdown
+    }
+    await fetchMembers(); // load all (system_admin = all clubs; others = own club)
   }
 
-  async function fetchMembers() {
-    document.getElementById('memberTableBody').innerHTML =
-      '<tr><td colspan="3"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>';
+  async function loadClubs() {
     try {
-      const res = await fetch(`${API_BASE}/api/members`, {
+      const res = await fetch(`${API_BASE}/api/clubs`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error();
+      allClubs = await res.json();
+      const select = document.getElementById('clubPickerSelect');
+      select.innerHTML = '<option value="">— 全部分會 —</option>' +
+        allClubs.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      document.getElementById('clubPickerBar').style.display = '';
+    } catch {
+      console.error('載入分會失敗');
+    }
+  }
+
+  function onClubPickerChange() {
+    const val = document.getElementById('clubPickerSelect').value;
+    selectedClubId = val ? parseInt(val) : null;
+    fetchMembers(selectedClubId ?? undefined);
+  }
+
+  function showNoClubHint() {
+    members = [];
+    document.getElementById('statTotal').textContent = '—';
+    document.getElementById('statDtm').textContent = '—';
+    document.getElementById('chartSubtitle').textContent = '';
+    document.getElementById('levelLegend').innerHTML = '';
+    if (levelChart) { levelChart.destroy(); levelChart = null; }
+    document.getElementById('badgeCount').textContent = '0 位';
+    document.getElementById('memberTableBody').innerHTML =
+      '<tr><td colspan="4"><div class="table-empty">請先選擇分會以查看會員</div></td></tr>';
+  }
+
+  async function fetchMembers(clubId) {
+    document.getElementById('memberTableBody').innerHTML =
+      '<tr><td colspan="4"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>';
+    try {
+      let url = `${API_BASE}/api/users`;
+      if (isSystemAdmin() && clubId != null) {
+        url += `?club_id=${clubId}`;
+      }
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) throw new Error();
@@ -682,17 +909,35 @@
       renderList();
     } catch {
       document.getElementById('memberTableBody').innerHTML =
-        '<tr><td colspan="3"><div class="table-empty">載入失敗</div></td></tr>';
+        '<tr><td colspan="4"><div class="table-empty">載入失敗</div></td></tr>';
     }
   }
 
+  function setFilter(status) {
+    filterStatus = status;
+    document.getElementById('filterActive').classList.toggle('active',  status === 'active');
+    document.getElementById('filterPending').classList.toggle('active', status === 'pending');
+    document.getElementById('searchInput').value = '';
+    renderList();
+  }
+
   function updateStats() {
-    document.getElementById('statTotal').textContent = members.length;
+    const activeMembers  = members.filter(m => (m.status || 'active') === 'active');
+    const pendingMembers = members.filter(m => m.status === 'pending');
+
+    document.getElementById('statTotal').textContent = activeMembers.length;
     document.getElementById('statDtm').textContent =
-      members.filter(m => m.level.toUpperCase().includes('DTM')).length;
+      activeMembers.filter(m => (m.level || '').toUpperCase().includes('DTM')).length;
+
+    // Pending badge
+    const badge = document.getElementById('pendingBadge');
+    if (badge) {
+      badge.textContent = pendingMembers.length;
+      badge.className = 'pending-badge' + (pendingMembers.length === 0 ? ' zero' : '');
+    }
 
     const counts = Object.fromEntries(LEVEL_CONFIG.map(c => [c.key, 0]));
-    members.forEach(m => {
+    activeMembers.forEach(m => {
       const k = parseLevel(m.level);
       if (counts[k] !== undefined) counts[k]++;
     });
@@ -742,85 +987,256 @@
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: { label: c => ` ${c.raw} 位` }
-          },
+          tooltip: { callbacks: { label: c => ` ${c.raw} 位` } },
         },
         scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1, font: { size: 11 } },
-            grid: { color: '#f1f5f9' },
-          },
-          x: {
-            ticks: { font: { size: 12 } },
-            grid: { display: false },
-          },
+          y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+          x: { ticks: { font: { size: 12 } }, grid: { display: false } },
         },
       },
     });
   }
 
+  // ---- Add member ----
+  let addTab = 'single';
+
+  function openAddModal() {
+    if (isSystemAdmin() && !selectedClubId) { alert('請先選擇分會'); return; }
+    document.getElementById('addNameZh').value  = '';
+    document.getElementById('addNameEn').value  = '';
+    document.getElementById('addLevel').value   = 'TM';
+    document.getElementById('addUsername').value = '';
+    document.getElementById('addPassword').value = 'Toastmasters1';
+    document.getElementById('bulkText').value   = '';
+    document.getElementById('addResults').style.display = 'none';
+    const btn = document.getElementById('addSubmitBtn');
+    btn.textContent = '儲存'; btn.onclick = submitAdd;
+    switchAddTab('single');
+    document.getElementById('addModal').classList.add('open');
+    setTimeout(() => document.getElementById('addNameZh').focus(), 50);
+  }
+
+  function closeAddModal() {
+    document.getElementById('addModal').classList.remove('open');
+  }
+
+  function switchAddTab(tab) {
+    addTab = tab;
+    document.getElementById('addSingle').style.display = tab === 'single' ? '' : 'none';
+    document.getElementById('addBulk').style.display   = tab === 'bulk'   ? '' : 'none';
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.modal-tab[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById('addSubmitBtn').textContent = tab === 'single' ? '儲存' : '匯入';
+    document.getElementById('addResults').style.display = 'none';
+  }
+
+  function autoUsername() {
+    const en   = document.getElementById('addNameEn').value;
+    const base = en.toLowerCase().replace(/[^a-z0-9]/g, '');
+    document.getElementById('addUsername').value = base;
+  }
+
+  async function submitAdd() {
+    if (addTab === 'single') await addSingle(); else await addBulk();
+  }
+
+  async function addSingle() {
+    const name_zh  = document.getElementById('addNameZh').value.trim();
+    const name_en  = document.getElementById('addNameEn').value.trim();
+    const level    = document.getElementById('addLevel').value.trim() || 'TM';
+    const username = document.getElementById('addUsername').value.trim();
+    const password = document.getElementById('addPassword').value.trim();
+    if (!name_zh || !name_en) { alert('請填入中英文姓名'); return; }
+    if (username.length < 3)  { alert('帳號至少需要 3 個字元'); return; }
+    if (password.length < 6)  { alert('密碼至少需要 6 個字元'); return; }
+    const body = { username, password, name_zh, name_en, level, role: 'club_member' };
+    if (isSystemAdmin()) body.club_id = selectedClubId;
+    try {
+      const res = await fetch(`${API_BASE}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || '新增失敗');
+      closeAddModal();
+      await fetchMembers(isSystemAdmin() ? selectedClubId : undefined);
+    } catch(e) { alert(e.message); }
+  }
+
+  async function addBulk() {
+    const text     = document.getElementById('bulkText').value.trim();
+    const password = document.getElementById('bulkPassword').value.trim();
+    if (!text)              { alert('請輸入會員資料'); return; }
+    if (password.length < 6){ alert('密碼至少需要 6 個字元'); return; }
+    const members = text.split('\n')
+      .map(l => l.trim()).filter(l => l)
+      .map(line => {
+        const p = line.split(',').map(x => x.trim());
+        return { name_zh: p[0] || '', name_en: p[1] || '', level: p[2] || 'TM' };
+      });
+    const body = { members, default_password: password };
+    if (isSystemAdmin()) body.club_id = selectedClubId;
+    try {
+      const res = await fetch(`${API_BASE}/api/users/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || '匯入失敗');
+      const { results, defaultPassword } = await res.json();
+      const ok   = results.filter(r => r.ok);
+      const fail = results.filter(r => !r.ok);
+      const el = document.getElementById('addResults');
+      el.style.display = '';
+      el.innerHTML = `<div class="bulk-results">
+        <div class="bulk-result-summary">成功 ${ok.length} 筆${fail.length ? `，失敗 ${fail.length} 筆` : ''}</div>
+        ${ok.length ? `<div class="bulk-result-head">預設密碼：<code>${defaultPassword}</code></div>` : ''}
+        ${ok.map(r => `<div class="bulk-result-row ok">✓ ${r.nameZh}（帳號：${r.username}）</div>`).join('')}
+        ${fail.map(r => `<div class="bulk-result-row err">✗ ${r.nameZh || '?'} — ${r.error}</div>`).join('')}
+      </div>`;
+      const btn = document.getElementById('addSubmitBtn');
+      btn.textContent = '完成';
+      btn.onclick = async () => { closeAddModal(); await fetchMembers(isSystemAdmin() ? selectedClubId : undefined); };
+    } catch(e) { alert(e.message); }
+  }
+
+  document.getElementById('addModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('addModal')) closeAddModal();
+  });
+
+  function sortBy(key) {
+    sortDir = (sortKey === key && sortDir === 'asc') ? 'desc' : 'asc';
+    sortKey = key;
+    document.querySelectorAll('th.sortable').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      const ic = th.querySelector('.sort-icon');
+      if (ic) ic.textContent = '↕';
+    });
+    const active = document.querySelector(`th[data-key="${key}"]`);
+    if (active) {
+      active.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+      const ic = active.querySelector('.sort-icon');
+      if (ic) ic.textContent = sortDir === 'asc' ? '↑' : '↓';
+    }
+    renderList();
+  }
+
   function renderList() {
     const q = document.getElementById('searchInput').value.trim().toLowerCase();
-    const filtered = q
-      ? members.filter(m =>
-          m.nameZh.toLowerCase().includes(q) ||
-          m.nameEn.toLowerCase().includes(q) ||
-          m.level.toLowerCase().includes(q))
-      : members;
+
+    // Filter by status tab first
+    let filtered = members.filter(m => (m.status || 'active') === filterStatus);
+
+    // Then by search query
+    if (q) {
+      filtered = filtered.filter(m =>
+        (m.nameZh || '').toLowerCase().includes(q) ||
+        (m.nameEn || '').toLowerCase().includes(q) ||
+        (m.level  || '').toLowerCase().includes(q) ||
+        (m.username || '').toLowerCase().includes(q));
+    }
+
+    if (sortKey) {
+      filtered = [...filtered].sort((a, b) => {
+        const av = (a[sortKey] ?? '').toString().toLowerCase();
+        const bv = (b[sortKey] ?? '').toString().toLowerCase();
+        const cmp = av.localeCompare(bv, 'zh-TW');
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
 
     document.getElementById('badgeCount').textContent = `${filtered.length} 位`;
 
     const tbody = document.getElementById('memberTableBody');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="3"><div class="table-empty">沒有符合的會員</div></td></tr>';
+      const emptyMsg = filterStatus === 'pending' ? '目前沒有待審核的申請' : '沒有符合的會員';
+      tbody.innerHTML = `<tr><td colspan="4"><div class="table-empty">${emptyMsg}</div></td></tr>`;
       return;
     }
-    tbody.innerHTML = filtered.map(m => `
+
+    const canEdit = canWrite();
+    tbody.innerHTML = filtered.map(m => {
+      const isPending = filterStatus === 'pending';
+      const actions = isPending
+        ? `<button class="btn-approve-row" onclick="approveUser('${m.username}')">批准</button>
+           <button class="btn-reject-row"  onclick="rejectUser('${m.username}')">拒絕</button>`
+        : (canEdit
+            ? `<button class="btn-edit-row" onclick="openModal('${m.username}')">
+                <svg class="btn-edit-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span class="btn-edit-label">編輯</span>
+               </button>
+               <button class="btn-del-row" onclick="deleteMember('${m.username}')" title="刪除會員">
+                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+               </button>`
+            : '—');
+      return `
       <tr>
         <td>
           <div class="td-member">
-            <div class="mc-avatar">${m.nameZh.charAt(0)}</div>
+            <div class="mc-avatar">${(m.nameZh || m.username).charAt(0)}</div>
             <div>
-              <div class="mc-name-zh">${m.nameZh}</div>
-              <div class="mc-name-en">${m.nameEn}</div>
+              <div class="mc-name-zh">${m.nameZh || '—'}</div>
+              <div class="mc-name-en">${m.nameEn || '—'}</div>
+              <div class="mc-username">@${m.username}</div>
             </div>
           </div>
         </td>
-        <td><span class="level-badge">${m.level}</span></td>
-        <td class="td-actions">
-          <button class="btn-edit-row" onclick="openModal(${m.id})">
-            <svg class="btn-edit-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            <span class="btn-edit-label">編輯</span>
-          </button>
-          <button class="btn-del-row" onclick="deleteMember(${m.id})" title="刪除">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-          </button>
-        </td>
-      </tr>`).join('');
+        <td><span class="level-badge">${m.level || 'TM'}</span></td>
+        <td style="font-size:12px;color:${m.clubName ? '#0f172a' : '#94a3b8'}">${m.clubName || '—'}</td>
+        <td class="td-actions">${actions}</td>
+      </tr>`;
+    }).join('');
   }
 
-  function openModal(id = null) {
-    editingId = id;
-    document.getElementById('modalTitle').textContent = id ? '編輯會員' : '新增會員';
-    if (id) {
-      const m = members.find(m => m.id === id);
-      document.getElementById('fNameZh').value = m.nameZh;
-      document.getElementById('fNameEn').value = m.nameEn;
-      document.getElementById('fLevel').value  = m.level;
-    } else {
-      document.getElementById('fNameZh').value = '';
-      document.getElementById('fNameEn').value = '';
-      document.getElementById('fLevel').value  = '';
-    }
+  async function approveUser(username) {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${username}/approve`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || '批准失敗');
+      await fetchMembers(isSystemAdmin() ? selectedClubId : undefined);
+    } catch(e) { alert(e.message); }
+  }
+
+  async function rejectUser(username) {
+    if (!confirm(`確定要拒絕「${username}」的加入申請嗎？此操作無法復原。`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${username}/reject`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || '拒絕失敗');
+      await fetchMembers(isSystemAdmin() ? selectedClubId : undefined);
+    } catch(e) { alert(e.message); }
+  }
+
+  async function deleteMember(username) {
+    if (!confirm(`確定要刪除會員「${username}」嗎？此操作無法復原。`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${username}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || '刪除失敗');
+      await fetchMembers(isSystemAdmin() ? selectedClubId : undefined);
+    } catch(e) { alert(e.message); }
+  }
+
+  function openModal(username) {
+    const m = members.find(m => m.username === username);
+    if (!m) return;
+    editingUsername = username;
+    document.getElementById('fNameZh').value = m.nameZh || '';
+    document.getElementById('fNameEn').value = m.nameEn || '';
+    document.getElementById('fLevel').value  = m.level  || 'TM';
     document.getElementById('modal').classList.add('open');
     document.getElementById('fNameZh').focus();
   }
 
   function closeModal() {
     document.getElementById('modal').classList.remove('open');
-    editingId = null;
+    editingUsername = null;
   }
 
   async function saveMember() {
@@ -831,34 +1247,16 @@
     };
     if (!body.name_zh || !body.name_en) { alert('請填入中英文姓名'); return; }
     try {
-      const url    = editingId ? `${API_BASE}/api/members/${editingId}` : `${API_BASE}/api/members`;
-      const method = editingId ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
+      const res = await fetch(`${API_BASE}/api/users/${editingUsername}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error((await res.json()).detail || '儲存失敗');
       closeModal();
-      await fetchMembers();
+      await fetchMembers(isSystemAdmin() ? selectedClubId : undefined);
     } catch (e) {
       alert(e.message);
-    }
-  }
-
-  async function deleteMember(id) {
-    if (!confirm('確定要移除此會員嗎？')) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/members/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error();
-      members = members.filter(m => m.id !== id);
-      updateStats();
-      renderList();
-    } catch {
-      alert('刪除失敗');
     }
   }
 
@@ -880,6 +1278,7 @@
     if (e.target === document.getElementById('modal')) closeModal();
   });
 
+  applyRoleUI(); // 立即執行，消除切換頁面時的閃爍延遲
   document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>

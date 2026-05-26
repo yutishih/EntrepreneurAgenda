@@ -11,6 +11,13 @@ async function checkAuth() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
+      const data = await res.json();
+      // Keep localStorage in sync with server (role/club_id may have changed)
+      setAuth(data.token || token, data.username, data.role, data.club_id, data.must_change_pw);
+      if (data.must_change_pw) {
+        window.location.href = '/change-password';
+        return;
+      }
       document.querySelector('.app-layout').style.display = 'flex';
       const btn = document.getElementById('logoutBtn');
       if (btn) btn.textContent = `登出（${getUsername()}）`;
@@ -913,6 +920,8 @@ function updatePreview() {
 // SAVE / LOAD
 // ================================================================
 let currentAgendaId = null;
+let selectedClubId  = null;   // system_admin: which club this agenda belongs to
+let allClubs        = [];
 
 function collectSaveData() {
   return { ...collectData(), timeOverrides: { ...timeOverrides }, lang, themeImgUrl: images.themeImg || null };
@@ -967,11 +976,17 @@ function applyAgendaData(d) {
 }
 
 async function saveAgenda() {
+  // system_admin must pick a club before saving
+  if (isSystemAdmin() && !selectedClubId) {
+    alert('請先在上方選擇此議程所屬的分會，再儲存。');
+    return;
+  }
   const btn = document.getElementById('btnSave');
   btn.disabled = true;
   btn.textContent = '儲存中...';
   try {
-    const body = JSON.stringify({ data: collectSaveData() });
+    const payload = { data: collectSaveData(), club_id: selectedClubId };
+    const body    = JSON.stringify(payload);
     const headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${getToken()}`,
@@ -1169,6 +1184,22 @@ async function loadAgenda(id, { ownLoading = true } = {}) {
     });
     if (!res.ok) throw new Error('載入失敗');
     const data = await res.json();
+
+    // Restore club picker for system_admin (API injects _clubId)
+    if (isSystemAdmin()) {
+      const clubId = data._clubId ?? null;
+      const clubChanged = clubId !== selectedClubId;
+      selectedClubId = clubId;
+      const sel = document.getElementById('agendaClubSelect');
+      if (sel) sel.value = clubId ?? '';
+      _updateClubPickerHint();
+      // Reload member roster if club changed
+      if (clubChanged) {
+        memberRoster = [];
+        fetchMemberDatalist();
+      }
+    }
+
     applyAgendaData(data);
     currentAgendaId = id;
     setSaveStatus('saved');
@@ -1399,7 +1430,14 @@ let memberRoster = [];
 
 async function fetchMemberDatalist() {
   try {
-    const res = await fetch(`${API_BASE}/api/members`, {
+    const params = new URLSearchParams();
+    // system_admin: filter by the agenda's club; if no club selected yet, skip
+    if (isSystemAdmin()) {
+      if (!selectedClubId) return;
+      params.set('club_id', selectedClubId);
+    }
+    const qs = params.toString();
+    const res = await fetch(`${API_BASE}/api/users${qs ? '?' + qs : ''}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
     if (!res.ok) return;
@@ -1571,10 +1609,54 @@ function initAutocomplete() {
   }
 }
 
+async function loadAgendaClubs() {
+  try {
+    const res = await fetch(`${API_BASE}/api/clubs`);
+    if (!res.ok) return;
+    allClubs = await res.json();
+    const sel = document.getElementById('agendaClubSelect');
+    if (!sel) return;
+    allClubs.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      sel.appendChild(opt);
+    });
+    document.getElementById('agendaClubPickerRow').style.display = '';
+  } catch { /* ignore */ }
+}
+
+function onAgendaClubChange(val) {
+  selectedClubId = val ? parseInt(val) : null;
+  _updateClubPickerHint();
+  setSaveStatus('unsaved');
+  // Reload member roster filtered to the newly selected club
+  memberRoster = [];
+  fetchMemberDatalist();
+}
+
+function _updateClubPickerHint() {
+  const hint = document.getElementById('agendaClubHint');
+  if (!hint) return;
+  if (!selectedClubId) {
+    hint.textContent = '⚠ 請選擇分會，否則無法儲存';
+    hint.style.color = '#b45309';
+  } else {
+    const club = allClubs.find(c => c.id === selectedClubId);
+    hint.textContent = club ? `此議程將歸屬於「${club.name}」` : '';
+    hint.style.color = '#64748b';
+  }
+}
+
 async function init() {
   showLoading();
   try {
     await checkAuth();
+    applyRoleUI();
+    if (isSystemAdmin()) {
+      await loadAgendaClubs();
+      _updateClubPickerHint();
+    }
     initAutocomplete();
     fetchMemberDatalist();
 

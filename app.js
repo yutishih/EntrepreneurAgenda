@@ -926,10 +926,11 @@ let allClubs        = [];
 function collectSaveData() {
   return {
     ...collectData(),
-    timeOverrides:  { ...timeOverrides },
+    timeOverrides:    { ...timeOverrides },
+    durationSettings: { ...durationSettings },
     lang,
-    themeImgUrl:    images.themeImg || null,
-    varietySession: { ...varietySession },
+    themeImgUrl:      images.themeImg || null,
+    varietySession:   { ...varietySession },
   };
 }
 
@@ -955,6 +956,15 @@ function applyAgendaData(d) {
       const el = document.getElementById(`to_${key}`);
       if (el) el.value = val || '';
     });
+  }
+
+  if (d.durationSettings) {
+    durationSettings.tmeMins = d.durationSettings.tmeMins ?? 4;
+    durationSettings.geMins  = d.durationSettings.geMins  ?? 4;
+    const tmeEl = document.getElementById('dur_tmeMins');
+    if (tmeEl) tmeEl.value = durationSettings.tmeMins;
+    const geEl = document.getElementById('dur_geMins');
+    if (geEl) geEl.value = durationSettings.geMins;
   }
 
   if (d.lang === 'zh' || d.lang === 'en') {

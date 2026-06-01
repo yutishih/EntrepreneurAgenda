@@ -924,7 +924,13 @@ let selectedClubId  = null;   // system_admin: which club this agenda belongs to
 let allClubs        = [];
 
 function collectSaveData() {
-  return { ...collectData(), timeOverrides: { ...timeOverrides }, lang, themeImgUrl: images.themeImg || null };
+  return {
+    ...collectData(),
+    timeOverrides:  { ...timeOverrides },
+    lang,
+    themeImgUrl:    images.themeImg || null,
+    varietySession: { ...varietySession },
+  };
 }
 
 function applyAgendaData(d) {
@@ -955,6 +961,19 @@ function applyAgendaData(d) {
     lang = d.lang;
     const btn = document.getElementById('langToggle');
     if (btn) btn.textContent = lang === 'en' ? '切換中文' : 'Switch to EN';
+  }
+
+  if (d.varietySession) {
+    varietySession.enabled  = !!d.varietySession.enabled;
+    varietySession.duration = d.varietySession.duration || 15;
+    varietySession.host     = d.varietySession.host || '';
+    const cb = document.getElementById('varietyEnabled');
+    if (cb) cb.checked = varietySession.enabled;
+    toggleVariety(varietySession.enabled);
+    const hostEl = document.getElementById('varietyHost');
+    if (hostEl) hostEl.value = varietySession.host;
+    const durEl = document.getElementById('varietyDuration');
+    if (durEl) durEl.value = varietySession.duration;
   }
 
   images.themeImg = d.themeImgUrl || null;

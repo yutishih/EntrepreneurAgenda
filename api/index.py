@@ -103,6 +103,16 @@ class AgendaSaveRequest(BaseModel):
 
 class ClubRequest(BaseModel):
     name: str
+    name_zh: Optional[str] = None
+    name_en: Optional[str] = None
+    charter_no: Optional[str] = None
+    founded_date: Optional[str] = None
+    fee: Optional[str] = None
+    logo_url: Optional[str] = None
+    fb_qr_url: Optional[str] = None
+    line_qr_url: Optional[str] = None
+    template_key: Optional[str] = None
+    settings: Optional[Dict[str, Any]] = None
 
 
 class UserCreateRequest(BaseModel):
@@ -145,6 +155,7 @@ class PresignRequest(BaseModel):
     content_type: str
     meeting_date: Optional[str] = None
     meeting_no: Optional[str] = None
+    club_id: Optional[int] = None
 
 
 # ------------------------------------------------------------------ helpers
@@ -415,24 +426,62 @@ def delete_agenda(agenda_id: int, user: dict = Depends(require_club_admin_or_abo
 
 
 # ------------------------------------------------------------------ clubs
+
+# Branding/template columns returned to the frontend and used for agenda rendering.
+_CLUB_COLS = (
+    "id, name, name_zh, name_en, charter_no, founded_date, fee,"
+    " logo_url, fb_qr_url, line_qr_url, template_key, settings"
+)
+
+
+def _club_row_to_dict(r):
+    return {
+        "id": r[0],
+        "name": r[1],
+        "name_zh": r[2],
+        "name_en": r[3],
+        "charter_no": r[4],
+        "founded_date": r[5],
+        "fee": r[6],
+        "logo_url": r[7],
+        "fb_qr_url": r[8],
+        "line_qr_url": r[9],
+        "template_key": r[10] or "standard",
+        "settings": r[11] or {},
+    }
+
+
 @app.get("/api/clubs")
 def list_clubs():
-    """Public endpoint — club names are not sensitive and are needed on the register form."""
+    """Public endpoint — club info is not sensitive; register form uses id/name,
+    agenda generator uses the branding/template fields."""
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, name FROM clubs ORDER BY id")
+            cur.execute(f"SELECT {_CLUB_COLS} FROM clubs ORDER BY id")
             rows = cur.fetchall()
-    return [{"id": r[0], "name": r[1]} for r in rows]
+    return [_club_row_to_dict(r) for r in rows]
 
 
 @app.post("/api/clubs")
 def create_club(req: ClubRequest, user: dict = Depends(require_system_admin)):
     if not req.name.strip():
         raise HTTPException(status_code=400, detail="分會名稱不得為空")
+    settings_json = json.dumps(req.settings) if req.settings is not None else "{}"
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("INSERT INTO clubs (name) VALUES (%s) RETURNING id", (req.name.strip(),))
+                cur.execute(
+                    "INSERT INTO clubs"
+                    " (name, name_zh, name_en, charter_no, founded_date, fee,"
+                    "  logo_url, fb_qr_url, line_qr_url, template_key, settings)"
+                    " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) RETURNING id",
+                    (
+                        req.name.strip(), req.name_zh, req.name_en, req.charter_no,
+                        req.founded_date, req.fee,
+                        req.logo_url, req.fb_qr_url, req.line_qr_url,
+                        req.template_key or "standard", settings_json,
+                    ),
+                )
                 new_id = cur.fetchone()[0]
     except psycopg2.errors.UniqueViolation:
         raise HTTPException(status_code=400, detail="分會名稱已存在")
@@ -443,10 +492,23 @@ def create_club(req: ClubRequest, user: dict = Depends(require_system_admin)):
 def update_club(club_id: int, req: ClubRequest, user: dict = Depends(require_system_admin)):
     if not req.name.strip():
         raise HTTPException(status_code=400, detail="分會名稱不得為空")
+    settings_json = json.dumps(req.settings) if req.settings is not None else "{}"
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE clubs SET name=%s WHERE id=%s", (req.name.strip(), club_id))
+                cur.execute(
+                    "UPDATE clubs SET"
+                    " name=%s, name_zh=%s, name_en=%s, charter_no=%s, founded_date=%s, fee=%s,"
+                    " logo_url=%s, fb_qr_url=%s, line_qr_url=%s,"
+                    " template_key=%s, settings=%s::jsonb"
+                    " WHERE id=%s",
+                    (
+                        req.name.strip(), req.name_zh, req.name_en, req.charter_no,
+                        req.founded_date, req.fee,
+                        req.logo_url, req.fb_qr_url, req.line_qr_url,
+                        req.template_key or "standard", settings_json, club_id,
+                    ),
+                )
                 if cur.rowcount == 0:
                     raise HTTPException(status_code=404, detail="找不到此分會")
     except psycopg2.errors.UniqueViolation:
@@ -731,12 +793,14 @@ def presign_upload(req: PresignRequest, user: dict = Depends(require_club_admin_
     ext = req.filename.rsplit(".", 1)[-1].lower() if "." in req.filename else "jpg"
     tw_tz = timezone(timedelta(hours=8))
     ts = datetime.now(tw_tz).strftime("%H%M%S")
+    # Files for a known club are filed under media/clubs/{id}/; otherwise flat media/.
+    base = f"media/clubs/{req.club_id}" if req.club_id else "media"
     if req.meeting_date and req.meeting_no:
-        key = f"media/{req.meeting_date}_No{req.meeting_no}_{ts}.{ext}"
+        key = f"{base}/{req.meeting_date}_No{req.meeting_no}_{ts}.{ext}"
     elif req.meeting_date:
-        key = f"media/{req.meeting_date}_{ts}.{ext}"
+        key = f"{base}/{req.meeting_date}_{ts}.{ext}"
     else:
-        key = f"media/{ts}_{uuid.uuid4()}.{ext}"
+        key = f"{base}/{ts}_{uuid.uuid4()}.{ext}"
     client = _r2()
     upload_url = client.generate_presigned_url(
         "put_object",

@@ -637,7 +637,7 @@
       <span>總覽</span>
     </a>
 
-    <a class="nav-item" href="/index">
+    <a class="nav-item" href="/index" onclick="goNewAgenda(); return false;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
       <span>新建議程</span>
     </a>
@@ -679,7 +679,7 @@
   <header class="topbar">
     <div class="topbar-title">議程管理</div>
     <div class="topbar-actions">
-      <button class="btn-primary write-action" onclick="location.href='/index'">
+      <button class="btn-primary write-action" onclick="goNewAgenda()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         新建議程
       </button>
@@ -878,6 +878,13 @@
     homeRenderCalendar();
     fetchStats();
     fetchList('');
+  }
+
+  // New agenda: carry the chosen club so /index applies that club's template.
+  function goNewAgenda() {
+    let url = '/index';
+    if (isSystemAdmin() && selectedClubId != null) url += `?club_id=${selectedClubId}`;
+    location.href = url;
   }
 
   function showNoAgendaHint() {

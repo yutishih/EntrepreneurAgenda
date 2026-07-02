@@ -33,7 +33,27 @@
     .agenda-club-hint {
       font-size: 11px; margin-top: 5px; min-height: 16px;
     }
-  </style>
+    /* ---- chillhihigh signal-time grid ---- */
+    .signal-grid-title {
+      font-size: 12px; font-weight: 600; color: #334155;
+      margin: 12px 0 6px;
+    }
+    .signal-grid { display: flex; flex-direction: column; gap: 5px; }
+    .signal-grid-head, .signal-row {
+      display: grid; grid-template-columns: 1fr 50px 50px 50px;
+      gap: 6px; align-items: center;
+    }
+    .signal-grid-head span { font-size: 11px; text-align: center; font-weight: 600; }
+    .signal-grid-head .sg-g { color: #16a34a; }
+    .signal-grid-head .sg-y { color: #ca8a04; }
+    .signal-grid-head .sg-r { color: #dc2626; }
+    .signal-row label { font-size: 12px; color: #475569; }
+    .signal-row input {
+      width: 100%; padding: 5px 6px; text-align: center;
+      border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;
+    }
+    .signal-row input:focus { outline: none; border-color: #772432; }
+</style>
 </head>
 <body>
 
@@ -318,6 +338,70 @@
       </div>
     </details>
 
+    <!-- Template-specific fields: shown only when the active club uses this template -->
+    <details open data-tmpl="chillhihigh" style="display:none">
+      <summary>Chill Hi High 專屬欄位</summary>
+      <div class="form-section">
+        <div class="form-row">
+          <label>主題題目 Table Topics Question</label>
+          <textarea rows="3" id="tableTopicsQuestion" placeholder="你覺得「最不適合開玩笑」的議題是什麼？…"></textarea>
+        </div>
+        <div class="form-row">
+          <label>白板記錄員 Board Writer</label>
+          <input type="text" id="boardWriter" placeholder="Name, Title" class="member-ac">
+        </div>
+        <div class="form-row">
+          <label>攝影師 Photographer</label>
+          <input type="text" id="photographer" placeholder="Name, Title" class="member-ac">
+        </div>
+
+        <div class="signal-grid-title">時間管理 Time Signals（綠 / 黃 / 紅）</div>
+        <div class="signal-grid">
+          <div class="signal-grid-head"><span></span><span class="sg-g">綠</span><span class="sg-y">黃</span><span class="sg-r">紅</span></div>
+          <div class="signal-row">
+            <label>暖場 Variety</label>
+            <input id="sig_variety_g" value="10" oninput="updateSignal('variety','g',this.value)">
+            <input id="sig_variety_y" value="12'30&quot;" oninput="updateSignal('variety','y',this.value)">
+            <input id="sig_variety_r" value="15" oninput="updateSignal('variety','r',this.value)">
+          </div>
+          <div class="signal-row">
+            <label>指定演講 Speech</label>
+            <input id="sig_preparedSpeech_g" value="5" oninput="updateSignal('preparedSpeech','g',this.value)">
+            <input id="sig_preparedSpeech_y" value="6" oninput="updateSignal('preparedSpeech','y',this.value)">
+            <input id="sig_preparedSpeech_r" value="7" oninput="updateSignal('preparedSpeech','r',this.value)">
+          </div>
+          <div class="signal-row">
+            <label>即席問答 Topics</label>
+            <input id="sig_tableTopics_g" value="10" oninput="updateSignal('tableTopics','g',this.value)">
+            <input id="sig_tableTopics_y" value="12'30&quot;" oninput="updateSignal('tableTopics','y',this.value)">
+            <input id="sig_tableTopics_r" value="15" oninput="updateSignal('tableTopics','r',this.value)">
+          </div>
+          <div class="signal-row">
+            <label>個別講評 Eval</label>
+            <input id="sig_evaluation_g" value="2" oninput="updateSignal('evaluation','g',this.value)">
+            <input id="sig_evaluation_y" value="2'30&quot;" oninput="updateSignal('evaluation','y',this.value)">
+            <input id="sig_evaluation_r" value="3" oninput="updateSignal('evaluation','r',this.value)">
+          </div>
+          <div class="signal-row">
+            <label>語言/幽默講評</label>
+            <input id="sig_langEval_g" value="3" oninput="updateSignal('langEval','g',this.value)">
+            <input id="sig_langEval_y" value="4" oninput="updateSignal('langEval','y',this.value)">
+            <input id="sig_langEval_r" value="5" oninput="updateSignal('langEval','r',this.value)">
+          </div>
+          <div class="signal-row">
+            <label>總講評 General</label>
+            <input id="sig_generalEval_g" value="3" oninput="updateSignal('generalEval','g',this.value)">
+            <input id="sig_generalEval_y" value="4" oninput="updateSignal('generalEval','y',this.value)">
+            <input id="sig_generalEval_r" value="5" oninput="updateSignal('generalEval','r',this.value)">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>即席問答 每位講者時間標示 Speaker Spec</label>
+          <input type="text" id="sig_ttSpeakerSpec" value="1'/1'30&quot;/2'" oninput="updateSignal('ttSpeakerSpec',null,this.value)">
+        </div>
+      </div>
+    </details>
+
     </div><!-- /.form-scroll-body -->
     <div class="form-actions">
       <div class="form-actions-menu">
@@ -352,7 +436,7 @@
             <span class="btn-settings-label">設定 ▾</span>
           </button>
           <div class="settings-menu-panel">
-            <button class="settings-menu-item" onclick="toggleLang()">
+            <button class="settings-menu-item" id="langMenuItem" onclick="toggleLang()">
               <span>語言</span><span id="langToggle">切換中文</span>
             </button>
             <button class="settings-menu-item" onclick="downloadPDF()">下載 PDF</button>
@@ -366,7 +450,9 @@
       </div>
     </div>
     <div class="preview-scroll">
-      <div id="agendaPreview" class="agenda-page"></div>
+      <div id="agendaPages">
+        <div id="agendaPreview" class="agenda-page"></div>
+      </div>
     </div>
   </div>
 
@@ -401,6 +487,7 @@
 </div>
 
 <script src="auth.js"></script>
+<script src="templates.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

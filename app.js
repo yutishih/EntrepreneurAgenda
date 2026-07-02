@@ -76,14 +76,16 @@ const PATHWAY_OPTIONS = PATHWAYS.map(([code, name]) =>
 // STATE
 // ================================================================
 let speeches = [
-  { title: 'TBD', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
-  { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
-  { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+  { title: 'TBD', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+  { title: '', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+  { title: '', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
 ];
 
 let evaluators = ['', '', ''];
 
 let lang = 'en';
+// When true (bilingual templates), member names render as "English 中文".
+let bilingualNames = false;
 
 const TRANSLATIONS = {
   en: {
@@ -260,12 +262,46 @@ function updateVariety(key, value) {
   updatePreview();
 }
 
+// Per-meeting time-signal cards (green / yellow / red), editable per category.
+// Used by templates that render inline time-management columns (e.g. chillhihigh).
+// Defaults mirror standard Toastmasters timing; stored as strings to allow 2'30".
+function defaultSignals() {
+  return {
+    variety:        { g: '10', y: `12'30"`, r: '15' },
+    preparedSpeech: { g: '5',  y: '6',      r: '7'  },
+    tableTopics:    { g: '10', y: `12'30"`, r: '15' },
+    ttSpeakerSpec:  `1'/1'30"/2'`,
+    evaluation:     { g: '2',  y: `2'30"`,  r: '3'  },
+    langEval:       { g: '3',  y: '4',      r: '5'  },
+    generalEval:    { g: '3',  y: '4',      r: '5'  },
+  };
+}
+let signals = defaultSignals();
+
+// oninput handler: cat='variety'|'preparedSpeech'|… , key='g'|'y'|'r'
+function updateSignal(cat, key, value) {
+  if (key === null) { signals[cat] = value; }   // scalar (ttSpeakerSpec)
+  else { signals[cat] = { ...signals[cat], [key]: value }; }
+  updatePreview();
+}
+
+// Bundled fallbacks used when a club has no custom logo/QR uploaded. Sourced
+// from the standard template's assetDefaults (templates.js) so the default
+// image paths live in one place. (`images.*` is consumed by the standard
+// template; CHH uses its own assetDefaults inside its render.)
+const _stdAssets = templateAssetDefaults('standard');
+const DEFAULT_IMAGES = {
+  logo:   _stdAssets.logo_url,
+  fbQr:   _stdAssets.fb_qr_url,
+  lineQr: _stdAssets.line_qr_url,
+};
+
 const images = {
-  logo:          'media/toastmasters_logo.png',
+  logo:          DEFAULT_IMAGES.logo,
   themeImg:      null,
   themeImgBase64: null,  // local base64, avoids CORS when rendering to canvas
-  fbQr:          'media/FacebookQR.png',
-  lineQr:        'media/LINEQR.png',
+  fbQr:          DEFAULT_IMAGES.fbQr,
+  lineQr:        DEFAULT_IMAGES.lineQr,
 };
 
 // ================================================================
@@ -298,6 +334,8 @@ async function uploadThemeImage(input) {
         content_type: file.type,
         meeting_date: val('meetingDate') || null,
         meeting_no: val('meetingNo') || null,
+        // file theme images under the agenda's club folder
+        club_id: (isSystemAdmin() ? selectedClubId : getClubId()) || null,
       }),
     });
     if (!presignRes.ok) throw new Error((await presignRes.json()).detail || '取得上傳網址失敗');
@@ -356,8 +394,15 @@ function renderSpeechForms() {
         <input type="text" value="${sp.duration}" oninput="updateSpeech(${i},'duration',this.value)" placeholder="5'-7'">
       </div>
       <div class="form-row">
+        <label>演講語言 Language（Chill Hi High 用於個別講評員標示）</label>
+        <select class="sp-lang" oninput="updateSpeech(${i},'speechLang',this.value)">
+          <option value="en">英語 English</option>
+          <option value="zh">國語 Mandarin</option>
+        </select>
+      </div>
+      <div class="form-row">
         <label>學習路徑 Pathway</label>
-        <select oninput="updateSpeech(${i},'pathwayCode',this.value)">
+        <select class="sp-pathway" oninput="updateSpeech(${i},'pathwayCode',this.value)">
           <option value="">— 不指定 —</option>
           ${PATHWAY_OPTIONS}
         </select>
@@ -374,8 +419,10 @@ function renderSpeechForms() {
   `).join('');
 
   speeches.forEach((sp, i) => {
-    const sel = document.querySelector(`#speech-${i} select`);
-    if (sel) sel.value = sp.pathwayCode || '';
+    const pw = document.querySelector(`#speech-${i} .sp-pathway`);
+    if (pw) pw.value = sp.pathwayCode || '';
+    const lg = document.querySelector(`#speech-${i} .sp-lang`);
+    if (lg) lg.value = sp.speechLang || 'en';
   });
 
   renderEvaluatorForms();
@@ -414,7 +461,7 @@ function removeEvaluator(i) {
 }
 
 function addSpeech() {
-  speeches.push({ title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' });
+  speeches.push({ title: '', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' });
   renderSpeechForms();
   updatePreview();
 }
@@ -615,302 +662,6 @@ function buildSpeechAgendaLine(sp) {
 }
 
 // ================================================================
-// RIGHT PANEL BUILDER
-// ================================================================
-function buildRightPanel() {
-  const pwSource = lang === 'zh' ? PATHWAYS_ZH : PATHWAYS;
-  const pwList = pwSource.map(([code, name]) =>
-    `<div class="rp-pw"><span class="rp-pwc">${esc(code)}｜</span><em class="rp-pwn">${esc(name)}</em></div>`
-  ).join('');
-
-  const fbContent = images.fbQr
-    ? `<img src="${images.fbQr}" class="qr-img" alt="FB QR">`
-    : `<div class="qr-ph"></div>`;
-  const lineContent = images.lineQr
-    ? `<img src="${images.lineQr}" class="qr-img" alt="LINE QR">`
-    : `<div class="qr-ph"></div>`;
-
-  return `<div class="rp-wrap">
-  <div class="rp-pw-list">${pwList}</div>
-  <div class="rp-tr">
-    <div class="rp-tr-title">${t('timeRules')}</div>
-    <table class="rp-tr-table">
-      <thead><tr><td></td><th class="tc-g">min</th><th class="tc-y">ok</th><th class="tc-r">max</th></tr></thead>
-      <tbody>
-        <tr><td class="tr-lbl">${t('trPrepared')}</td><td class="tc-g">5</td><td class="tc-y">6</td><td class="tc-r">7</td></tr>
-        <tr><td class="tr-lbl">${t('trTopic')}</td><td class="tc-g">1</td><td class="tc-y">1.5</td><td class="tc-r">2</td></tr>
-        <tr><td class="tr-lbl">${t('trEval')}</td><td class="tc-g">2</td><td class="tc-y">2.5</td><td class="tc-r">3</td></tr>
-        <tr><td class="tr-lbl">${t('trLEGE')}</td><td class="tc-g">3</td><td class="tc-y">4</td><td class="tc-r">5</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="rp-qr-items">
-    <div class="rp-qr-item">${fbContent}<div class="rp-qr-lbl">${t('fbLabel')}</div></div>
-    <div class="rp-qr-item">${lineContent}<div class="rp-qr-lbl">${t('lineLabel')}</div></div>
-  </div>
-</div>`;
-}
-
-// ================================================================
-// HEADER BUILDER
-// ================================================================
-function buildHeader(data) {
-  const dateDisplay = data.meetingDate ? formatDate(data.meetingDate) : '____.__.__';
-
-  const logoHtml = images.logo
-    ? `<img src="${images.logo}" class="hg-logo-img" alt="TM Logo">`
-    : `<div class="hg-logo-ph"><div class="logo-ring"><span>TM</span></div></div>`;
-
-  const themeImgHtml = images.themeImg
-    ? `<img src="${images.themeImg}" class="hg-theme-img" alt="Theme">`
-    : `<div class="hg-theme-ph"><span>Theme<br>Image</span></div>`;
-
-  return `<div class="doc-header">
-  <div class="hg-logo">${logoHtml}</div>
-  <div class="hg-names">
-    <div class="club-name-zh">企業家國際演講會</div>
-    <div class="club-name-en">Entrepreneur Toastmasters Club</div>
-  </div>
-  <div class="hg-img">${themeImgHtml}</div>
-  <div class="hg-meta-left">
-    <div>No. 4069930</div>
-    <div>${t('foundedSince')}:</div>
-    <div>2014.06.29</div>
-    <div>&nbsp;</div>
-    <div>${t('fee')} : NTD150</div>
-  </div>
-  <div class="hg-meta-right">
-    <div class="hmr-text" style="grid-column:span 2"><strong>${t('thTime')} : ${dateDisplay} ｜ ${esc(data.timeRange)}</strong></div>
-    <div class="hmr-text" style="grid-column:span 2">${t('meetingSchedule')}</div>
-    <div class="hmr-text" style="grid-column:span 2">${esc(data.venueInfo).replace(/\n/g, '<br>')}</div>
-  </div>
-</div>`;
-}
-
-// ================================================================
-// AGENDA HTML GENERATOR
-// ================================================================
-function generateAgendaHTML(data) {
-  const speechCount = data.speeches.length;
-  const evalCount   = data.evaluators.length;
-  const times = calcTimes(data.speeches);
-
-  // rows: reception(1) + opening(5) + speech_header(1) + speeches(N)
-  //       + photo(1) + intermission(1) + topics(1) + spacer(1)
-  //       + eval_header(1) + evaluators(M) + timer(1) + ah(1) + LE(1) + GE(1)
-  //       + closing(2) + sharing(1)  = 19 + N + M
-  const totalRows = 19 + speechCount + evalCount;
-
-  const rightPanelHtml = buildRightPanel();
-  const headerHtml = buildHeader(data);
-
-  // Dynamic duration column width: size it to the longest single-column
-  // duration string (e.g. "12'-15'") so double-digit minutes don't overflow.
-  // The col-dur + col-agenda pool is fixed at 69mm, so widen one / shrink the other.
-  const DUR_POOL = 69; // mm shared by col-dur + col-agenda
-  const durStrings = data.speeches.map(sp => sp.duration || "5'-7'").concat(["3'~5'"]);
-  const maxDurLen = durStrings.reduce((m, s) => Math.max(m, String(s).length), 0);
-  const durWidth = Math.min(16, Math.max(8, Math.round(maxDurLen * 1.5 + 3)));
-  const agendaWidth = DUR_POOL - durWidth;
-
-  let tbody = '';
-
-  // Reception — right panel cell starts here with rowspan
-  tbody += `
-  <tr>
-    <td class="time-cell">${times.receptionStart}</td>
-    <td class="dur-cell" colspan="2">${times.receptionMins}'</td>
-    <td class="agenda-cell">${t('reception')}</td>
-    <td class="taker-cell">${esc(displayMember(data.receptionHost))}</td>
-    <td class="rp-cell" rowspan="${totalRows}">${rightPanelHtml}</td>
-  </tr>`;
-
-  // Opening block — time & dur rowspan 5
-  tbody += `
-  <tr>
-    <td class="time-cell" rowspan="5">${times.openingStart}</td>
-    <td class="dur-cell" rowspan="5" colspan="2">${times.openingMins}'</td>
-    <td class="agenda-cell">${t('callingOrder')}</td>
-    <td class="taker-cell">${esc(displayMember(data.callingToOrder))}</td>
-  </tr>
-  <tr>
-    <td class="agenda-cell">${t('welcomeGuests')}</td>
-    <td class="taker-cell">${esc(displayMember(data.welcomeTME))}</td>
-  </tr>
-  <tr>
-    <td class="agenda-cell">${t('tmeIntro')}</td>
-    <td class="taker-cell">${esc(displayMember(data.tme))}</td>
-  </tr>
-  <tr>
-    <td class="agenda-cell">${t('timerExplain')}</td>
-    <td class="taker-cell">${esc(displayMember(data.timer))}</td>
-  </tr>
-  <tr>
-    <td class="agenda-cell">${t('ahExplain')}</td>
-    <td class="taker-cell">${esc(displayMember(data.ahCounter))}</td>
-  </tr>`;
-
-  // Variety Session (optional)
-  if (varietySession.enabled) {
-    tbody += `
-  <tr class="row-section">
-    <td class="time-cell">${times.speechStart}</td>
-    <td class="dur-cell" colspan="2">${times.varietyMins}'</td>
-    <td class="agenda-cell"><strong>${t('varietySession')}</strong></td>
-    <td class="taker-cell">${esc(displayMember(varietySession.host))}</td>
-  </tr>`;
-  }
-
-  // Prepared Speech block — time rowspan = 1 + speechCount
-  const speechBlockSpan = 1 + speechCount;
-  tbody += `
-  <tr class="row-section">
-    <td class="time-cell" rowspan="${speechBlockSpan}">${times.preparedSpeechStart}</td>
-    <td class="secdur-cell" rowspan="${speechBlockSpan}">${times.speechMins}'</td>
-    <td class="agenda-cell" colspan="2"><strong>${t('preparedSpeech')}</strong></td>
-    <td class="taker-cell">${esc(displayMember(data.tme))}</td>
-  </tr>`;
-
-  data.speeches.forEach(sp => {
-    tbody += `
-  <tr>
-    <td class="dur-cell">${esc(sp.duration || "5'-7'")}</td>
-    <td class="agenda-cell">${buildSpeechAgendaLine(sp)}</td>
-    <td class="taker-cell">${esc(displayMember(sp.speaker))}</td>
-  </tr>`;
-  });
-
-  // Group Photo
-  tbody += `
-  <tr>
-    <td class="time-cell">${times.photoStart}</td>
-    <td class="dur-cell" colspan="2">${times.photoMins}'</td>
-    <td class="agenda-cell">${t('groupPhoto')}</td>
-    <td class="taker-cell">${t('allParticipants')}</td>
-  </tr>`;
-
-  // Intermission
-  tbody += `
-  <tr class="row-intermission">
-    <td colspan="5">${t('intermission', times.intermissionMins)}</td>
-  </tr>`;
-
-  // Table Topics
-  tbody += `
-  <tr class="row-section">
-    <td class="time-cell">${times.topicsStart}</td>
-    <td class="dur-cell" colspan="2">${times.topicsMins}'</td>
-    <td class="agenda-cell"><strong>${t('tableTopics')}</strong></td>
-    <td class="taker-cell">${esc(displayMember(data.tableTopicsMaster))}</td>
-  </tr>`;
-
-  // Spacer
-  tbody += `<tr class="row-spacer"><td colspan="5"></td></tr>`;
-
-  // Evaluation block — rowspan = 1 (header) + M (evaluators) + 4 (timer, ah, LE, GE)
-  const evalRowSpan = evalCount + 5;
-  tbody += `
-  <tr class="row-section">
-    <td class="time-cell" rowspan="${evalRowSpan}">${times.evalStart}</td>
-    <td class="secdur-cell" rowspan="${evalRowSpan}">${times.evalMins}'</td>
-    <td class="agenda-cell" colspan="2"><strong>${t('evaluation')}</strong></td>
-    <td class="taker-cell">${esc(displayMember(data.generalEvaluator))}</td>
-  </tr>`;
-
-  data.evaluators.forEach((ev, i) => {
-    tbody += `
-  <tr>
-    <td class="dur-cell">2'~3'</td>
-    <td class="agenda-cell">${t('evaluatorFor', i + 1)}</td>
-    <td class="taker-cell">${esc(displayMember(ev))}</td>
-  </tr>`;
-  });
-
-  tbody += `
-  <tr>
-    <td class="dur-cell">1'</td>
-    <td class="agenda-cell">${t('timerReport')}</td>
-    <td class="taker-cell">${esc(displayMember(data.timer))}</td>
-  </tr>
-  <tr>
-    <td class="dur-cell">1'</td>
-    <td class="agenda-cell">${t('ahReport')}</td>
-    <td class="taker-cell">${esc(displayMember(data.ahCounter))}</td>
-  </tr>
-  <tr>
-    <td class="dur-cell">3'~5'</td>
-    <td class="agenda-cell">${t('langEval')}</td>
-    <td class="taker-cell">${esc(displayMember(data.langEvaluator))}</td>
-  </tr>
-  <tr>
-    <td class="dur-cell">3'~5'</td>
-    <td class="agenda-cell">${t('generalEval')}</td>
-    <td class="taker-cell">${esc(displayMember(data.generalEvaluator))}</td>
-  </tr>`;
-
-  // Closing — time rowspan 2
-  tbody += `
-  <tr>
-    <td class="time-cell" rowspan="2">${times.closingStart}</td>
-    <td class="dur-cell" colspan="2">${Math.ceil(times.closingMins / 2)}'</td>
-    <td class="agenda-cell">${t('tmeClosing')}</td>
-    <td class="taker-cell">${esc(displayMember(data.tme))}</td>
-  </tr>
-  <tr>
-    <td class="dur-cell" colspan="2">${Math.floor(times.closingMins / 2)}'</td>
-    <td class="agenda-cell">${t('awards')}</td>
-    <td class="taker-cell">${esc(displayMember(data.awardsPresenter))}</td>
-  </tr>`;
-
-  // Sharing & Feedback
-  tbody += `
-  <tr>
-    <td class="time-cell">${times.sharingStart}</td>
-    <td class="dur-cell" colspan="2">${times.sharingMins}'</td>
-    <td class="agenda-cell">${t('sharing')}</td>
-    <td class="taker-cell">${esc(displayMember(data.sharingFeedback))}</td>
-  </tr>`;
-
-  return `
-${headerHtml}
-
-<div class="theme-row">
-  <span class="theme-label">${t('themeLabel')}</span>
-  <span class="theme-value"><strong><em>${esc(data.meetingTheme) || '—'}</em></strong></span>
-  <span class="meeting-no-label">${t('meetingNoLabel', data.meetingNo)}</span>
-</div>
-
-<div class="mission-section">
-  <div class="mission-title">${t('missionTitle')}</div>
-  <div class="mission-text">${t('missionText')}</div>
-</div>
-
-<table class="agenda-table">
-  <colgroup>
-    <col class="col-time">
-    <col class="col-secdur">
-    <col class="col-dur" style="width:${durWidth}mm">
-    <col class="col-agenda" style="width:${agendaWidth}mm">
-    <col class="col-taker">
-    <col class="col-rp">
-  </colgroup>
-  <thead>
-    <tr>
-      <th>${t('thTime')}</th>
-      <th colspan="2"></th>
-      <th>${t('thAgenda')}</th>
-      <th>${t('thTaker')}</th>
-      <th>${t('thPathways')}</th>
-    </tr>
-  </thead>
-  <tbody>${tbody}</tbody>
-</table>
-
-<div class="agenda-footer">${t('adjournment')}</div>
-`;
-}
-
-// ================================================================
 // PREVIEW
 // ================================================================
 function collectData() {
@@ -933,16 +684,25 @@ function collectData() {
     langEvaluator:     val('langEvaluator'),
     awardsPresenter:   val('awardsPresenter'),
     sharingFeedback:   val('sharingFeedback'),
+    // template-specific extra roles / fields (optional, cross-template safe)
+    boardWriter:       val('boardWriter'),
+    photographer:      val('photographer'),
+    tableTopicsQuestion: val('tableTopicsQuestion'),
+    signals:           signals,
   };
 }
 
 function equalizeRowHeights() {
-  const table = document.querySelector('#agendaPreview .agenda-table');
+  const table = document.querySelector('#agendaPreview .agenda-table, #agendaPreview .ch-table');
   if (!table) return;
   const rows = [...table.querySelectorAll('tbody tr')];
   if (!rows.length) return;
 
-  const extra = table.offsetHeight - rows.reduce((sum, tr) => sum + tr.offsetHeight, 0);
+  // Fill only the body area: total table height minus the header, which does
+  // not stretch. (Including the header here over-grows rows and overflows A4.)
+  const headH = table.tHead ? table.tHead.offsetHeight : 0;
+  const bodyH = rows.reduce((sum, tr) => sum + tr.offsetHeight, 0);
+  const extra = table.offsetHeight - headH - bodyH;
   if (extra <= 0) return;
 
   const addPerRow = extra / rows.length;
@@ -955,23 +715,106 @@ const PAGE_H_PX = 277 * MM_TO_PX;
 
 function applyPreviewScale() {
   const scroll = document.querySelector('.preview-scroll');
-  const page   = document.getElementById('agendaPreview');
-  if (!scroll || !page) return;
+  const pages  = document.getElementById('agendaPages');
+  if (!scroll || !pages) return;
   const scale = Math.min(1, (scroll.clientWidth - 20) / PAGE_W_PX);
-  page.style.transformOrigin = 'top center';
-  page.style.transform       = scale < 1 ? `scale(${scale})` : '';
-  page.style.marginBottom    = scale < 1 ? `${PAGE_H_PX * (scale - 1)}px` : '';
+  pages.style.transformOrigin = 'top center';
+  pages.style.transform       = scale < 1 ? `scale(${scale})` : '';
+  // compensate the visual gap a sub-1 scale leaves below the (possibly multi-page) block
+  const h = pages.offsetHeight;
+  pages.style.marginBottom    = scale < 1 ? `${h * (scale - 1)}px` : '';
 }
 
 function updatePreview() {
   const data = collectData();
   const preview = document.getElementById('agendaPreview');
-  preview.innerHTML = generateAgendaHTML(data);
-  preview.classList.toggle('lang-zh', lang === 'zh');
-  preview.classList.toggle('lang-en', lang === 'en');
+  const pagesWrap = document.getElementById('agendaPages');
+  const club = getActiveClub();
+  applyClubImages(club);
+  const tmpl = AGENDA_TEMPLATES[club && club.template_key] || AGENDA_TEMPLATES.standard;
+  applyTemplateFields(tmpl.key);
+
+  // Language capability is declared per template (templates.js). A template that
+  // is inherently bilingual (langToggle:false, e.g. Chill Hi High) hides the
+  // 語言 toggle and pins the render language; bilingualNames shows En + 中 names.
+  const supportsLangToggle = tmpl.langToggle !== false;
+  const langItem = document.getElementById('langMenuItem');
+  if (langItem) langItem.style.display = supportsLangToggle ? '' : 'none';
+  if (!supportsLangToggle) {
+    lang = tmpl.fixedLang || 'zh';
+    const lt = document.getElementById('langToggle');
+    if (lt) lt.textContent = lang === 'en' ? '切換中文' : 'Switch to EN';
+  }
+  bilingualNames = !!tmpl.bilingualNames;
+
+  const out = tmpl.render(data, club, buildRenderCtx());
+  const pages = Array.isArray(out) ? out : [out];
+  const langCls = lang === 'zh' ? 'lang-zh' : 'lang-en';
+
+  // Page 1 stays in #agendaPreview; reset class each render so nothing stacks.
+  preview.innerHTML = pages[0];
+  preview.className = `agenda-page tmpl-${tmpl.key} ${langCls}`;
+
+  // Rebuild any extra pages as siblings inside #agendaPages.
+  pagesWrap.querySelectorAll('.extra-page').forEach(el => el.remove());
+  pages.slice(1).forEach(html => {
+    const div = document.createElement('div');
+    div.className = `agenda-page extra-page tmpl-${tmpl.key} ${langCls}`;
+    div.innerHTML = html;
+    pagesWrap.appendChild(div);
+  });
+
   requestAnimationFrame(() => { equalizeRowHeights(); applyPreviewScale(); });
   refreshAutoHints();
   setSaveStatus('unsaved');
+}
+
+// Resolve the active club (branding + template) for rendering.
+//  - system_admin: the club chosen in the agenda picker (selectedClubId)
+//  - everyone else: their own club from auth
+// Returns null when none resolved → templates fall back to built-in defaults.
+function getActiveClub() {
+  const cid = isSystemAdmin() ? selectedClubId : getClubId();
+  if (cid == null) return null;
+  return (allClubs || []).find(c => c.id === cid) || null;
+}
+
+// Point the shared `images` logo/QR slots at the active club's R2 assets,
+// falling back to the bundled defaults when a club hasn't uploaded its own.
+function applyClubImages(club) {
+  images.logo   = (club && club.logo_url)    || DEFAULT_IMAGES.logo;
+  images.fbQr   = (club && club.fb_qr_url)    || DEFAULT_IMAGES.fbQr;
+  images.lineQr = (club && club.line_qr_url)  || DEFAULT_IMAGES.lineQr;
+}
+
+// Bundle the helpers/globals templates need, so templates.js stays decoupled.
+function buildRenderCtx() {
+  return {
+    t, esc, calcTimes, displayMember, buildSpeechAgendaLine,
+    formatDate, varietySession, signals, PATHWAYS, PATHWAYS_ZH, images, lang,
+  };
+}
+
+// Show/hide template-specific form blocks (marked data-tmpl="<key>") so each
+// club only sees the inputs its active template uses. Shares the same
+// data-tmpl convention + helper (templates.js) used elsewhere.
+function applyTemplateFields(templateKey) {
+  applyTmplVisibility(document, templateKey);
+}
+
+// Push the current `signals` values into the signal-grid inputs (sig_<cat>_<key>).
+function syncSignalInputs() {
+  Object.entries(signals).forEach(([cat, val]) => {
+    if (typeof val === 'string') {
+      const el = document.getElementById(`sig_${cat}`);
+      if (el) el.value = val;
+    } else {
+      ['g', 'y', 'r'].forEach(k => {
+        const el = document.getElementById(`sig_${cat}_${k}`);
+        if (el) el.value = val[k] || '';
+      });
+    }
+  });
 }
 
 // ================================================================
@@ -1000,6 +843,7 @@ function applyAgendaData(d) {
     'receptionHost', 'callingToOrder', 'welcomeTME', 'tme', 'timer', 'ahCounter',
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
+    'boardWriter', 'photographer', 'tableTopicsQuestion',
   ];
   fields.forEach(id => {
     const el = document.getElementById(id);
@@ -1058,6 +902,11 @@ function applyAgendaData(d) {
     const durEl = document.getElementById('varietyDuration');
     if (durEl) durEl.value = varietySession.duration;
   }
+
+  // Restore time-signal cards (merge over defaults so older agendas stay valid),
+  // then push values into the signal-grid inputs.
+  signals = { ...defaultSignals(), ...(d.signals || {}) };
+  syncSignalInputs();
 
   images.themeImg = d.themeImgUrl || null;
   const statusEl = document.getElementById('themeImgStatus');
@@ -1346,7 +1195,7 @@ function setSaveStatus(state) {
 async function downloadPDF() {
   const data = collectData();
   const dateStr = formatDate(data.meetingDate) || 'agenda';
-  const element = document.getElementById('agendaPreview');
+  const element = document.getElementById('agendaPages');
 
   // Remove transform first so container dimensions reflect full A4 size
   const savedTransform       = element.style.transform;
@@ -1357,6 +1206,7 @@ async function downloadPDF() {
   element.style.transformOrigin = '';
 
   const restoreTheme = await swapThemeImgForCapture(element);
+  const restoreImgs  = await swapCrossOriginImagesForCapture(element);
 
   const opt = {
     margin:      [8, 8, 8, 8],
@@ -1364,6 +1214,7 @@ async function downloadPDF() {
     image:       { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:   { mode: ['css', 'legacy'], before: '.extra-page' },
   };
 
   html2pdf().set(opt).from(element).save().then(() => {
@@ -1371,6 +1222,7 @@ async function downloadPDF() {
     element.style.marginBottom    = savedMarginBottom;
     element.style.transformOrigin = savedTransformOrigin;
     restoreTheme();
+    restoreImgs();
   });
 }
 
@@ -1451,10 +1303,47 @@ async function swapThemeImgForCapture(element) {
   }
 }
 
+// Fetch any URL through the backend R2 proxy and return a base64 data URL.
+async function fetchProxiedBase64(url) {
+  const proxyUrl = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`;
+  const res = await fetch(proxyUrl, { headers: { Authorization: `Bearer ${getToken()}` } });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Swap cross-origin imgs (e.g. club logo / QR on R2) to base64 so html2canvas
+// doesn't taint the canvas. Theme image is handled separately (cover-crop).
+// Returns a restore function.
+async function swapCrossOriginImagesForCapture(element) {
+  const imgs = [...element.querySelectorAll('img')].filter(img => {
+    if (img.src.startsWith('data:') || img.classList.contains('hg-theme-img')) return false;
+    try { return new URL(img.src, location.href).origin !== location.origin; }
+    catch { return false; }
+  });
+  const restores = [];
+  for (const img of imgs) {
+    try {
+      const b64 = await fetchProxiedBase64(img.src);
+      if (!b64) continue;
+      const savedSrc = img.src;
+      img.src = b64;
+      await new Promise(r => { img.onload = r; img.onerror = r; });
+      restores.push(() => { img.src = savedSrc; });
+    } catch { /* leave as-is */ }
+  }
+  return () => restores.forEach(fn => fn());
+}
+
 async function downloadJPG() {
   const data = collectData();
   const dateStr = formatDate(data.meetingDate) || 'agenda';
-  const element = document.getElementById('agendaPreview');
+  const element = document.getElementById('agendaPages');
 
   // Remove transform first so container dimensions reflect full A4 size
   const savedTransform       = element.style.transform;
@@ -1465,6 +1354,7 @@ async function downloadJPG() {
   element.style.transformOrigin = '';
 
   const restoreTheme = await swapThemeImgForCapture(element);
+  const restoreImgs  = await swapCrossOriginImagesForCapture(element);
 
   const canvas = await html2canvas(element, {
     scale: 2,
@@ -1478,6 +1368,7 @@ async function downloadJPG() {
   element.style.marginBottom    = savedMarginBottom;
   element.style.transformOrigin = savedTransformOrigin;
   restoreTheme();
+  restoreImgs();
 
   const link = document.createElement('a');
   link.download = `Agenda_${dateStr}_No${data.meetingNo || ''}.jpg`;
@@ -1496,15 +1387,25 @@ function applyDefaultState() {
     'receptionHost', 'callingToOrder', 'welcomeTME', 'tme', 'timer', 'ahCounter',
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
+    'boardWriter', 'photographer', 'tableTopicsQuestion',
   ];
   fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  signals = defaultSignals();
+  syncSignalInputs();
   document.getElementById('meetingDate').value     = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  document.getElementById('timeRange').value       = '19:10 ~ 21:00';
-  document.getElementById('venueInfo').value       = 'Venue: 鑫喜文創｜台北市信義區忠孝東路五段71巷11弄25號1樓\n（捷運板南線：市政府站4號出口，走路3分鐘）';
+  // Time/venue defaults: club's own setting → its template's fieldDefaults →
+  // the standard template's fieldDefaults (last-resort). All defaults live in
+  // templates.js, so nothing is hard-coded here.
+  const _club = getActiveClub();
+  const _set  = (_club && _club.settings) || {};
+  const _fd   = templateFieldDefaults(_club ? _club.template_key : 'standard');
+  const _std  = templateFieldDefaults('standard');
+  document.getElementById('timeRange').value = _set.timeRange || _fd.timeRange || _std.timeRange || '';
+  document.getElementById('venueInfo').value = _set.venue || _fd.venue || _std.venue || '';
   speeches = [
-    { title: 'TBD', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
-    { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
-    { title: '', speaker: '', duration: "5'-7'", pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+    { title: 'TBD', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+    { title: '', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
+    { title: '', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
   ];
   evaluators = ['', '', ''];
   Object.keys(timeOverrides).forEach(k => {
@@ -1567,7 +1468,9 @@ function displayMember(val) {
     (m.level ? `${m.nameEn}, ${m.level}` : m.nameEn) === val
   );
   if (!m) return val;
-  const name = lang === 'zh' ? m.nameZh : m.nameEn;
+  const name = bilingualNames
+    ? [m.nameEn, m.nameZh].filter(Boolean).join(' ')   // "English 中文"
+    : (lang === 'zh' ? m.nameZh : m.nameEn);
   return m.level ? `${name}, ${m.level}` : name;
 }
 
@@ -1720,11 +1623,14 @@ function initAutocomplete() {
   }
 }
 
+// Load all clubs (branding + template) for every role — needed so the agenda
+// renderer can resolve the active club. Only system_admin sees the picker UI.
 async function loadAgendaClubs() {
   try {
     const res = await fetch(`${API_BASE}/api/clubs`);
     if (!res.ok) return;
     allClubs = await res.json();
+    if (!isSystemAdmin()) return;   // members/club_admins: data only, no picker
     const sel = document.getElementById('agendaClubSelect');
     if (!sel) return;
     allClubs.forEach(c => {
@@ -1764,17 +1670,27 @@ async function init() {
   try {
     await checkAuth();
     applyRoleUI();
-    if (isSystemAdmin()) {
-      await loadAgendaClubs();
-      _updateClubPickerHint();
-    }
+    await loadAgendaClubs();          // all roles: needed to resolve club branding/template
+    if (isSystemAdmin()) _updateClubPickerHint();
     initAutocomplete();
     fetchMemberDatalist();
 
-    const urlId = new URLSearchParams(window.location.search).get('id');
+    const params = new URLSearchParams(window.location.search);
+    const urlId = params.get('id');
     if (urlId) {
       await loadAgenda(parseInt(urlId), { ownLoading: false });
     } else {
+      // New agenda: if a club was chosen on /home (?club_id=…), preselect it so
+      // getActiveClub() resolves that club's template/branding from the start.
+      const urlClubId = params.get('club_id');
+      if (isSystemAdmin() && urlClubId) {
+        selectedClubId = parseInt(urlClubId);
+        const sel = document.getElementById('agendaClubSelect');
+        if (sel) sel.value = selectedClubId;
+        _updateClubPickerHint();
+        memberRoster = [];
+        fetchMemberDatalist();
+      }
       applyDefaultState();
     }
 

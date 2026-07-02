@@ -1138,5 +1138,196 @@ details[open] summary::before { content: "▼ "; }
   .preview-panel { overflow: visible; background: white; }
   .preview-scroll { padding: 0; overflow: visible; }
   .agenda-page { box-shadow: none; width: 100%; padding: 5mm; }
+  #agendaPages { width: 100%; gap: 0; }
+  .extra-page { page-break-before: always; }
   @page { size: A4 portrait; margin: 8mm; }
 }
+
+/* ============================================================
+   TEMPLATE: COMPACT  (.tmpl-compact)
+   A single-column alternative layout. Fully namespaced so it never
+   collides with the standard template's classes.
+   ============================================================ */
+.tmpl-compact { font-size: 9pt; }
+.tmpl-compact .c-header {
+  border-bottom: 2px solid #772432;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+.tmpl-compact .c-club {
+  font-size: 15pt; font-weight: 700; color: #772432;
+}
+.tmpl-compact .c-club-en {
+  font-size: 9pt; font-weight: 400; color: #64748b; margin-left: 6px;
+}
+.tmpl-compact .c-meta { margin-top: 4px; color: #334155; }
+.tmpl-compact .c-theme { margin-top: 2px; color: #0f172a; }
+
+.tmpl-compact .c-table {
+  width: 100%; border-collapse: collapse;
+}
+.tmpl-compact .c-table th {
+  text-align: left; font-size: 8pt; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.4px;
+  border-bottom: 1px solid #cbd5e1; padding: 4px 6px;
+}
+.tmpl-compact .c-table td {
+  padding: 4px 6px; border-bottom: 1px solid #eef2f7;
+  vertical-align: top; white-space: pre-line;
+}
+.tmpl-compact .c-time { width: 14mm; color: #772432; font-weight: 600; }
+.tmpl-compact .c-dur  { width: 16mm; color: #64748b; }
+.tmpl-compact .c-taker { width: 45mm; }
+.tmpl-compact .c-row-section td {
+  background: #f6e9ec; color: #772432;
+  border-bottom: 1px solid #e7c9d0;
+}
+.tmpl-compact .c-footer {
+  margin-top: 10px; text-align: center;
+  font-weight: 700; color: #772432;
+}
+
+/* ============================================================
+   TEMPLATE: CHILL HI HIGH  (.tmpl-chillhihigh)
+   Bilingual humor-club layout with inline green/yellow/red signal
+   columns and a Meeting Roles glossary. Fully namespaced.
+   ============================================================ */
+.tmpl-chillhihigh { font-size: 8pt; color: #1f2937; }
+.tmpl-chillhihigh .ch-header { display: flex; gap: 10px; align-items: flex-start; }
+.tmpl-chillhihigh .ch-logo { flex-shrink: 0; }
+.tmpl-chillhihigh .ch-logo-img { width: 26mm; height: auto; object-fit: contain; }
+.tmpl-chillhihigh .ch-titles { flex: 1; min-width: 0; }
+.tmpl-chillhihigh .ch-name { font-size: 14pt; color: #1d3a8a; line-height: 1.2; }
+.tmpl-chillhihigh .ch-slogan { font-style: italic; color: #374151; margin: 2px 0 4px; font-size: 10pt; }
+.tmpl-chillhihigh .ch-info { color: #374151; line-height: 1.45; }
+
+.tmpl-chillhihigh .ch-theme {
+  background: #7b1f2b; color: #fff; text-align: center;
+  padding: 6px 10px; margin: 8px 0; border-radius: 2px; font-weight: 600;
+}
+.tmpl-chillhihigh .ch-theme-q { font-weight: 400; margin-top: 3px; font-size: 7.5pt; }
+
+/* flex:1 + height:0 lets the table absorb leftover page height so page 1
+   fills the A4 sheet; equalizeRowHeights() spreads that space across rows. */
+.tmpl-chillhihigh .ch-table { width: 100%; border-collapse: collapse; flex: 1; height: 0; }
+.tmpl-chillhihigh .ch-table th,
+.tmpl-chillhihigh .ch-table td {
+  border: 0.5px solid #cbd5e1; padding: 3px 5px; vertical-align: middle;
+}
+.tmpl-chillhihigh .ch-table thead th {
+  background: #f1f5f9; font-size: 7.5pt; text-align: center; color: #334155;
+}
+.tmpl-chillhihigh .ch-c-time { width: 12mm; }
+.tmpl-chillhihigh .ch-c-dur  { width: 13mm; }
+.tmpl-chillhihigh .ch-c-host { width: 38mm; }
+.tmpl-chillhihigh .ch-c-sig  { width: 11mm; }
+.tmpl-chillhihigh .ch-time { text-align: center; color: #1d3a8a; }
+.tmpl-chillhihigh .ch-dur  { text-align: center; color: #475569; }
+.tmpl-chillhihigh .ch-ag   { white-space: pre-line; }
+.tmpl-chillhihigh .ch-spec { color: #7b1f2b; font-weight: 600; }
+.tmpl-chillhihigh td.ch-g, .tmpl-chillhihigh td.ch-y, .tmpl-chillhihigh td.ch-r {
+  text-align: center; font-weight: 600;
+}
+.tmpl-chillhihigh th.ch-g, .tmpl-chillhihigh td.ch-g { background: #dcfce7; color: #15803d; }
+.tmpl-chillhihigh th.ch-y, .tmpl-chillhihigh td.ch-y { background: #fef9c3; color: #a16207; }
+.tmpl-chillhihigh th.ch-r, .tmpl-chillhihigh td.ch-r { background: #fee2e2; color: #b91c1c; }
+.tmpl-chillhihigh .ch-section td { background: #fdf1d6; font-weight: 600; }
+.tmpl-chillhihigh .ch-section td.ch-g { background: #dcfce7; }
+.tmpl-chillhihigh .ch-section td.ch-y { background: #fef9c3; }
+.tmpl-chillhihigh .ch-section td.ch-r { background: #fee2e2; }
+.tmpl-chillhihigh .ch-band td {
+  background: #e5e7eb; text-align: center; font-weight: 600; color: #374151;
+}
+
+.tmpl-chillhihigh .ch-footer {
+  background: #7b1f2b; color: #fff; text-align: center;
+  padding: 5px; margin: 8px 0; font-weight: 600; border-radius: 2px;
+}
+.tmpl-chillhihigh .ch-roles { margin-top: 6px; }
+.tmpl-chillhihigh .ch-roles-title {
+  background: #f1f5f9; text-align: center; font-weight: 700;
+  padding: 4px; color: #334155; border: 0.5px solid #cbd5e1;
+}
+.tmpl-chillhihigh .ch-roles-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border: 0.5px solid #cbd5e1; border-top: none;
+}
+.tmpl-chillhihigh .ch-role {
+  display: flex; gap: 6px; padding: 4px 6px;
+  border-right: 0.5px solid #e5e7eb; border-bottom: 0.5px solid #e5e7eb;
+  font-size: 6.8pt;
+}
+.tmpl-chillhihigh .ch-role-t { font-weight: 700; color: #1f2937; flex: 0 0 38%; }
+.tmpl-chillhihigh .ch-role-d { color: #4b5563; flex: 1; }
+
+/* ---- multi-page wrapper ---- */
+#agendaPages {
+  width: 194mm;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8mm;
+  transform-origin: top center;
+}
+
+/* ---- chillhihigh PAGE 2 (.ch2-*) ---- */
+.tmpl-chillhihigh .ch2-page { font-size: 8.5pt; color: #1f2937; display: flex; flex-direction: column; gap: 8px; }
+/* Hero / body images carry their own framing — show them plainly. Heights are
+   capped so two images + the QR row always fit within one A4 page. */
+.tmpl-chillhihigh .ch2-hero { text-align: center; }
+.tmpl-chillhihigh .ch2-hero-img {
+  width: 100%; height: auto; max-height: 85mm;
+  object-fit: contain; display: block; margin: 0 auto;
+}
+.tmpl-chillhihigh .ch2-img2 { text-align: center; }
+.tmpl-chillhihigh .ch2-img2-img {
+  width: 100%; height: auto; max-height: 120mm;
+  object-fit: contain; display: block; margin: 0 auto;
+}
+.tmpl-chillhihigh .ch2-hero-text { display: flex; flex-direction: column; gap: 4px; }
+.tmpl-chillhihigh .ch2-hero-name { font-size: 15pt; color: #1d3a8a; }
+.tmpl-chillhihigh .ch2-hero-slogan { font-style: italic; color: #374151; }
+
+.tmpl-chillhihigh .ch2-title {
+  background: #1e3a5f; color: #fff; font-weight: normal; font-size: 10.5pt;
+  padding: 4px 10px; border-radius: 2px; margin-bottom: 6px;
+}
+.tmpl-chillhihigh .ch2-upcoming { display: flex; gap: 24px; padding: 0 6px; flex-wrap: wrap; font-size: 10.5pt; }
+.tmpl-chillhihigh .ch2-upcoming strong { color: #b45309; font-weight: normal; }
+
+.tmpl-chillhihigh .ch2-join { display: flex; gap: 14px; align-items: stretch; }
+.tmpl-chillhihigh .ch2-join-left { flex: 1.2; }
+.tmpl-chillhihigh .ch2-wish { list-style: none; padding: 0; margin: 4px 0 0; }
+.tmpl-chillhihigh .ch2-wish li { padding: 2px 0 2px 14px; position: relative; }
+.tmpl-chillhihigh .ch2-wish li::before { content: "›"; position: absolute; left: 0; color: #b45309; font-weight: 700; }
+.tmpl-chillhihigh .ch2-join-right {
+  flex: 1; background: #fef9c3; border-radius: 4px; padding: 10px 12px;
+  display: flex; flex-direction: column; justify-content: center;
+  font-weight: 600; color: #7b1f2b; line-height: 1.5;
+}
+.tmpl-chillhihigh .ch2-join-right em { color: #1d3a8a; font-weight: 500; }
+
+.tmpl-chillhihigh .ch2-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tmpl-chillhihigh .ch2-step {
+  display: flex; align-items: center; gap: 6px;
+  background: #f1f5f9; border-radius: 4px; padding: 8px;
+}
+.tmpl-chillhihigh .ch2-step-n {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+  background: #1e3a5f; color: #fff; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; font-size: 8pt;
+}
+.tmpl-chillhihigh .ch2-fee { color: #b45309; font-weight: 700; }
+
+.tmpl-chillhihigh .ch2-pw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tmpl-chillhihigh .ch2-pw {
+  border: 0.5px solid #cbd5e1; border-radius: 4px; padding: 6px 8px; text-align: center;
+}
+.tmpl-chillhihigh .ch2-pw-zh { font-weight: 700; color: #7b1f2b; }
+.tmpl-chillhihigh .ch2-pw-en { font-size: 7pt; color: #475569; }
+
+.tmpl-chillhihigh .ch2-qrs { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-top: 4px; }
+.tmpl-chillhihigh .ch2-qr { flex: 1; min-width: 0; text-align: center; }
+.tmpl-chillhihigh .ch2-qr-img { width: 100%; max-width: 40mm; height: auto; object-fit: contain; }
+.tmpl-chillhihigh .ch2-qr-l { font-size: 12pt; font-weight: 700; color: #1e3a5f; margin-bottom: 5px; }

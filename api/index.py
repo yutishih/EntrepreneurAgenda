@@ -303,12 +303,27 @@ def change_password(req: ChangePasswordRequest, user: dict = Depends(get_current
 # ------------------------------------------------------------------ agenda
 @app.get("/api/agendas")
 def list_agendas(
-    date:    str = None,
-    page:    int = 1,
-    limit:   int = 10,
-    club_id: Optional[int] = Query(default=None),
-    user:    dict = Depends(get_current_user),
+    date:      str = None,
+    date_from: str = None,
+    date_to:   str = None,
+    page:      int = 1,
+    limit:     int = 10,
+    club_id:   Optional[int] = Query(default=None),
+    full:      int = 0,
+    order:     str = None,
+    user:      dict = Depends(get_current_user),
 ):
+    """List agendas.
+
+    `full=1`   → each item also carries its whole `data` JSONB, so a caller that
+                 needs several agendas at once (e.g. the role-planning matrix)
+                 does not have to issue one GET per agenda.
+    `order=date` → sort by meeting_date instead of updated_at, for callers that
+                 present a chronological window of meetings.
+    `date_from` / `date_to` → inclusive meeting_date range. Agendas with no
+                 meeting_date are excluded once either bound is given, since they
+                 cannot be placed on a timeline.
+    """
     import math
     offset = (page - 1) * limit
     with get_db() as conn:
@@ -318,6 +333,12 @@ def list_agendas(
             if date:
                 where += " AND meeting_date = %s"
                 params.append(date)
+            if date_from:
+                where += " AND meeting_date >= %s"
+                params.append(date_from)
+            if date_to:
+                where += " AND meeting_date <= %s"
+                params.append(date_to)
             if user["role"] != "system_admin":
                 # Non-system_admin only sees their own club's agendas
                 where += " AND club_id = %s"
@@ -328,22 +349,30 @@ def list_agendas(
                 params.append(club_id)
             cur.execute(f"SELECT COUNT(*) FROM agendas {where}", params)
             total = cur.fetchone()[0]
+            order_by = (
+                "meeting_date DESC NULLS LAST, id DESC" if order == "date"
+                else "updated_at DESC"
+            )
             cur.execute(
-                f"SELECT id, data, updated_at FROM agendas {where}"
-                f" ORDER BY updated_at DESC LIMIT %s OFFSET %s",
+                f"SELECT id, data, updated_at, club_id FROM agendas {where}"
+                f" ORDER BY {order_by} LIMIT %s OFFSET %s",
                 params + [limit, offset],
             )
             rows = cur.fetchall()
     items = []
     for r in rows:
         d = parse_jsonb(r[1])
-        items.append({
+        item = {
             "id":           r[0],
             "meetingDate":  d.get("meetingDate", ""),
             "meetingNo":    d.get("meetingNo", ""),
             "meetingTheme": d.get("meetingTheme", ""),
             "updatedAt":    r[2].isoformat() if r[2] else "",
-        })
+            "clubId":       r[3],
+        }
+        if full:
+            item["data"] = d
+        items.append(item)
     return {
         "items": items,
         "total": total,
@@ -852,6 +881,9 @@ if not os.getenv("VERCEL"):
 
     @app.get("/index")
     def page_index_html(): return _FileResponse(_root / "index.html")
+
+    @app.get("/roles")
+    def page_roles(): return _FileResponse(_root / "roles.html")
 
     @app.get("/member")
     def page_member(): return _FileResponse(_root / "member.html")

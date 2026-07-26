@@ -10,11 +10,14 @@ EntrepreneurAgenda/
 ├── login.html            # 登入 / 註冊頁面
 ├── home.html             # 會務管理首頁（Dashboard 版型）
 ├── index.html            # 議程表產生器（需登入）
+├── roles.html            # 角色安排頁面（多場例會 × 角色矩陣）
 ├── member.html           # 會員管理頁面（管理 users 資料表）
 ├── club.html             # 分會管理頁面
 ├── admin.html            # 用戶管理頁面（僅 system_admin）
 ├── change-password.html  # 修改密碼頁面（含首次登入強制改密碼）
 ├── app.js                # 議程產生器主邏輯
+├── roles.js              # 角色安排邏輯（ROLE_GROUPS 角色清單 + 矩陣編輯 / merge 存檔）
+├── member-ac.js          # 可重用的會員自動完成元件（下拉建議 + 可自由輸入）
 ├── templates.js          # 議程版型引擎（AGENDA_TEMPLATES + 每版型 manifest / 預設素材 / 語言能力）
 ├── style.css             # 議程產生器樣式（含各版型 .tmpl-<key> 命名空間）
 ├── media/                # 靜態圖片
@@ -116,6 +119,45 @@ EntrepreneurAgenda/
 - `boardWriter`、`photographer`、`tableTopicsQuestion`
 - `signals`：時間管理綠/黃/紅牌（每類別可手動編輯，預設帶入標準計時規則）
 - `speeches[].speechLang`：每篇演講語言（`en` / `zh`）。**Chill Hi High** 依此把對應（同索引）的個別講評員標示為「英語講評員 / 國語講評員」。
+- `timeOverrides`／`durationOverrides`／`durationLabels`：議程表上的時刻與時長覆寫（見下）
+
+---
+
+## 時間與時長：全部可手動覆寫（`/index` ⏱ 時間設定）
+
+議程表上**每一個**時刻與時長都保留自動計算，同時都能逐場手動指定。**空白 = 自動**。
+
+### 各段開始時刻（`timeOverrides`，議程表「時間」欄）
+
+`receptionStart`、`openingStart`、`speechStart`（多元單元）、`preparedSpeechStart`、`photoStart`、`topicsStart`、`evalStart`、`closingStart`、`sharingStart`，另有 `endTime`（推算休息／即席問答彈性時間的目標結束時刻）。
+
+> **釘住某一段後，後面各段會從該時刻往下推算**——所以指定一個時刻是「整場往後挪」，不會出現與後續各列互相矛盾的時間。上游的釘選仍然有效。
+> 格式須為 `H:MM` / `HH:MM`，不合格式即忽略並回到自動值。
+
+### 各段時長（`durationOverrides`，議程表「時長」欄）
+
+`receptionMins`、`openingMins`、`speechMins`、`photoMins`、`intermissionMins`、`topicsMins`、`evalMins`、`closingMins`、`sharingMins`。
+
+自動值的算法：
+
+| 欄位 | 自動計算 |
+|------|----------|
+| `speechMins` | Σ 各篇演講時長上限 + 4′ 換場 + 總主持人串場（`durationSettings.tmeMins`） |
+| `evalMins` | 每位個別講評 3′ + 固定報告 12′ + 總講評串場（`durationSettings.geMins`） |
+| `topicsMins`／`intermissionMins` | 吸收距離 `endTime` 的剩餘時間（各上限 +10′）；任一邊被手動指定時，另一邊才吸收剩餘 |
+| 其他 | 固定預設值（報到 20′、開幕 10′、拍照 5′、結尾 6′、分享 5′） |
+
+### 講評區固定列時長（`durationLabels`）
+
+`個別講評 2'~3'`、`計時員報告 1'`、`贅語報告 1'`、`語言講評 3'~5'`、`總講評 3'~5'` 原本寫死在版型裡，現在改為每場可編輯的**顯示字串**（可填區間，不參與加總運算），與 `signals` 同一套模式：載入時 merge 到預設值上，舊議程自動沿用原本字樣。
+
+> 版型端從 `ctx.durationLabels` 取用，並以 `templates.js` 的 `DEFAULT_DURATION_LABELS` 作最後防線。`standard` 與 `compact` 已改為資料驅動；`chillhihigh` 的講評列本來就用 `signals` 的綠/黃/紅欄，不受影響。
+
+### 每個欄位旁的「自動: X」與 ⟳
+
+提示顯示的是**該欄自己解除釘選後會變成的值**（上游釘選仍計入），也就是 ⟳ 按下去會還原成的那個值——由 `autoValueFor(key)` 針對單一欄位重算得出，因此提示不會和實際結果矛盾。
+
+> **相容性**：舊版曾把「報到開始」存成 `timeOverrides.openingStart`，而 `openingStart` 現在是「開幕」那一段的獨立釘選。載入時以「有沒有 `receptionStart` 這個鍵」判斷新舊格式，舊資料會遷移到 `receptionStart`，不會被誤讀成新的開幕釘選。
 
 ### 多頁版型
 
@@ -136,6 +178,71 @@ EntrepreneurAgenda/
 > - `standard`（標準版／企業家）
 > - `compact`（精簡單欄示範版）
 > - `chillhihigh`（雙語幽默版／Chill Hi High：中英混用、內嵌綠/黃/紅時間牌欄、個別講評員依演講語言標示、底部 Meeting Roles 說明；**兩頁**：議程頁 + 宣傳後頁）
+
+---
+
+## 角色安排（`/roles`）
+
+一頁規劃**多場例會**的角色：**每列一個角色、每欄一場例會**，直接在格子裡填人。
+
+### 沒有另一套資料表
+
+角色安排**不另存**——每一格讀寫的就是該場議程 `agendas.data` 裡**同一個欄位**（`app.js` 的 `collectData()` 那些）。因此：
+
+- ✅ 在此頁排定角色 → 該場議程表**立即**顯示同一個人。
+- ✅ 在議程產生器改角色 → 回到此頁重新載入即同步。
+- ⚠️ 角色清單（`roles.js` 的 `ROLE_GROUPS`）是**從議程欄位推導**的。議程若新增角色欄位，記得同步加進 `ROLE_GROUPS`。
+
+### 角色清單（`ROLE_GROUPS`）
+
+| 分組 | 角色（`agendas.data` 欄位） |
+|------|------|
+| 會議主持 | `receptionHost`、`callingToOrder`、`welcomeTME`、`tme` |
+| 計時 / 記錄 | `timer`、`ahCounter`、`boardWriter`、`photographer` |
+| 單元主持 | `varietyHost`（＝`varietySession.host`）、`tableTopicsMaster` |
+| 指定演講 | `speeches[i].speaker`（動態，至少 3 列） |
+| 講評 | `evaluators[i]`（動態，至少 3 列）、`langEvaluator`、`generalEvaluator` |
+| 結尾 | `awardsPresenter`、`sharingFeedback` |
+
+演講 / 講評的列數取**目前載入場次中的最大值**（最少 3 列）。
+
+### 欄標題可編輯的每場欄位（`META_FIELDS`）
+
+欄標題的**例會主題**（`meetingTheme`）也可直接編輯，走與角色**完全相同**的 draft / dirty / merge 流程，但刻意**不列入角色列**——因此不算進「已指派」計數（主題不是人），且不套用會員自動完成。
+
+要再開放其他每場欄位（例如 `meetingNo`），在 `roles.js` 的 `META_FIELDS` 加一筆即可：
+
+```js
+const META_FIELDS = [
+  { key: 'meetingTheme', label: '例會主題', placeholder: '未設定主題' },
+];
+```
+
+### 人選輸入：下拉建議 + 可自由輸入
+
+每格都是 `<input class="member-ac">`，由 `member-ac.js` 提供下拉建議（↑↓ 選擇、Enter 確認、Esc 關閉），**同時可以直接打字**——來賓、代理人、`TBD` 都填得進去，下拉只是建議，不會限制輸入值。
+
+- 建議名單來自 `/api/users`（僅 `active`），系統管理員依所選分會取用。
+- 插入格式為 `姓名, 等級`，依**該場議程自己的 `data.lang`** 決定中文名或英文名（`data-ac-lang`）。
+
+### 存檔是 merge-based
+
+`PUT /api/agendas/{id}` 是 **full-replace**，所以存檔時：**重新讀取該場議程 → 只覆寫此頁真正改過的角色欄位 → 寫回**。這樣即使有人同時在議程產生器編輯同一場，也不會被舊資料覆蓋。（讀回的 `_clubId` 是編輯器用的提示欄位，寫回前會移除。）
+
+### 介面行為
+
+| 行為 | 說明 |
+|------|------|
+| 未儲存標示 | 改過的格子（含欄標題的例會主題）變黃底；該欄標題出現橘點；上方顯示未儲存項目數 |
+| 例會主題 | 欄標題的主題平時看起來就是說明文字，hover / focus 才浮出輸入框，改完與角色一起儲存 |
+| 已指派計數 | 每欄顯示 `已指派 / 該場角色數` |
+| 額外名額 | 某場原本沒有的演講 / 講評名額，格子淡化並以 `＋` 提示：填入並儲存**會為該議程新增一列** |
+| 未啟用多元單元 | 該場 `varietySession.enabled` 為 false 時淡化提示（只寫 host，不會自動啟用單元） |
+| 日期範圍 | 以**例會日期**篩選要顯示的場次（起訖皆含），欄位由左至右由舊到新。預設為今天往前 2 個月 ～ 往後 3 個月——會往回抓，是因為分會最新一場議程往往已經過去，只看「未來」會開在空白畫面。快捷鍵：`←` / `→` 整段平移一個月，另有「近期 / 未來 / 今年 / 全部」。單邊留空即為不限。上限 40 欄，超過時提示縮小範圍（保留最新的場次） |
+| 快捷鍵 | `Ctrl/Cmd + S` 儲存全部；有未儲存變更時離開頁面會提示 |
+| 權限 | `club_member` 唯讀（欄位 disabled、寫入按鈕隱藏）；`club_admin` 以上可儲存 |
+
+> 例會必須**先有議程**才會出現在此頁。要規劃新的一場，請先用「新建議程」建立該場次。
 
 ---
 
@@ -221,6 +328,7 @@ Push 到 GitHub，Vercel 自動部署。`/api/*` 的請求透過 `vercel.json` �
 | `/login` | `login.html` | 登入 / 自行註冊（送出後等待審核） |
 | `/home` | `home.html` | 會務 Dashboard |
 | `/index` | `index.html` | 議程表產生器 |
+| `/roles` | `roles.html` | 角色安排（多場例會 × 角色矩陣） |
 | `/member` | `member.html` | 會員管理（管理 users） |
 | `/club` | `club.html` | 分會管理 |
 | `/admin` | `admin.html` | 用戶管理（system_admin only） |
@@ -382,6 +490,7 @@ DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
 | `/login` | `login.html` | 登入 / 自行註冊（送出後需等待審核） | 無 |
 | `/home` | `home.html` | 會務管理 Dashboard，含統計卡片、議程列表 | 任何登入用戶 |
 | `/index` | `index.html` | 議程表產生器，即時預覽並可匯出 PDF / JPG | 任何登入用戶 |
+| `/roles` | `roles.html` | 角色安排，多場例會 × 角色矩陣，人選可下拉選取或自由輸入 | `club_admin`（寫入） |
 | `/member` | `member.html` | 會員管理，新增、編輯、批量匯入、審核、移除會員 | `club_admin`（寫入） |
 | `/club` | `club.html` | 分會管理，新增、編輯、刪除分會 | `system_admin`（寫入） |
 | `/admin` | `admin.html` | 用戶管理，設定角色與所屬分會 | `system_admin` |
@@ -408,13 +517,25 @@ DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
 
 | 方法 | 路徑 | 說明 | 權限 |
 |------|------|------|------|
-| GET    | `/api/agendas` | 取得議程列表（支援 `date`、`page`、`limit`、`club_id`） | 已登入 |
+| GET    | `/api/agendas` | 取得議程列表（支援 `date`、`date_from`、`date_to`、`page`、`limit`、`club_id`、`full`、`order`） | 已登入 |
 | POST   | `/api/agendas` | 新增議程 | `club_admin` 以上 |
 | GET    | `/api/agendas/{id}` | 取得單一議程 | 已登入 |
 | PUT    | `/api/agendas/{id}` | 更新議程 | `club_admin` 以上 |
 | DELETE | `/api/agendas/{id}` | 刪除議程 | `club_admin` 以上 |
 
 > `club_admin` 只能看到 / 操作自己分會的議程；`system_admin` 可看到全部。
+
+`GET /api/agendas` 的兩個選用參數（供角色安排頁一次取多場）：
+
+| 參數 | 說明 |
+|------|------|
+| `full=1` | 每筆額外回傳完整的 `data` JSONB，避免一場一次 GET 的 N+1 請求 |
+| `order=date` | 改以 `meeting_date DESC NULLS LAST` 排序（預設為 `updated_at DESC`） |
+| `date_from` / `date_to` | `meeting_date` 範圍（起訖皆含），可只給單邊。給任一邊時，沒有 `meeting_date` 的議程會被排除 |
+
+> `total` 回傳的是**篩選後**的總數，因此可用來判斷是否被 `limit` 截斷。
+
+> 列表每筆另含 `clubId`。未帶這兩個參數時回傳格式與行為不變。
 
 ### 分會管理（需 Bearer Token）
 

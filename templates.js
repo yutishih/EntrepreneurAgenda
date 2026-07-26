@@ -45,6 +45,18 @@ const CHH_FIELD_DEFAULTS = {
   venue: '社會創新實驗中心 (臺北市大安區仁愛路三段 99 號) 107 會議室',
 };
 
+// Duration labels for the fixed evaluation rows. Ranges rather than numbers, so
+// they are display strings the meeting can override (ctx.durationLabels, edited
+// in the 時間設定 panel). Kept here as a last-resort fallback so a render never
+// emits `undefined` if the caller supplies no labels.
+const DEFAULT_DURATION_LABELS = {
+  evaluator:   "2'~3'",
+  timerReport: "1'",
+  ahReport:    "1'",
+  langEval:    "3'~5'",
+  generalEval: "3'~5'",
+};
+
 const AGENDA_TEMPLATES = {
   // --------------------------------------------------------------
   // STANDARD — the original Entrepreneur Toastmasters layout.
@@ -74,7 +86,7 @@ const AGENDA_TEMPLATES = {
     render(data, club, ctx) {
       const {
         t, esc, calcTimes, displayMember, buildSpeechAgendaLine,
-        formatDate, varietySession, PATHWAYS, PATHWAYS_ZH, images, lang,
+        formatDate, varietySession, durationLabels, PATHWAYS, PATHWAYS_ZH, images, lang,
       } = ctx;
 
       const brand = {
@@ -156,6 +168,7 @@ const AGENDA_TEMPLATES = {
       const speechCount = data.speeches.length;
       const evalCount   = data.evaluators.length;
       const times = calcTimes(data.speeches);
+      const DL = { ...DEFAULT_DURATION_LABELS, ...(durationLabels || {}) };
 
       // rows: reception(1) + opening(5) + speech_header(1) + speeches(N)
       //       + photo(1) + intermission(1) + topics(1) + spacer(1)
@@ -166,7 +179,7 @@ const AGENDA_TEMPLATES = {
       // Dynamic duration column width: size it to the longest single-column
       // duration string (e.g. "12'-15'") so double-digit minutes don't overflow.
       const DUR_POOL = 69; // mm shared by col-dur + col-agenda
-      const durStrings = data.speeches.map(sp => sp.duration || "5'-7'").concat(["3'~5'"]);
+      const durStrings = data.speeches.map(sp => sp.duration || "5'-7'").concat(Object.values(DL));
       const maxDurLen = durStrings.reduce((m, s) => Math.max(m, String(s).length), 0);
       const durWidth = Math.min(16, Math.max(8, Math.round(maxDurLen * 1.5 + 3)));
       const agendaWidth = DUR_POOL - durWidth;
@@ -278,7 +291,7 @@ const AGENDA_TEMPLATES = {
       data.evaluators.forEach((ev, i) => {
         tbody += `
   <tr>
-    <td class="dur-cell">2'~3'</td>
+    <td class="dur-cell">${esc(DL.evaluator)}</td>
     <td class="agenda-cell">${t('evaluatorFor', i + 1)}</td>
     <td class="taker-cell">${esc(displayMember(ev))}</td>
   </tr>`;
@@ -286,22 +299,22 @@ const AGENDA_TEMPLATES = {
 
       tbody += `
   <tr>
-    <td class="dur-cell">1'</td>
+    <td class="dur-cell">${esc(DL.timerReport)}</td>
     <td class="agenda-cell">${t('timerReport')}</td>
     <td class="taker-cell">${esc(displayMember(data.timer))}</td>
   </tr>
   <tr>
-    <td class="dur-cell">1'</td>
+    <td class="dur-cell">${esc(DL.ahReport)}</td>
     <td class="agenda-cell">${t('ahReport')}</td>
     <td class="taker-cell">${esc(displayMember(data.ahCounter))}</td>
   </tr>
   <tr>
-    <td class="dur-cell">3'~5'</td>
+    <td class="dur-cell">${esc(DL.langEval)}</td>
     <td class="agenda-cell">${t('langEval')}</td>
     <td class="taker-cell">${esc(displayMember(data.langEvaluator))}</td>
   </tr>
   <tr>
-    <td class="dur-cell">3'~5'</td>
+    <td class="dur-cell">${esc(DL.generalEval)}</td>
     <td class="agenda-cell">${t('generalEval')}</td>
     <td class="taker-cell">${esc(displayMember(data.generalEvaluator))}</td>
   </tr>`;
@@ -381,7 +394,8 @@ ${headerHtml}
     assetDefaults: {},       // uses no logo/QR
     settings: [],            // no club-editable template-specific fields
     render(data, club, ctx) {
-      const { t, esc, calcTimes, displayMember, buildSpeechAgendaLine, formatDate, varietySession, lang } = ctx;
+      const { t, esc, calcTimes, displayMember, buildSpeechAgendaLine, formatDate, varietySession, durationLabels, lang } = ctx;
+      const DL = { ...DEFAULT_DURATION_LABELS, ...(durationLabels || {}) };
 
       const brand = {
         nameZh: (club && club.name_zh) || '企業家國際演講會',
@@ -420,10 +434,10 @@ ${headerHtml}
 
       section(times.evalStart, `${times.evalMins}'`, t('evaluation'));
       item('', '', t('generalEval'), esc(displayMember(data.generalEvaluator)));
-      data.evaluators.forEach((ev, i) => item('', "2'~3'", t('evaluatorFor', i + 1), esc(displayMember(ev))));
-      item('', "1'", t('timerReport'), esc(displayMember(data.timer)));
-      item('', "1'", t('ahReport'), esc(displayMember(data.ahCounter)));
-      item('', "3'~5'", t('langEval'), esc(displayMember(data.langEvaluator)));
+      data.evaluators.forEach((ev, i) => item('', esc(DL.evaluator), t('evaluatorFor', i + 1), esc(displayMember(ev))));
+      item('', esc(DL.timerReport), t('timerReport'), esc(displayMember(data.timer)));
+      item('', esc(DL.ahReport), t('ahReport'), esc(displayMember(data.ahCounter)));
+      item('', esc(DL.langEval), t('langEval'), esc(displayMember(data.langEvaluator)));
 
       section(times.closingStart, `${times.closingMins}'`, t('tmeClosing'));
       item('', '', t('awards'), esc(displayMember(data.awardsPresenter)));

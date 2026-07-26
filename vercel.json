@@ -5,6 +5,7 @@
     { "source": "/home.html",  "destination": "/home",  "permanent": true },
     { "source": "/index.html", "destination": "/index", "permanent": true },
     { "source": "/member.html","destination": "/member","permanent": true },
+    { "source": "/roles.html", "destination": "/roles", "permanent": true },
     { "source": "/club.html",  "destination": "/club",  "permanent": true },
     { "source": "/admin.html",          "destination": "/admin",           "permanent": true },
     { "source": "/change-password.html","destination": "/change-password", "permanent": true }
@@ -15,6 +16,7 @@
     { "source": "/home",            "destination": "/home.html"             },
     { "source": "/index",           "destination": "/index.html"            },
     { "source": "/member",          "destination": "/member.html"           },
+    { "source": "/roles",           "destination": "/roles.html"            },
     { "source": "/club",            "destination": "/club.html"             },
     { "source": "/admin",           "destination": "/admin.html"            },
     { "source": "/change-password", "destination": "/change-password.html" }

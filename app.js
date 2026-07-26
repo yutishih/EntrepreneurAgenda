@@ -213,20 +213,57 @@ function refreshInputsForLang() {
   renderEvaluatorForms();
 }
 
+// Every clock time shown in the agenda's time column can be pinned by hand.
+// Blank = derive it from the previous block, as before. A pinned time also
+// becomes the anchor for everything after it, so pinning one row shifts the
+// rest of the evening instead of silently disagreeing with it.
 const timeOverrides = {
-  endTime:        '',
-  receptionStart: '',
+  endTime:             '',
+  receptionStart:      '',
+  openingStart:        '',
+  speechStart:         '',
+  preparedSpeechStart: '',
+  photoStart:          '',
+  topicsStart:         '',
+  evalStart:           '',
+  closingStart:        '',
+  sharingStart:        '',
 };
 
+// Every block duration can likewise be pinned. Blank = auto:
+//   speechMins → Σ speech durations + 4' transition + TME hosting
+//   evalMins   → 3' per evaluator + 12' fixed reports + GE hosting
+//   topicsMins / intermissionMins → absorb the slack up to the target end time
 const durationOverrides = {
   receptionMins:    '',
   openingMins:      '',
+  speechMins:       '',
   photoMins:        '',
   intermissionMins: '',
   topicsMins:       '',
+  evalMins:         '',
   closingMins:      '',
   sharingMins:      '',
 };
+
+// Fixed-duration rows inside the evaluation block. These are *ranges* ("2'~3'"),
+// not numbers that feed the arithmetic, so they are kept as display strings and
+// edited directly — same pattern as `signals`.
+function defaultDurationLabels() {
+  return {
+    evaluator:   "2'~3'",
+    timerReport: "1'",
+    ahReport:    "1'",
+    langEval:    "3'~5'",
+    generalEval: "3'~5'",
+  };
+}
+let durationLabels = defaultDurationLabels();
+
+function updateDurationLabel(key, value) {
+  durationLabels[key] = value;
+  updatePreview();
+}
 
 const durationSettings = {
   tmeMins: 4,
@@ -511,14 +548,15 @@ function calcTimes(spList) {
   const endTime        = getTime('endTime',        '21:00');
 
   const receptionMins = getDur('receptionMins', 20);
-  const openingStart  = addMins(receptionStart, receptionMins);
+  const openingStart  = getTime('openingStart', addMins(receptionStart, receptionMins));
   const openingMins   = getDur('openingMins', 10);
   const varietyMins = varietySession.enabled ? varietySession.duration : 0;
   // speech block: sum of max durations + 4 min transition + TME hosting
-  const speechMins  = spList.reduce((s, sp) => s + parseDurationMax(sp.duration), 0) + 4 + durationSettings.tmeMins;
+  const speechMins  = getDur('speechMins',
+    spList.reduce((s, sp) => s + parseDurationMax(sp.duration), 0) + 4 + durationSettings.tmeMins);
   const photoMins   = getDur('photoMins',   5);
   // eval: 3' per evaluator + timer(1) + ah(1) + LE(5) + GE(5) + GE hosting
-  const evalMins    = evaluators.length * 3 + 12 + durationSettings.geMins;
+  const evalMins    = getDur('evalMins', evaluators.length * 3 + 12 + durationSettings.geMins);
   const closingMins = getDur('closingMins', 6);
   const sharingMins = getDur('sharingMins', 5);
 
@@ -551,14 +589,15 @@ function calcTimes(spList) {
     intermissionMins =  5 + intermissionExtra;
   }
 
-  // Calculate start times sequentially
-  const speechStart         = addMins(openingStart,         openingMins);
-  const preparedSpeechStart = addMins(speechStart,          varietyMins);
-  const photoStart          = addMins(preparedSpeechStart,  speechMins);
-  const topicsStart         = addMins(photoStart,           photoMins + intermissionMins);
-  const evalStart           = addMins(topicsStart,          topicsMins);
-  const closingStart        = addMins(evalStart,            evalMins);
-  const sharingStart        = addMins(closingStart,         closingMins);
+  // Start times run sequentially, each one either pinned by hand or derived from
+  // the block before it — so a pinned time carries the rest of the chain with it.
+  const speechStart         = getTime('speechStart',         addMins(openingStart,        openingMins));
+  const preparedSpeechStart = getTime('preparedSpeechStart', addMins(speechStart,         varietyMins));
+  const photoStart          = getTime('photoStart',          addMins(preparedSpeechStart, speechMins));
+  const topicsStart         = getTime('topicsStart',         addMins(photoStart,          photoMins + intermissionMins));
+  const evalStart           = getTime('evalStart',           addMins(topicsStart,         topicsMins));
+  const closingStart        = getTime('closingStart',        addMins(evalStart,           evalMins));
+  const sharingStart        = getTime('sharingStart',        addMins(closingStart,        closingMins));
 
   return {
     receptionStart, receptionMins, openingStart, endTime,
@@ -594,40 +633,44 @@ function resetDurationOverride(key) {
 }
 
 function refreshAutoHints() {
-  const times = calcTimes(speeches);
-
-  // HH:MM fields
-  [
-    ['endTime',        times.endTime],
-    ['receptionStart', times.receptionStart],
-  ].forEach(([key, val]) => {
+  Object.keys(timeOverrides).forEach(key => {
     const el = document.getElementById(`auto_${key}`);
-    if (el) el.textContent = `自動: ${val}`;
+    if (el) el.textContent = `自動: ${autoValueFor(key)}`;
     const input = document.getElementById(`to_${key}`);
     if (input) input.classList.toggle('is-overridden', !!timeOverrides[key].trim());
   });
 
-  // Duration fields (overrideable)
-  [
-    ['receptionMins',    times.receptionMins],
-    ['openingMins',      times.openingMins],
-    ['photoMins',        times.photoMins],
-    ['intermissionMins', times.intermissionMins],
-    ['topicsMins',       times.topicsMins],
-    ['closingMins',      times.closingMins],
-    ['sharingMins',      times.sharingMins],
-  ].forEach(([key, val]) => {
+  Object.keys(durationOverrides).forEach(key => {
     const el = document.getElementById(`auto_${key}`);
-    if (el) el.textContent = `自動: ${val} 分鐘`;
+    if (el) el.textContent = `自動: ${autoValueFor(key)} 分鐘`;
     const input = document.getElementById(`to_${key}`);
     if (input) input.classList.toggle('is-overridden', String(durationOverrides[key]).trim() !== '');
   });
+}
 
-  // Read-only info (speeches, eval)
-  const spEl = document.getElementById('auto_speechMins');
-  if (spEl) spEl.textContent = `${times.speechMins} 分鐘`;
-  const evEl = document.getElementById('auto_evalMins');
-  if (evEl) evEl.textContent = `${times.evalMins} 分鐘`;
+/**
+ * What one field would show if it alone were un-pinned — exactly the value its
+ * ⟳ button restores. Pins further up the chain still count, so the hint never
+ * contradicts what you'd actually get. Computed by clearing that single
+ * override for the duration of one (pure, synchronous) calcTimes call.
+ */
+function autoValueFor(key) {
+  const store = key in timeOverrides ? timeOverrides : durationOverrides;
+  const saved = store[key];
+  store[key] = '';
+  try {
+    return calcTimes(speeches)[key];
+  } finally {
+    store[key] = saved;
+  }
+}
+
+// Push the current `durationLabels` into their inputs (durlbl_<key>).
+function syncDurationLabelInputs() {
+  Object.entries(durationLabels).forEach(([key, val]) => {
+    const el = document.getElementById(`durlbl_${key}`);
+    if (el) el.value = val || '';
+  });
 }
 
 // ================================================================
@@ -791,7 +834,8 @@ function applyClubImages(club) {
 function buildRenderCtx() {
   return {
     t, esc, calcTimes, displayMember, buildSpeechAgendaLine,
-    formatDate, varietySession, signals, PATHWAYS, PATHWAYS_ZH, images, lang,
+    formatDate, varietySession, signals, durationLabels,
+    PATHWAYS, PATHWAYS_ZH, images, lang,
   };
 }
 
@@ -830,6 +874,7 @@ function collectSaveData() {
     timeOverrides:     { ...timeOverrides },
     durationOverrides: { ...durationOverrides },
     durationSettings:  { ...durationSettings },
+    durationLabels:    { ...durationLabels },
     lang,
     themeImgUrl:      images.themeImg || null,
     varietySession:   { ...varietySession },
@@ -853,27 +898,40 @@ function applyAgendaData(d) {
   speeches   = d.speeches   || [];
   evaluators = d.evaluators || [];
 
+  // Clear first — this state outlives a single load, so keys the saved agenda
+  // omits must fall back to auto rather than keep the previous agenda's value.
+  Object.keys(timeOverrides).forEach(k => { timeOverrides[k] = ''; });
+  Object.keys(durationOverrides).forEach(k => { durationOverrides[k] = ''; });
+
   if (d.timeOverrides) {
-    timeOverrides.endTime        = d.timeOverrides.endTime        || '';
-    // migrate openingStart → receptionStart
-    timeOverrides.receptionStart = d.timeOverrides.receptionStart || d.timeOverrides.openingStart || '';
-    // migrate intermissionMins from old timeOverrides format
-    if (d.timeOverrides.intermissionMins !== undefined && String(d.timeOverrides.intermissionMins).trim() !== '') {
-      durationOverrides.intermissionMins = String(d.timeOverrides.intermissionMins);
+    const src = d.timeOverrides;
+    // Legacy shape: `openingStart` once meant what is now `receptionStart`, and
+    // `intermissionMins` used to live in here. Detect it by a missing
+    // `receptionStart` — every save since that rename includes the key. Without
+    // this check the old value would be misread as the new openingStart pin.
+    if (src.receptionStart === undefined) {
+      timeOverrides.receptionStart = src.openingStart || '';
+    } else {
+      Object.keys(timeOverrides).forEach(k => { timeOverrides[k] = src[k] || ''; });
     }
-    Object.entries(timeOverrides).forEach(([key, val]) => {
-      const el = document.getElementById(`to_${key}`);
-      if (el) el.value = val || '';
-    });
+    timeOverrides.endTime = src.endTime || '';
+    if (src.intermissionMins !== undefined && String(src.intermissionMins).trim() !== '') {
+      durationOverrides.intermissionMins = String(src.intermissionMins);
+    }
   }
 
   if (d.durationOverrides) {
-    Object.assign(durationOverrides, d.durationOverrides);
-    Object.entries(durationOverrides).forEach(([key, val]) => {
+    Object.keys(durationOverrides).forEach(k => {
+      if (d.durationOverrides[k] !== undefined) durationOverrides[k] = d.durationOverrides[k];
+    });
+  }
+
+  [timeOverrides, durationOverrides].forEach(store => {
+    Object.entries(store).forEach(([key, val]) => {
       const el = document.getElementById(`to_${key}`);
       if (el) el.value = val || '';
     });
-  }
+  });
 
   if (d.durationSettings) {
     durationSettings.tmeMins = d.durationSettings.tmeMins ?? 4;
@@ -907,6 +965,10 @@ function applyAgendaData(d) {
   // then push values into the signal-grid inputs.
   signals = { ...defaultSignals(), ...(d.signals || {}) };
   syncSignalInputs();
+
+  // Same for the fixed evaluation-row duration labels.
+  durationLabels = { ...defaultDurationLabels(), ...(d.durationLabels || {}) };
+  syncDurationLabelInputs();
 
   images.themeImg = d.themeImgUrl || null;
   const statusEl = document.getElementById('themeImgStatus');
@@ -1392,6 +1454,8 @@ function applyDefaultState() {
   fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   signals = defaultSignals();
   syncSignalInputs();
+  durationLabels = defaultDurationLabels();
+  syncDurationLabelInputs();
   document.getElementById('meetingDate').value     = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   // Time/venue defaults: club's own setting → its template's fieldDefaults →
   // the standard template's fieldDefaults (last-resort). All defaults live in

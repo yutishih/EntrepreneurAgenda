@@ -138,7 +138,7 @@
                  oninput="updateDuration('geMins', this.value)"> <span class="time-unit">分鐘</span>
         </div>
         <hr style="margin:6px 0;border-color:#ddd">
-        <p class="time-override-hint">空白 = 自動計算｜手動輸入分鐘數覆蓋</p>
+        <p class="time-override-hint">空白 = 自動計算｜填入即覆蓋該欄</p>
         <div class="time-override-row">
           <div class="time-override-label">
             目標結束 End Time
@@ -148,16 +148,96 @@
                  oninput="updateTimeOverride('endTime', this.value)">
           <button class="btn-time-reset" onclick="resetTimeOverride('endTime')" title="還原自動">⟳</button>
         </div>
+
+        <hr style="margin:6px 0;border-color:#ddd">
+        <p class="time-override-hint">
+          <strong>各段開始時刻</strong>（議程表時間欄）<br>
+          指定某段時刻後，後面各段會從該時刻往下推算。
+        </p>
         <div class="time-override-row">
           <div class="time-override-label">
-            報到開始 Reception Start
+            報到 Reception
             <span id="auto_receptionStart" class="time-auto"></span>
           </div>
-          <input type="text" id="to_receptionStart" maxlength="5" placeholder="18:50"
+          <input type="text" id="to_receptionStart" maxlength="5" placeholder="自動"
                  oninput="updateTimeOverride('receptionStart', this.value)">
           <button class="btn-time-reset" onclick="resetTimeOverride('receptionStart')" title="還原自動">⟳</button>
         </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            開幕 Opening
+            <span id="auto_openingStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_openingStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('openingStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('openingStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            多元單元 Variety
+            <span id="auto_speechStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_speechStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('speechStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('speechStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            指定演講 Prepared Speech
+            <span id="auto_preparedSpeechStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_preparedSpeechStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('preparedSpeechStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('preparedSpeechStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            拍照 Group Photo
+            <span id="auto_photoStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_photoStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('photoStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('photoStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            即席問答 Table Topics
+            <span id="auto_topicsStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_topicsStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('topicsStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('topicsStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            講評 Evaluation
+            <span id="auto_evalStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_evalStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('evalStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('evalStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            結尾 Closing
+            <span id="auto_closingStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_closingStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('closingStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('closingStart')" title="還原自動">⟳</button>
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">
+            會後分享 Sharing
+            <span id="auto_sharingStart" class="time-auto"></span>
+          </div>
+          <input type="text" id="to_sharingStart" maxlength="5" placeholder="自動"
+                 oninput="updateTimeOverride('sharingStart', this.value)">
+          <button class="btn-time-reset" onclick="resetTimeOverride('sharingStart')" title="還原自動">⟳</button>
+        </div>
+
         <hr style="margin:6px 0;border-color:#ddd">
+        <p class="time-override-hint"><strong>各段時長</strong>（議程表時長欄）</p>
         <div class="time-override-row">
           <div class="time-override-label">
             報到 Reception
@@ -181,6 +261,9 @@
             演講 Speeches
             <span id="auto_speechMins" class="time-auto"></span>
           </div>
+          <input type="number" id="to_speechMins" min="0" style="width:60px"
+                 placeholder="自動" oninput="updateDurationOverride('speechMins', this.value)"> <span class="time-unit">分鐘</span>
+          <button class="btn-time-reset" onclick="resetDurationOverride('speechMins')" title="還原自動">⟳</button>
         </div>
         <div class="time-override-row">
           <div class="time-override-label">
@@ -214,6 +297,9 @@
             講評 Evaluation
             <span id="auto_evalMins" class="time-auto"></span>
           </div>
+          <input type="number" id="to_evalMins" min="0" style="width:60px"
+                 placeholder="自動" oninput="updateDurationOverride('evalMins', this.value)"> <span class="time-unit">分鐘</span>
+          <button class="btn-time-reset" onclick="resetDurationOverride('evalMins')" title="還原自動">⟳</button>
         </div>
         <div class="time-override-row">
           <div class="time-override-label">
@@ -232,6 +318,36 @@
           <input type="number" id="to_sharingMins" min="0" max="30" style="width:60px"
                  placeholder="自動" oninput="updateDurationOverride('sharingMins', this.value)"> <span class="time-unit">分鐘</span>
           <button class="btn-time-reset" onclick="resetDurationOverride('sharingMins')" title="還原自動">⟳</button>
+        </div>
+
+        <hr style="margin:6px 0;border-color:#ddd">
+        <p class="time-override-hint">
+          <strong>講評區各列時長</strong>（議程表上直接顯示的字樣，可填區間）
+        </p>
+        <div class="time-override-row">
+          <div class="time-override-label">個別講評 Evaluator</div>
+          <input type="text" id="durlbl_evaluator" style="width:74px" placeholder="2'~3'"
+                 oninput="updateDurationLabel('evaluator', this.value)">
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">計時員報告 Timer Report</div>
+          <input type="text" id="durlbl_timerReport" style="width:74px" placeholder="1'"
+                 oninput="updateDurationLabel('timerReport', this.value)">
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">贅語報告 Ah Report</div>
+          <input type="text" id="durlbl_ahReport" style="width:74px" placeholder="1'"
+                 oninput="updateDurationLabel('ahReport', this.value)">
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">語言講評 Language Eval</div>
+          <input type="text" id="durlbl_langEval" style="width:74px" placeholder="3'~5'"
+                 oninput="updateDurationLabel('langEval', this.value)">
+        </div>
+        <div class="time-override-row">
+          <div class="time-override-label">總講評 General Eval</div>
+          <input type="text" id="durlbl_generalEval" style="width:74px" placeholder="3'~5'"
+                 oninput="updateDurationLabel('generalEval', this.value)">
         </div>
       </div>
     </details>

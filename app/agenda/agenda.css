@@ -131,16 +131,6 @@ details[open] summary::before { content: "▼ "; }
 }
 .img-clear-btn:hover { background: #ffd6d6; border-color: #f88; }
 .img-hint { font-size: 10px; color: #aaa; margin-top: 2px; }
-.img-warning {
-  font-size: 10px;
-  color: #e67700;
-  background: #fff8ee;
-  border: 1px solid #ffd591;
-  border-radius: 5px;
-  padding: 5px 8px;
-  margin-top: 6px;
-  line-height: 1.5;
-}
 
 /* Speech entry */
 .speech-entry {
@@ -297,7 +287,6 @@ details[open] summary::before { content: "▼ "; }
 }
 .btn-action-reset:hover { color: #772432; }
 
-/* Kept for potential future use; hidden by default */
 .btn-preview-toggle { display: none; }
 .btn-preview-close  { display: none; }
 
@@ -823,115 +812,6 @@ details[open] summary::before { content: "▼ "; }
 }
 
 /* ============================================================
-   AUTH — form header & logout
-   ============================================================ */
-.form-header h1 {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin: 0;
-  padding: 0;
-  border: none;
-}
-
-/* ============================================================
-   AUTH — login overlay
-   ============================================================ */
-.login-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(26, 26, 46, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.login-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 36px 32px 32px;
-  width: 340px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
-  text-align: center;
-}
-.login-logo { font-size: 36px; margin-bottom: 8px; }
-.login-card h2 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin-bottom: 3px;
-}
-.login-subtitle {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 20px;
-}
-.login-tabs {
-  display: flex;
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid #e0e0e0;
-  margin-bottom: 18px;
-}
-.login-tab {
-  flex: 1;
-  padding: 7px;
-  border: none;
-  background: #fafafa;
-  font-size: 13px;
-  cursor: pointer;
-  color: #666;
-  transition: background 0.15s;
-}
-.login-tab.active {
-  background: #772432;
-  color: #fff;
-  font-weight: 600;
-}
-.login-field {
-  text-align: left;
-  margin-bottom: 12px;
-}
-.login-field label {
-  display: block;
-  font-size: 11px;
-  color: #666;
-  margin-bottom: 4px;
-}
-.login-field input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 13px;
-  transition: border-color 0.2s;
-}
-.login-field input:focus {
-  outline: none;
-  border-color: #772432;
-}
-.login-error {
-  font-size: 12px;
-  color: #772432;
-  min-height: 18px;
-  margin-bottom: 8px;
-  text-align: left;
-}
-.btn-login-submit {
-  width: 100%;
-  padding: 10px;
-  background: #772432;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-login-submit:hover { background: #5a1a25; }
-
-/* ============================================================
    MEMBER AUTOCOMPLETE DROPDOWN
    ============================================================ */
 .member-dropdown {
@@ -982,10 +862,8 @@ details[open] summary::before { content: "▼ "; }
    RESPONSIVE (RWD)
    ============================================================ */
 @media (max-width: 860px) {
-  /* --- Layout: preview fills full area, panel is fixed overlay --- */
   .app-layout { position: relative; }
 
-  /* --- Backdrop when panel is open --- */
   .panel-backdrop {
     display: none;
     position: fixed; inset: 0;
@@ -994,7 +872,6 @@ details[open] summary::before { content: "▼ "; }
   }
   .panel-backdrop.open { display: block; }
 
-  /* --- Form panel: left-side fixed drawer --- */
   .form-panel {
     position: fixed;
     left: 0;
@@ -1007,14 +884,13 @@ details[open] summary::before { content: "▼ "; }
     border-bottom: none;
     flex-shrink: 0;
     z-index: 50;
-    overflow: visible; /* allow toggle tab to stick out beyond panel edge */
+    overflow: visible;
     transform: translateX(-100%);
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 4px 0 16px rgba(0,0,0,0.12);
   }
   .form-panel.panel-open { transform: translateX(0); }
 
-  /* --- Toggle tab: sticks out to the right edge of the panel --- */
   .form-toggle-bar {
     display: flex;
     position: absolute;
@@ -1037,10 +913,8 @@ details[open] summary::before { content: "▼ "; }
   .toggle-chevron { color: #1a1a2e; transform: rotate(-90deg); transition: transform 0.3s ease; }
   .form-panel.panel-open .toggle-chevron { transform: rotate(90deg); }
 
-  /* --- Scroll body --- */
   .form-scroll-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px 0; }
 
-  /* --- Form actions: collapsible upward menu --- */
   .form-actions-menu {
     overflow: hidden;
     max-height: 0;
@@ -1072,7 +946,6 @@ details[open] summary::before { content: "▼ "; }
   .actions-chevron { color: #aaa; transition: transform 0.3s ease; }
   .form-actions.actions-open .actions-chevron { transform: rotate(180deg); }
 
-  /* --- Preview: fill the entire content area --- */
   .preview-panel { display: flex; position: static; flex: 1; min-height: 0; }
   .preview-scroll { padding: 10px; overflow-x: hidden; }
   .preview-toolbar { position: sticky; top: 0; z-index: 11; }
@@ -1082,7 +955,6 @@ details[open] summary::before { content: "▼ "; }
   .btn-settings:hover,
   .settings-dropdown.open .btn-settings { background: none; color: #772432; border-color: #772432; }
 
-  /* --- Modal --- */
   .modal-box { max-height: 92svh; }
 }
 
@@ -1145,8 +1017,6 @@ details[open] summary::before { content: "▼ "; }
 
 /* ============================================================
    TEMPLATE: COMPACT  (.tmpl-compact)
-   A single-column alternative layout. Fully namespaced so it never
-   collides with the standard template's classes.
    ============================================================ */
 .tmpl-compact { font-size: 9pt; }
 .tmpl-compact .c-header {
@@ -1189,8 +1059,6 @@ details[open] summary::before { content: "▼ "; }
 
 /* ============================================================
    TEMPLATE: CHILL HI HIGH  (.tmpl-chillhihigh)
-   Bilingual humor-club layout with inline green/yellow/red signal
-   columns and a Meeting Roles glossary. Fully namespaced.
    ============================================================ */
 .tmpl-chillhihigh { font-size: 8pt; color: #1f2937; }
 .tmpl-chillhihigh .ch-header { display: flex; gap: 10px; align-items: flex-start; }
@@ -1207,8 +1075,6 @@ details[open] summary::before { content: "▼ "; }
 }
 .tmpl-chillhihigh .ch-theme-q { font-weight: 400; margin-top: 3px; font-size: 7.5pt; }
 
-/* flex:1 + height:0 lets the table absorb leftover page height so page 1
-   fills the A4 sheet; equalizeRowHeights() spreads that space across rows. */
 .tmpl-chillhihigh .ch-table { width: 100%; border-collapse: collapse; flex: 1; height: 0; }
 .tmpl-chillhihigh .ch-table th,
 .tmpl-chillhihigh .ch-table td {
@@ -1273,8 +1139,6 @@ details[open] summary::before { content: "▼ "; }
 
 /* ---- chillhihigh PAGE 2 (.ch2-*) ---- */
 .tmpl-chillhihigh .ch2-page { font-size: 8.5pt; color: #1f2937; display: flex; flex-direction: column; gap: 8px; }
-/* Hero / body images carry their own framing — show them plainly. Heights are
-   capped so two images + the QR row always fit within one A4 page. */
 .tmpl-chillhihigh .ch2-hero { text-align: center; }
 .tmpl-chillhihigh .ch2-hero-img {
   width: 100%; height: auto; max-height: 85mm;
@@ -1331,3 +1195,47 @@ details[open] summary::before { content: "▼ "; }
 .tmpl-chillhihigh .ch2-qr { flex: 1; min-width: 0; text-align: center; }
 .tmpl-chillhihigh .ch2-qr-img { width: 100%; max-width: 40mm; height: auto; object-fit: contain; }
 .tmpl-chillhihigh .ch2-qr-l { font-size: 12pt; font-weight: 700; color: #1e3a5f; margin-bottom: 5px; }
+
+/* ============================================================
+   AGENDA-SPECIFIC: club picker + signal grid (from index.html <style>)
+   ============================================================ */
+#agendaClubPickerRow {
+  padding: 12px 16px 10px;
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+}
+.agenda-club-picker-label {
+  font-size: 11px; font-weight: 600; color: #92400e;
+  letter-spacing: 0.4px; text-transform: uppercase;
+  margin-bottom: 6px;
+  display: flex; align-items: center; gap: 5px;
+}
+.agenda-club-select {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid #fcd34d; border-radius: 7px;
+  font-size: 13px; background: #fff; cursor: pointer;
+  transition: border-color 0.2s;
+}
+.agenda-club-select:focus { outline: none; border-color: #d97706; }
+.agenda-club-hint {
+  font-size: 11px; margin-top: 5px; min-height: 16px;
+}
+.signal-grid-title {
+  font-size: 12px; font-weight: 600; color: #334155;
+  margin: 12px 0 6px;
+}
+.signal-grid { display: flex; flex-direction: column; gap: 5px; }
+.signal-grid-head, .signal-row {
+  display: grid; grid-template-columns: 1fr 50px 50px 50px;
+  gap: 6px; align-items: center;
+}
+.signal-grid-head span { font-size: 11px; text-align: center; font-weight: 600; }
+.signal-grid-head .sg-g { color: #16a34a; }
+.signal-grid-head .sg-y { color: #ca8a04; }
+.signal-grid-head .sg-r { color: #dc2626; }
+.signal-row label { font-size: 12px; color: #475569; }
+.signal-row input {
+  width: 100%; padding: 5px 6px; text-align: center;
+  border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;
+}
+.signal-row input:focus { outline: none; border-color: #772432; }

@@ -1,24 +1,32 @@
-'use strict';
+'use client';
 
-/**
- * ROLE PLANNING (/roles)
- * ================================================================
- * A matrix editor for meeting roles: one column per meeting, one row per role.
- *
- * There is no separate storage for role plans — the cells read and write the
- * *same* fields of `agendas.data` that the agenda generator uses, so planning a
- * role here immediately shows up on that meeting's agenda sheet, and vice
- * versa. The role list below is therefore derived from the agenda fields in
- * `app.js` (`collectData()` / `collectSaveData()`).
- *
- * Because `PUT /api/agendas/{id}` replaces `data` wholesale, saving is
- * merge-based: re-read the agenda, overwrite only the role fields that were
- * edited here, then write it back. That keeps a concurrent edit in the agenda
- * editor from being clobbered by a stale copy.
- */
+import { useEffect } from 'react';
+import { apiJson } from '@/lib/api';
+import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, canWrite } from '@/lib/auth';
+import { MemberAC } from '@/lib/memberAutocomplete';
+import Sidebar from '@/components/Sidebar';
+import './roles.css';
 
 // ================================================================
-// ROLE DEFINITIONS  (mirrors the agenda fields in app.js)
+// This page is a deliberate lift-and-shift port of the legacy
+// roles.html + roles.js role matrix editor — imperative DOM ops kept
+// nearly verbatim rather than rewritten as React state (same approach
+// as /home, /club, /member, /agenda). Module-level `let`/`const` mirror
+// the original inline <script> globals.
+//
+// There is no separate storage for role plans — the cells read and
+// write the *same* fields of `agendas.data` that the agenda generator
+// uses, so planning a role here immediately shows up on that meeting's
+// agenda sheet, and vice versa. The role list below is therefore
+// derived from the agenda fields in app/agenda/page.js.
+//
+// Because `PUT /svc/agendas/{id}` replaces `data` wholesale, saving is
+// merge-based: re-read the agenda, overwrite only the role fields that
+// were edited here, then write it back.
+// ================================================================
+
+// ================================================================
+// ROLE DEFINITIONS  (mirrors the agenda fields in app/agenda/page.js)
 // ================================================================
 const ROLE_GROUPS = [
   {
@@ -76,7 +84,7 @@ const META_FIELDS = [
   { key: 'meetingTheme', label: '例會主題', placeholder: '未設定主題' },
 ];
 
-/** Same shape app.js uses, so a row added here stays valid in the editor. */
+/** Same shape app/agenda/page.js uses, so a row added here stays valid in the editor. */
 function blankSpeech() {
   return {
     title: '', speaker: '', duration: "5'-7'", speechLang: 'en',
@@ -115,18 +123,17 @@ function roleSet(data, role, value) {
 let meetings       = [];     // [{ id, meetingDate, meetingNo, meetingTheme, clubId, data, draft, dirty:Set }]
 let rows           = [];     // flattened matrix rows: {type:'group'|'role', ...}
 let roleById       = {};     // roleId → role descriptor
-let allClubs       = [];
 let selectedClubId = null;
-let dateFrom       = '';    // inclusive meeting_date bounds; '' = unbounded
+let dateFrom       = '';     // inclusive meeting_date bounds; '' = unbounded
 let dateTo         = '';
 
 /** Safety net so an unbounded range cannot pull the whole history at once. */
 const MAX_COLUMNS = 40;
 
-const roleId = role => role.key;
+const roleId = (role) => role.key;
 
 // ---------------------------------------------------------------- date range
-const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 function addMonths(iso, n) {
   const d = new Date(`${iso}T00:00:00`);
@@ -145,6 +152,8 @@ function defaultRange() {
   const today = ymd(new Date());
   return { from: addMonths(today, -2), to: addMonths(today, 3) };
 }
+
+const dirtyMeetings = () => meetings.filter((m) => m.dirty.size > 0);
 
 const confirmDiscard = () =>
   !dirtyMeetings().length || confirm('有未儲存的變更，重新載入將會捨棄。要繼續嗎？');
@@ -186,63 +195,30 @@ function onDateRangeChange() {
 }
 
 // ================================================================
-// INIT
+// AUTH / LOAD
 // ================================================================
-async function init() {
-  applyRoleUI();
-  const token = getToken();
-  if (!token) { location.href = '/login'; return; }
+async function checkRolesAuth() {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/verify`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) { clearAuth(); location.href = '/login'; return; }
-    const d = await res.json();
-    setAuth(getToken(), d.username, d.role, d.club_id, d.must_change_pw);
-    if (d.must_change_pw) { location.href = '/change-password'; return; }
-    document.getElementById('navUser').textContent   = d.username;
-    document.getElementById('userAvatar').textContent = d.username.slice(0, 1).toUpperCase();
+    const data = await apiJson('/auth/verify');
+    setAuth(data.username, data.role, data.club_id, data.must_change_pw);
+    if (data.must_change_pw) { location.href = '/change-password'; return false; }
+    document.getElementById('navUser').textContent = data.username;
+    document.getElementById('userAvatar').textContent = data.username.slice(0, 1).toUpperCase();
     applyRoleUI();
+    return true;
   } catch {
-    clearAuth(); location.href = '/login'; return;
+    clearAuth();
+    location.href = '/login';
+    return false;
   }
-
-  MemberAC.init();
-
-  const r = defaultRange();
-  dateFrom = r.from;
-  dateTo   = r.to;
-  syncDateInputs();
-
-  // Registered before any early return so they are always active, including for
-  // a system_admin who has not picked a club yet.
-  document.addEventListener('keydown', e => {          // Ctrl/Cmd+S saves the board
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-      e.preventDefault();
-      if (canWrite()) saveAll();
-    }
-  });
-  window.addEventListener('beforeunload', e => {
-    if (dirtyMeetings().length) { e.preventDefault(); e.returnValue = ''; }
-  });
-
-  if (isSystemAdmin()) {
-    await loadClubs();
-    if (selectedClubId == null) { showPickClubHint(); return; }
-  }
-  await Promise.all([loadRoster(), loadMeetings()]);
 }
 
 async function loadClubs() {
   try {
-    const res = await fetch(`${API_BASE}/api/clubs`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-    if (!res.ok) throw new Error();
-    allClubs = await res.json();
+    const allClubs = await apiJson('/clubs');
     const sel = document.getElementById('clubPickerSelect');
     sel.innerHTML = '<option value="">— 請選擇分會 —</option>' +
-      allClubs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      allClubs.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
     document.getElementById('clubPickerBar').style.display = '';
   } catch {
     toast('載入分會失敗', true);
@@ -271,12 +247,10 @@ function showPickClubHint() {
 /** Roster that feeds the cell dropdowns. Guests can still be typed freely. */
 async function loadRoster() {
   try {
-    let url = `${API_BASE}/api/users`;
-    if (isSystemAdmin() && selectedClubId != null) url += `?club_id=${selectedClubId}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
-    if (!res.ok) throw new Error();
-    const users = await res.json();
-    MemberAC.setRoster(users.filter(u => (u.status || 'active') === 'active'));
+    let path = '/users';
+    if (isSystemAdmin() && selectedClubId != null) path += `?club_id=${selectedClubId}`;
+    const users = await apiJson(path);
+    MemberAC.setRoster(users.filter((u) => (u.status || 'active') === 'active'));
     document.getElementById('rosterCount').textContent = `${MemberAC.getRoster().length} 位會員可選`;
   } catch {
     toast('載入會員名單失敗，仍可手動輸入姓名', true);
@@ -293,15 +267,11 @@ async function loadMeetings() {
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo)   params.set('date_to',   dateTo);
     if (isSystemAdmin() && selectedClubId != null) params.set('club_id', selectedClubId);
-    const res = await fetch(`${API_BASE}/api/agendas?${params}`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-    if (!res.ok) throw new Error();
-    const json = await res.json();
+    const json = await apiJson(`/agendas?${params}`);
 
     // API returns newest first; show them left→right chronologically.
     meetings = (json.items || [])
-      .map(it => ({ ...it, data: it.data || {}, draft: {}, dirty: new Set() }))
+      .map((it) => ({ ...it, data: it.data || {}, draft: {}, dirty: new Set() }))
       .sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)));
 
     buildRows();
@@ -317,9 +287,9 @@ async function loadMeetings() {
 /** (Re)seed a meeting's editable draft from its saved agenda data. */
 function resetDraft(m) {
   m.dirty.clear();
-  rows.filter(r => r.type === 'role')
-      .forEach(r => { m.draft[roleId(r.role)] = roleGet(m.data, r.role); });
-  META_FIELDS.forEach(f => { m.draft[f.key] = roleGet(m.data, f); });
+  rows.filter((r) => r.type === 'role')
+      .forEach((r) => { m.draft[roleId(r.role)] = roleGet(m.data, r.role); });
+  META_FIELDS.forEach((f) => { m.draft[f.key] = roleGet(m.data, f); });
 }
 
 function updateRangeLabel(total) {
@@ -335,21 +305,21 @@ function updateRangeLabel(total) {
 // ================================================================
 function buildRows() {
   // Show as many speech / evaluator slots as the busiest loaded meeting needs.
-  const maxSpeech = Math.max(3, ...meetings.map(m => (m.data.speeches   || []).length));
-  const maxEval   = Math.max(3, ...meetings.map(m => (m.data.evaluators || []).length));
+  const maxSpeech = Math.max(3, ...meetings.map((m) => (m.data.speeches   || []).length));
+  const maxEval   = Math.max(3, ...meetings.map((m) => (m.data.evaluators || []).length));
 
   rows     = [];
   roleById = {};
 
-  const pushRole = role => {
+  const pushRole = (role) => {
     roleById[roleId(role)] = role;
     rows.push({ type: 'role', role });
   };
 
   // Resolvable by the save path, but intentionally absent from `rows`.
-  META_FIELDS.forEach(f => { roleById[f.key] = f; });
+  META_FIELDS.forEach((f) => { roleById[f.key] = f; });
 
-  ROLE_GROUPS.forEach(group => {
+  ROLE_GROUPS.forEach((group) => {
     rows.push({ type: 'group', label: group.label });
     (group.roles || []).forEach(pushRole);
 
@@ -405,22 +375,22 @@ function renderMatrix() {
 
   const readOnly = !canWrite();
 
-  const head = meetings.map(m => `
+  const head = meetings.map((m) => `
     <th class="rm-meeting" data-mid="${m.id}">
       <div class="rm-m-date">${esc(fmtDate(m.meetingDate))}<span class="rm-dot" id="dot_${m.id}"></span></div>
       <div class="rm-m-no">${m.meetingNo ? `第 ${esc(m.meetingNo)} 次` : '—'}</div>
-      ${META_FIELDS.map(f => `
+      ${META_FIELDS.map((f) => `
         <input type="text" class="rm-m-meta" id="cell_${m.id}_${f.key}"
                value="${esc(m.draft[f.key] ?? '')}" data-mid="${m.id}" data-rid="${f.key}"
                placeholder="${esc(f.placeholder)}" ${readOnly ? 'disabled' : ''}
-               title="${esc(f.label)}（可編輯）" oninput="onCellInput(this)">`).join('')}
+               title="${esc(f.label)}（可編輯）" oninput="window.__rolesOnCellInput(this)">`).join('')}
       <div class="rm-m-foot">
         <span class="rm-m-fill" id="fill_${m.id}"></span>
         <a class="rm-m-link" href="/index?id=${m.id}" title="開啟此場議程">議程 ↗</a>
       </div>
     </th>`).join('');
 
-  const body = rows.map(r => {
+  const body = rows.map((r) => {
     if (r.type === 'group') {
       return `<tr class="rm-group-row">
         <th class="rm-role rm-group">${esc(r.label)}</th>
@@ -428,7 +398,7 @@ function renderMatrix() {
       </tr>`;
     }
     const rid = roleId(r.role);
-    const cells = meetings.map(m => {
+    const cells = meetings.map((m) => {
       const v      = m.draft[rid] ?? '';
       const acLang = m.data.lang === 'zh' ? 'zh' : 'en';
 
@@ -439,7 +409,7 @@ function renderMatrix() {
                value="${esc(v)}" data-ac-lang="${acLang}" data-mid="${m.id}" data-rid="${rid}"
                placeholder="${note ? '＋' : '—'}" ${readOnly ? 'disabled' : ''}
                data-base-title="${esc(note)}"
-               oninput="onCellInput(this)">
+               oninput="window.__rolesOnCellInput(this)">
       </td>`;
     }).join('');
     return `<tr>
@@ -462,7 +432,7 @@ function renderMatrix() {
 
 /** Called on every keystroke — must never rebuild the table (would drop focus). */
 function onCellInput(el) {
-  const m = meetings.find(x => String(x.id) === el.dataset.mid);
+  const m = meetings.find((x) => String(x.id) === el.dataset.mid);
   if (!m) return;
   const rid = el.dataset.rid;
   m.draft[rid] = el.value;
@@ -472,7 +442,7 @@ function onCellInput(el) {
   updateSaveBar();
 }
 
-const norm = s => String(s || '').trim().toLowerCase();
+const norm = (s) => String(s || '').trim().toLowerCase();
 
 /**
  * Decorations only (no DOM rebuild): the unsaved highlight per cell, plus the
@@ -482,12 +452,12 @@ const norm = s => String(s || '').trim().toLowerCase();
  * it is normal practice, so highlighting it would only add noise.
  */
 function refreshDecorations() {
-  const roleRows = rows.filter(r => r.type === 'role');
+  const roleRows = rows.filter((r) => r.type === 'role');
 
-  meetings.forEach(m => {
+  meetings.forEach((m) => {
     // Slots this meeting does not have only count once someone is put in them.
     let filled = 0, slots = 0;
-    roleRows.forEach(r => {
+    roleRows.forEach((r) => {
       const rid = roleId(r.role);
       const el  = document.getElementById(`cell_${m.id}_${rid}`);
       if (!el) return;
@@ -498,7 +468,7 @@ function refreshDecorations() {
     });
 
     // Header fields: edited highlight only — they take no part in the tally.
-    META_FIELDS.forEach(f => {
+    META_FIELDS.forEach((f) => {
       const el = document.getElementById(`cell_${m.id}_${f.key}`);
       if (el) el.classList.toggle('rm-edited', m.dirty.has(f.key));
     });
@@ -517,8 +487,6 @@ function refreshDecorations() {
 // ================================================================
 // SAVE
 // ================================================================
-const dirtyMeetings = () => meetings.filter(m => m.dirty.size > 0);
-
 function updateSaveBar() {
   const dirty = dirtyMeetings();
   const n     = dirty.reduce((s, m) => s + m.dirty.size, 0);
@@ -544,21 +512,15 @@ async function saveAll() {
     try {
       // Re-read so a concurrent edit in the agenda editor is not overwritten:
       // only the fields touched here are replaced.
-      const res = await fetch(`${API_BASE}/api/agendas/${m.id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error();
-      const fresh = await res.json();
+      const fresh = await apiJson(`/agendas/${m.id}`);
       delete fresh._clubId;              // editor-only hint, must not be persisted
 
-      m.dirty.forEach(rid => roleSet(fresh, roleById[rid], m.draft[rid]));
+      m.dirty.forEach((rid) => roleSet(fresh, roleById[rid], m.draft[rid]));
 
-      const put = await fetch(`${API_BASE}/api/agendas/${m.id}`, {
-        method:  'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body:    JSON.stringify({ data: fresh, club_id: m.clubId }),
+      await apiJson(`/agendas/${m.id}`, {
+        method: 'PUT',
+        body: { data: fresh, club_id: m.clubId },
       });
-      if (!put.ok) throw new Error();
 
       m.data = fresh;
       // Keep the list-level mirrors in step with what the API would now return.
@@ -588,7 +550,7 @@ function discardChanges() {
 // MISC
 // ================================================================
 function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => (
+  return String(s ?? '').replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
@@ -602,19 +564,120 @@ function toast(msg, isError = false) {
   toastTimer = setTimeout(() => { el.className = 'toast'; }, 3200);
 }
 
-function toggleSidebar() {
-  const sidebar  = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  const tab      = document.getElementById('sidebarToggleTab');
-  const open = sidebar.classList.toggle('sidebar-open');
-  backdrop.classList.toggle('visible', open);
-  tab.classList.toggle('open', open);
-}
+export default function RolesPage() {
+  useEffect(() => {
+    // Bridge for oninput="..." strings inside renderMatrix()'s innerHTML.
+    window.__rolesOnCellInput = onCellInput;
 
-function doLogout() {
-  if (!confirm('確定要登出嗎？')) return;
-  clearAuth(); location.href = '/login';
-}
+    applyRoleUI();
 
-applyRoleUI();   // run immediately to avoid a flash of admin-only controls
-document.addEventListener('DOMContentLoaded', init);
+    const onKeydown = (e) => {          // Ctrl/Cmd+S saves the board
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (canWrite()) saveAll();
+      }
+    };
+    const onBeforeUnload = (e) => {
+      if (dirtyMeetings().length) { e.preventDefault(); e.returnValue = ''; }
+    };
+    document.addEventListener('keydown', onKeydown);
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    const cleanupAutocomplete = MemberAC.init();
+
+    (async function init() {
+      applyRoleUI();
+      const ok = await checkRolesAuth();
+      if (!ok) return;
+
+      const r = defaultRange();
+      dateFrom = r.from;
+      dateTo   = r.to;
+      syncDateInputs();
+
+      if (isSystemAdmin()) {
+        await loadClubs();
+        if (selectedClubId == null) { showPickClubHint(); return; }
+      }
+      await Promise.all([loadRoster(), loadMeetings()]);
+    })();
+
+    return () => {
+      delete window.__rolesOnCellInput;
+      document.removeEventListener('keydown', onKeydown);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      cleanupAutocomplete?.();
+    };
+  }, []);
+
+  return (
+    <>
+      <Sidebar active="roles" />
+
+      <div className="main-area">
+        <header className="topbar">
+          <div className="topbar-title">角色安排</div>
+          <div className="topbar-actions">
+            <span className="save-state" id="saveState">已同步</span>
+            <button className="btn-ghost write-action" onClick={discardChanges}>捨棄變更</button>
+            <button className="btn-add write-action" id="btnSaveAll" onClick={saveAll} disabled>儲存變更</button>
+          </div>
+        </header>
+
+        <div className="content">
+
+          {/* Toolbar */}
+          <div className="picker-card">
+            <div id="clubPickerBar" style={{ display: 'none' }}>
+              <span className="picker-label">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                分會
+                <select id="clubPickerSelect" className="picker-select" onChange={onClubChange} style={{ marginLeft: 6 }}>
+                  <option value="">— 請選擇分會 —</option>
+                </select>
+              </span>
+            </div>
+
+            <span className="picker-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              例會日期
+              <input type="date" id="dateFrom" className="picker-select picker-date" onChange={onDateRangeChange} style={{ marginLeft: 6 }} />
+              <span className="date-sep">～</span>
+              <input type="date" id="dateTo" className="picker-select picker-date" onChange={onDateRangeChange} />
+            </span>
+
+            <div className="range-presets">
+              <button className="btn-pager" onClick={() => applyPreset('shift', -1)} title="範圍整段往前一個月">←</button>
+              <button className="btn-pager" onClick={() => applyPreset('around')}>近期</button>
+              <button className="btn-pager" onClick={() => applyPreset('upcoming')}>未來</button>
+              <button className="btn-pager" onClick={() => applyPreset('year')}>今年</button>
+              <button className="btn-pager" onClick={() => applyPreset('all')}>全部</button>
+              <button className="btn-pager" onClick={() => applyPreset('shift', 1)} title="範圍整段往後一個月">→</button>
+            </div>
+
+            <div className="toolbar-spacer"></div>
+
+            <span className="roster-count" id="rosterCount"></span>
+            <span className="pager-label" id="pagerLabel"></span>
+          </div>
+
+          <div className="hint-bar">
+            <span className="hint-chip">每格可從下拉選單挑選會員，也可直接輸入姓名（來賓、代理人等）。</span>
+            <span className="hint-chip"><span className="hint-swatch edited"></span>未儲存</span>
+          </div>
+
+          {/* Role matrix */}
+          <div className="matrix-card">
+            <div className="matrix-wrap" id="matrixWrap">
+              <div className="loading-spinner"><div className="spinner"></div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div id="memberDropdown" className="member-dropdown"></div>
+      <div id="toast" className="toast"></div>
+    </>
+  );
+}

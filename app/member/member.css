@@ -6,9 +6,12 @@ body {
   display: flex;
 }
 
+/* auto-fit so the row reflows on its own between the 2 cards a club_admin
+   sees and the 4 a system_admin sees (the extras are .system-admin-only,
+   hidden via applyRoleUI). */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
   margin-bottom: 28px;
 }
@@ -26,6 +29,8 @@ body {
 }
 .stat-icon.blue  { background: #e6f0f7; color: #004165; }
 .stat-icon.gold  { background: #fdf9e8; color: #a07800; }
+.stat-icon.red   { background: #f5eced; color: #772432; }
+.stat-icon.green { background: #f0fdf4; color: #22c55e; }
 .stat-body { flex: 1; }
 .stat-value { font-size: 26px; font-weight: 700; color: #0f172a; line-height: 1; }
 .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
@@ -106,6 +111,8 @@ table.member-list td { padding: 12px 16px; vertical-align: middle; }
 .mc-name-zh { font-weight: 600; color: #0f172a; font-size: 13px; }
 .mc-name-en { font-size: 12px; color: #64748b; margin-top: 1px; }
 .mc-username { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+/* Mobile stand-in for the 角色 column, which is too wide to keep at ≤640px. */
+.mc-role-inline { display: none; font-size: 10px; color: #94a3b8; margin-top: 2px; }
 
 .level-badge {
   display: inline-block;
@@ -114,6 +121,16 @@ table.member-list td { padding: 12px 16px; vertical-align: middle; }
   border-radius: 5px; padding: 3px 9px;
   white-space: nowrap;
 }
+
+.role-badge {
+  display: inline-block;
+  font-size: 11px; font-weight: 600;
+  border-radius: 5px; padding: 3px 9px;
+  white-space: nowrap;
+}
+.role-badge.system_admin { background: #fdf9e8; color: #a07800; }
+.role-badge.club_admin   { background: #e6f0f7; color: #004165; }
+.role-badge.club_member  { background: #f1f5f9; color: #64748b; }
 
 .td-actions { text-align: right; white-space: nowrap; }
 .btn-edit-row {
@@ -181,6 +198,9 @@ table.member-list td { padding: 12px 16px; vertical-align: middle; }
   border-radius: 4px; line-height: 1;
 }
 .modal-close:hover { background: #f1f5f9; color: #0f172a; }
+.modal-user-info { background: #f8fafc; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+.modal-user-info-name { font-weight: 700; font-size: 14px; }
+.modal-user-info-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
 .modal-field { margin-bottom: 14px; }
 .modal-field label { display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 5px; }
 .modal-field input, .modal-field select {
@@ -217,12 +237,13 @@ table.member-list td { padding: 12px 16px; vertical-align: middle; }
   table.member-list { table-layout: fixed; width: 100%; }
   table.member-list th,
   table.member-list td { padding: 10px 8px; }
-  table.member-list th:nth-child(2),
-  table.member-list td:nth-child(2) { width: 80px; }
-  table.member-list th:nth-child(3),
-  table.member-list td:nth-child(3) { width: 80px; }
-  table.member-list th:nth-child(4),
-  table.member-list td:nth-child(4) { width: 56px; }
+  /* Column widths are keyed off .col-* rather than nth-child because the
+     角色 column only exists for system_admin. */
+  .col-level   { width: 80px; }
+  .col-club    { width: 80px; }
+  .col-actions { width: 56px; }
+  .col-role    { display: none; }
+  .mc-role-inline { display: block; }
   .mc-avatar { width: 28px; height: 28px; font-size: 11px; flex-shrink: 0; }
   .td-member { gap: 8px; overflow: hidden; }
   .mc-name-zh { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -323,3 +344,5 @@ th.sort-asc .sort-icon, th.sort-desc .sort-icon { opacity: 1; color: #004165; }
   display: inline-flex; align-items: center;
 }
 .btn-del-row:hover { background: #f5eced; border-color: #d4a0a8; color: #772432; }
+.btn-del-row:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-del-row:disabled:hover { background: none; border-color: #e2e8f0; color: #94a3b8; }

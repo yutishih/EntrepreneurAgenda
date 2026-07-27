@@ -11,9 +11,8 @@ EntrepreneurAgenda/
 ├── home.html             # 會務管理首頁（Dashboard 版型）
 ├── index.html            # 議程表產生器（需登入）
 ├── roles.html            # 角色安排頁面（多場例會 × 角色矩陣）
-├── member.html           # 會員管理頁面（管理 users 資料表）
+├── member.html           # 會員管理頁面（管理 users 資料表；含 system_admin 專屬的角色 / 分會指派）
 ├── club.html             # 分會管理頁面
-├── admin.html            # 用戶管理頁面（僅 system_admin）
 ├── change-password.html  # 修改密碼頁面（含首次登入強制改密碼）
 ├── app.js                # 議程產生器主邏輯
 ├── roles.js              # 角色安排邏輯（ROLE_GROUPS 角色清單 + 矩陣編輯 / merge 存檔）
@@ -329,9 +328,8 @@ Push 到 GitHub，Vercel 自動部署。`/api/*` 的請求透過 `vercel.json` �
 | `/home` | `home.html` | 會務 Dashboard |
 | `/index` | `index.html` | 議程表產生器 |
 | `/roles` | `roles.html` | 角色安排（多場例會 × 角色矩陣） |
-| `/member` | `member.html` | 會員管理（管理 users） |
+| `/member` | `member.html` | 會員管理（管理 users；system_admin 另可設定角色與所屬分會） |
 | `/club` | `club.html` | 分會管理 |
-| `/admin` | `admin.html` | 用戶管理（system_admin only） |
 | `/change-password` | `change-password.html` | 修改密碼 / 首次登入強制改密碼 |
 
 ---
@@ -491,9 +489,8 @@ DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
 | `/home` | `home.html` | 會務管理 Dashboard，含統計卡片、議程列表 | 任何登入用戶 |
 | `/index` | `index.html` | 議程表產生器，即時預覽並可匯出 PDF / JPG | 任何登入用戶 |
 | `/roles` | `roles.html` | 角色安排，多場例會 × 角色矩陣，人選可下拉選取或自由輸入 | `club_admin`（寫入） |
-| `/member` | `member.html` | 會員管理，新增、編輯、批量匯入、審核、移除會員 | `club_admin`（寫入） |
+| `/member` | `member.html` | 會員管理，新增、編輯、批量匯入、審核、移除會員；system_admin 另可設定角色與所屬分會 | `club_admin`（寫入） |
 | `/club` | `club.html` | 分會管理，新增、編輯、刪除分會 | `system_admin`（寫入） |
-| `/admin` | `admin.html` | 用戶管理，設定角色與所屬分會 | `system_admin` |
 | `/change-password` | `change-password.html` | 修改密碼；admin 建立帳號後首次登入強制跳轉 | 任何登入用戶 |
 
 `auth.js` 會自動偵測環境：

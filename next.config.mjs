@@ -9,7 +9,9 @@ const nextConfig = {
       { source: '/member.html', destination: '/member', permanent: true },
       { source: '/roles.html', destination: '/roles', permanent: true },
       { source: '/club.html', destination: '/club', permanent: true },
-      { source: '/admin.html', destination: '/admin', permanent: true },
+      // 用戶管理 was merged into 會員管理; both legacy URLs land on /member.
+      { source: '/admin.html', destination: '/member', permanent: true },
+      { source: '/admin', destination: '/member', permanent: true },
       { source: '/change-password.html', destination: '/change-password', permanent: true },
     ];
   },

@@ -1424,9 +1424,16 @@ async function downloadPDF() {
   const savedTransform = element.style.transform;
   const savedMarginBottom = element.style.marginBottom;
   const savedTransformOrigin = element.style.transformOrigin;
+  const savedGap = element.style.gap;
   element.style.transform = '';
   element.style.marginBottom = '';
   element.style.transformOrigin = '';
+  // The live preview's inter-page gap (for on-screen page separation) has no
+  // print equivalent — left in place, it pushes each page's captured height
+  // past jsPDF's per-page budget and 'legacy' auto-slicing then inserts a
+  // spurious near-blank page for the overflow. Zero it and rely solely on the
+  // explicit `.extra-page` break for one clean page per `.agenda-page`.
+  element.style.gap = '0px';
 
   const restoreTheme = await swapThemeImgForCapture(element);
   const restoreImgs = await swapCrossOriginImagesForCapture(element);
@@ -1437,13 +1444,14 @@ async function downloadPDF() {
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['css', 'legacy'], before: '.extra-page' },
+    pagebreak: { mode: ['css'], before: '.extra-page' },
   };
 
   window.html2pdf().set(opt).from(element).save().then(() => {
     element.style.transform = savedTransform;
     element.style.marginBottom = savedMarginBottom;
     element.style.transformOrigin = savedTransformOrigin;
+    element.style.gap = savedGap;
     restoreTheme();
     restoreImgs();
   });
@@ -1453,6 +1461,10 @@ async function downloadJPG() {
   const data = collectData();
   const dateStr = formatDate(data.meetingDate) || 'agenda';
   const element = document.getElementById('agendaPages');
+  // One image per physical page (agendaPreview + any .extra-page siblings) —
+  // a multi-page template like chillhihigh/china should download as separate
+  // page-1/page-2 JPGs, not one tall image spanning both.
+  const pageEls = [...element.querySelectorAll('.agenda-page')];
 
   const savedTransform = element.style.transform;
   const savedMarginBottom = element.style.marginBottom;
@@ -1464,24 +1476,26 @@ async function downloadJPG() {
   const restoreTheme = await swapThemeImgForCapture(element);
   const restoreImgs = await swapCrossOriginImagesForCapture(element);
 
-  const canvas = await window.html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    scrollX: 0,
-    scrollY: 0,
-  });
+  for (let i = 0; i < pageEls.length; i++) {
+    const canvas = await window.html2canvas(pageEls[i], {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+    });
+    const suffix = pageEls.length > 1 ? `_p${i + 1}` : '';
+    const link = document.createElement('a');
+    link.download = `Agenda_${dateStr}_No${data.meetingNo || ''}${suffix}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.95);
+    link.click();
+  }
 
   element.style.transform = savedTransform;
   element.style.marginBottom = savedMarginBottom;
   element.style.transformOrigin = savedTransformOrigin;
   restoreTheme();
   restoreImgs();
-
-  const link = document.createElement('a');
-  link.download = `Agenda_${dateStr}_No${data.meetingNo || ''}.jpg`;
-  link.href = canvas.toDataURL('image/jpeg', 0.95);
-  link.click();
 }
 
 // ================================================================

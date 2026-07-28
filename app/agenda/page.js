@@ -9,6 +9,7 @@ import {
   templateAssetDefaults,
   templateFieldDefaults,
   applyTmplVisibility,
+  CHINA_DEFAULT_ROWS,
 } from '@/lib/agendaTemplates';
 import './agenda.css';
 
@@ -70,6 +71,12 @@ let speeches = [
 ];
 
 let evaluators = ['', '', ''];
+
+// CHINA template only — generic dual-column agenda body (this club's real
+// sheet relabels/reorders rows freely week to week, so it isn't modeled as
+// fixed role fields like the other templates; see lib/agendaTemplates.js).
+let agendaRows = CHINA_DEFAULT_ROWS.map((r) => ({ ...r }));
+const CHINA_PROJECT_COUNT = 3;
 
 let lang = 'en';
 // When true (bilingual templates), member names render as "English 中文".
@@ -490,6 +497,89 @@ function removeSpeech(i) {
   updatePreview();
 }
 
+// ---- CHINA template: dual-column agenda row editor ----
+function renderAgendaRowForms() {
+  const container = document.getElementById('agendaRowsList');
+  if (!container) return;
+  container.innerHTML = agendaRows.map((r, i) => `
+    <div class="speech-entry" id="china-row-${i}">
+      <div class="speech-entry-header">
+        <span>Row #${i + 1}</span>
+        <button class="btn-remove" onclick="window.__idxRemoveAgendaRow(${i})">✕ 移除</button>
+      </div>
+      <div class="form-row">
+        <label>Time / min.</label>
+        <div style="display:flex; gap:6px">
+          <input type="text" style="flex:1" value="${esc(r.time)}" oninput="window.__idxUpdateAgendaRow(${i},'time',this.value)" placeholder="7:03">
+          <input type="text" style="flex:1" value="${esc(r.duration)}" oninput="window.__idxUpdateAgendaRow(${i},'duration',this.value)" placeholder="min.">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Program</label>
+        <input type="text" value="${esc(r.program)}" oninput="window.__idxUpdateAgendaRow(${i},'program',this.value)" placeholder="e.g. Timer">
+      </div>
+      <div class="form-row">
+        <label>本次 Assignee</label>
+        <input type="text" class="member-ac" value="${esc(r.assignee)}" oninput="window.__idxUpdateAgendaRow(${i},'assignee',this.value)">
+      </div>
+      <div class="form-row">
+        <label>下次 Next Meeting Assignee</label>
+        <input type="text" class="member-ac" value="${esc(r.assigneeNext)}" oninput="window.__idxUpdateAgendaRow(${i},'assigneeNext',this.value)">
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label><input type="checkbox" ${r.section ? 'checked' : ''} onchange="window.__idxUpdateAgendaRow(${i},'section',this.checked)"> 粗體區塊標題 (section)</label>
+      </div>
+    </div>
+  `).join('') + `<button class="btn-add" onclick="window.__idxAddAgendaRow()">+ 新增列 Row</button>`;
+}
+
+function addAgendaRow() {
+  agendaRows.push({ time: '', duration: '', program: '', assignee: '', assigneeNext: '', section: false });
+  renderAgendaRowForms();
+  updatePreview();
+}
+
+function removeAgendaRow(i) {
+  agendaRows.splice(i, 1);
+  renderAgendaRowForms();
+  updatePreview();
+}
+
+function updateAgendaRow(i, key, value) {
+  agendaRows[i][key] = value;
+  updatePreview();
+}
+
+// Push a loaded/reset CHINA payload into its (non-repeating) plain form
+// fields + the agendaRows list. `d` is `{}` when resetting to blank defaults.
+function applyChinaFields(d) {
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('nextMeetingDate', d.nextMeetingDate);
+
+  const pm = d.prevMeeting || {};
+  ['date', 'attendMembers', 'attendGuests', 'bestSpeaker', 'bestEvaluator', 'bestTopicsSpeaker', 'bestSessionMaster']
+    .forEach((k) => setVal(`pm_${k}`, pm[k]));
+
+  const projects = d.speechProjects || [];
+  for (let i = 0; i < CHINA_PROJECT_COUNT; i++) {
+    const p = projects[i] || {};
+    setVal(`proj_${i}_speaker`, p.speaker);
+    setVal(`proj_${i}_code`, p.projectCode);
+    setVal(`proj_${i}_purpose`, p.purpose);
+    setVal(`proj_${i}_eval`, p.evaluatorNote);
+    const spEl = document.getElementById(`proj_${i}_spotlight`);
+    if (spEl) spEl.checked = !!p.spotlight;
+  }
+
+  const nexts = d.nextSpeakers || [];
+  for (let i = 0; i < CHINA_PROJECT_COUNT; i++) setVal(`nextSpeaker_${i}`, nexts[i]);
+
+  agendaRows = (Array.isArray(d.agendaRows) && d.agendaRows.length)
+    ? d.agendaRows.map((r) => ({ ...r }))
+    : CHINA_DEFAULT_ROWS.map((r) => ({ ...r }));
+  renderAgendaRowForms();
+}
+
 function updateSpeech(i, key, value) {
   speeches[i][key] = value;
   updatePreview();
@@ -728,6 +818,27 @@ function collectData() {
     photographer: val('photographer'),
     tableTopicsQuestion: val('tableTopicsQuestion'),
     signals,
+    // CHINA template only (ignored by other templates' render()s)
+    agendaRows: agendaRows.map((r) => ({ ...r })),
+    nextMeetingDate: val('nextMeetingDate'),
+    prevMeeting: {
+      label: 'The Fresh Start Before',
+      date: val('pm_date'),
+      attendMembers: val('pm_attendMembers'),
+      attendGuests: val('pm_attendGuests'),
+      bestSpeaker: val('pm_bestSpeaker'),
+      bestEvaluator: val('pm_bestEvaluator'),
+      bestTopicsSpeaker: val('pm_bestTopicsSpeaker'),
+      bestSessionMaster: val('pm_bestSessionMaster'),
+    },
+    speechProjects: Array.from({ length: CHINA_PROJECT_COUNT }, (_, i) => ({
+      speaker: val(`proj_${i}_speaker`),
+      projectCode: val(`proj_${i}_code`),
+      purpose: val(`proj_${i}_purpose`),
+      evaluatorNote: val(`proj_${i}_eval`),
+      spotlight: !!document.getElementById(`proj_${i}_spotlight`)?.checked,
+    })),
+    nextSpeakers: Array.from({ length: CHINA_PROJECT_COUNT }, (_, i) => val(`nextSpeaker_${i}`)),
   };
 }
 
@@ -965,6 +1076,7 @@ function applyAgendaData(d) {
   const fileInput = document.getElementById('img_themeImg');
   if (fileInput) fileInput.value = '';
 
+  applyChinaFields(d);
   renderSpeechForms();
   renderEvaluatorForms();
   updatePreview();
@@ -1421,6 +1533,7 @@ function applyDefaultState() {
   if (themeStatusEl) themeStatusEl.textContent = '';
   const themeFileInput = document.getElementById('img_themeImg');
   if (themeFileInput) themeFileInput.value = '';
+  applyChinaFields({});
   renderSpeechForms();
   renderEvaluatorForms();
   updatePreview();
@@ -1718,6 +1831,9 @@ export default function AgendaIndexPage() {
     window.__idxCalSelectDate = calSelectDate;
     window.__idxLoadAgenda = loadAgenda;
     window.__idxDeleteAgenda = deleteAgenda;
+    window.__idxRemoveAgendaRow = removeAgendaRow;
+    window.__idxUpdateAgendaRow = updateAgendaRow;
+    window.__idxAddAgendaRow = addAgendaRow;
 
     const settingsOutsideClick = (e) => {
       const dd = document.getElementById('settingsDropdown');
@@ -1781,6 +1897,9 @@ export default function AgendaIndexPage() {
       delete window.__idxCalSelectDate;
       delete window.__idxLoadAgenda;
       delete window.__idxDeleteAgenda;
+      delete window.__idxRemoveAgendaRow;
+      delete window.__idxUpdateAgendaRow;
+      delete window.__idxAddAgendaRow;
     };
   }, []);
 
@@ -2246,6 +2365,94 @@ export default function AgendaIndexPage() {
                   <label>即席問答 每位講者時間標示 Speaker Spec</label>
                   <input type="text" id="sig_ttSpeakerSpec" defaultValue={`1'/1'30"/2'`} onInput={(e) => updateSignal('ttSpeakerSpec', null, e.target.value)} />
                 </div>
+              </div>
+            </details>
+
+            {/* Template-specific fields: shown only when the active club uses this template */}
+            <details open data-tmpl="china" style={{ display: 'none' }}>
+              <summary>CHINA 專屬 — 議程列表（本次／下次雙欄）</summary>
+              <div className="form-section">
+                <div className="form-row">
+                  <label>下次會議日期 Next Meeting Date</label>
+                  <input type="date" id="nextMeetingDate" />
+                </div>
+                <div id="agendaRowsList"></div>
+              </div>
+            </details>
+
+            <details open data-tmpl="china" style={{ display: 'none' }}>
+              <summary>CHINA 專屬 — 上次會議回顧 Previous Meeting Recap</summary>
+              <div className="form-section">
+                <div className="form-row">
+                  <label>上次會議日期 Date</label>
+                  <input type="text" id="pm_date" placeholder="2026/7/09" />
+                </div>
+                <div className="form-row">
+                  <label>出席會員 Attend Members</label>
+                  <input type="text" id="pm_attendMembers" placeholder="15" />
+                </div>
+                <div className="form-row">
+                  <label>出席來賓 Attend Guests</label>
+                  <input type="text" id="pm_attendGuests" placeholder="15" />
+                </div>
+                <div className="form-row">
+                  <label>Best Speaker</label>
+                  <input type="text" id="pm_bestSpeaker" className="member-ac" />
+                </div>
+                <div className="form-row">
+                  <label>Best Evaluator</label>
+                  <input type="text" id="pm_bestEvaluator" className="member-ac" />
+                </div>
+                <div className="form-row">
+                  <label>Best Topics Speaker</label>
+                  <input type="text" id="pm_bestTopicsSpeaker" className="member-ac" />
+                </div>
+                <div className="form-row">
+                  <label>Best Session Master</label>
+                  <input type="text" id="pm_bestSessionMaster" className="member-ac" />
+                </div>
+              </div>
+            </details>
+
+            <details open data-tmpl="china" style={{ display: 'none' }}>
+              <summary>CHINA 專屬 — The ENGAGING Present（本次演講專案）</summary>
+              <div className="form-section">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="speech-entry">
+                    <div className="speech-entry-header"><span>Speaker {i + 1}</span></div>
+                    <div className="form-row">
+                      <label>講者 Speaker</label>
+                      <input type="text" id={`proj_${i}_speaker`} className="member-ac" />
+                    </div>
+                    <div className="form-row">
+                      <label>專案代碼 Project (e.g. PM L2P1)</label>
+                      <input type="text" id={`proj_${i}_code`} placeholder="PM L2P1" />
+                    </div>
+                    <div className="form-row">
+                      <label>Purpose</label>
+                      <textarea rows={2} id={`proj_${i}_purpose`}></textarea>
+                    </div>
+                    <div className="form-row">
+                      <label>Evaluator</label>
+                      <textarea rows={2} id={`proj_${i}_eval`}></textarea>
+                    </div>
+                    <div className="form-row" style={{ marginBottom: 0 }}>
+                      <label><input type="checkbox" id={`proj_${i}_spotlight`} /> Spotlight</label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+
+            <details open data-tmpl="china" style={{ display: 'none' }}>
+              <summary>CHINA 專屬 — The PROMISING Future（下次講者預告）</summary>
+              <div className="form-section">
+                {[0, 1, 2].map((i) => (
+                  <div className="form-row" key={i}>
+                    <label>Speaker {i + 1}</label>
+                    <input type="text" id={`nextSpeaker_${i}`} className="member-ac" />
+                  </div>
+                ))}
               </div>
             </details>
 

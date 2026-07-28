@@ -1210,8 +1210,8 @@ details[open] summary::before { content: "▼ "; }
   width: 22mm; height: 22mm; border-radius: 50%; border: 2pt solid #772432;
   display: flex; align-items: center; justify-content: center; color: #772432; font-weight: 700;
 }
-.tmpl-china .china-title-main { font-size: 16pt; font-weight: 800; color: #772432; letter-spacing: 1px; }
-.tmpl-china .china-title-accent { color: #d9534f; }
+.tmpl-china .china-title-main { font-size: 16pt; font-weight: 800; color: #111827; letter-spacing: 1px; }
+.tmpl-china .china-title-accent { color: #c8102e; }
 .tmpl-china .china-name-zh { font-size: 10pt; font-weight: 600; }
 .tmpl-china .china-name-en { font-size: 8.5pt; color: #334155; }
 .tmpl-china .china-meta-right { text-align: right; color: #334155; line-height: 1.5; }

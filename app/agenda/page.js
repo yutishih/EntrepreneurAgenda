@@ -8,6 +8,7 @@ import {
   AGENDA_TEMPLATES,
   templateAssetDefaults,
   templateFieldDefaults,
+  templatePlaceholders,
   applyTmplVisibility,
   CHINA_DEFAULT_ROWS,
 } from '@/lib/agendaTemplates';
@@ -950,8 +951,19 @@ function buildRenderCtx() {
 
 // Show/hide template-specific form blocks (marked data-tmpl="<key>") so each
 // club only sees the inputs its active template uses.
+// Shared inputs whose grayed-out example text should match the active
+// template's own wording/schedule, not whichever club's fixture ships first.
+function applyTemplatePlaceholders(templateKey) {
+  const ph = templatePlaceholders(templateKey);
+  ['meetingTheme', 'timeRange', 'tableTopicsQuestion'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && ph[id]) el.placeholder = ph[id];
+  });
+}
+
 function applyTemplateFields(templateKey) {
   applyTmplVisibility(document, templateKey);
+  applyTemplatePlaceholders(templateKey);
 }
 
 // ================================================================

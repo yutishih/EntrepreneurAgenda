@@ -1205,16 +1205,21 @@ details[open] summary::before { content: "▼ "; }
   display: grid; grid-template-columns: 24mm 1fr 30mm; align-items: center;
   gap: 3mm; padding-bottom: 2mm; border-bottom: 2pt solid #772432; margin-bottom: 1.5mm;
 }
+.tmpl-china .china-logo { display: flex; flex-direction: column; align-items: center; }
 .tmpl-china .china-logo-img { width: 22mm; height: auto; object-fit: contain; }
 .tmpl-china .china-logo-ph {
   width: 22mm; height: 22mm; border-radius: 50%; border: 2pt solid #772432;
   display: flex; align-items: center; justify-content: center; color: #772432; font-weight: 700;
 }
-.tmpl-china .china-title-main { font-size: 16pt; font-weight: 800; color: #111827; letter-spacing: 1px; }
+.tmpl-china .china-logo-tagline {
+  font-size: 5.5pt; font-weight: 700; color: #334155; letter-spacing: 0.3px;
+  text-align: center; margin-top: 0.8mm;
+}
+.tmpl-china .china-title-main { font-size: 21pt; font-weight: 800; color: #111827; letter-spacing: 0.5px; }
 .tmpl-china .china-title-accent { color: #c8102e; }
 .tmpl-china .china-titles { text-align: center; }
-.tmpl-china .china-name-zh { font-size: 10pt; font-weight: 600; }
-.tmpl-china .china-name-en { font-size: 8.5pt; color: #334155; }
+.tmpl-china .china-name-zh { font-size: 11pt; font-weight: 600; }
+.tmpl-china .china-name-en { font-size: 9.5pt; color: #334155; }
 .tmpl-china .china-meta-right { text-align: right; color: #0f172a; font-weight: 700; line-height: 1.5; }
 
 .tmpl-china .china-infobar {
@@ -1256,13 +1261,14 @@ details[open] summary::before { content: "▼ "; }
 
 /* ---- Page 2 ---- */
 .tmpl-china .china-recap {
-  border: 0.5pt solid #cbd5e1; border-radius: 2px; padding: 2mm 3mm; margin-bottom: 2mm;
+  border-bottom: 0.5pt solid #cbd5e1; padding-bottom: 1.5mm; margin-bottom: 2mm;
 }
-.tmpl-china .china-recap-title { font-style: italic; font-weight: 700; color: #772432; margin-bottom: 1mm; }
-.tmpl-china .china-recap-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1mm 6mm; }
+.tmpl-china .china-recap-title { font-style: italic; font-weight: 700; }
+.tmpl-china .china-recap-inline { display: flex; gap: 8mm; }
+.tmpl-china .china-recap-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1mm 6mm; align-items: baseline; }
 
 .tmpl-china .china-section-title {
-  background: #1e3a5f; color: #fff; font-weight: 600; font-size: 9pt;
+  background: #2e6da4; color: #fff; font-weight: 600; font-size: 9pt;
   padding: 1mm 3mm; margin: 2mm 0 1.5mm; border-radius: 2px;
 }
 .tmpl-china .china-projects { display: flex; flex-direction: column; gap: 2mm; margin-bottom: 1mm; }
@@ -1280,11 +1286,13 @@ details[open] summary::before { content: "▼ "; }
 }
 .tmpl-china .china-tc-table td:first-child { text-align: left; }
 
-.tmpl-china .china-officer-table { width: 100%; border-collapse: collapse; }
+.tmpl-china .china-officer-table { width: 100%; border-collapse: collapse; margin: 2mm 0 1.5mm; text-align: center; }
 .tmpl-china .china-officer-table th, .tmpl-china .china-officer-table td {
   border: 0.5pt solid #cbd5e1; padding: 0.8mm 2mm;
 }
-.tmpl-china .china-officer-table th { background: #f1f5f9; }
+.tmpl-china .china-officer-table th { background: #2e6da4; color: #fff; font-weight: 600; }
+.tmpl-china .china-officer-table td:first-child { font-weight: 700; }
+.tmpl-china .china-officer-table tbody tr:nth-child(odd) { background: #eaf0f8; }
 
 .tmpl-china .china-footer-brand {
   text-align: center; font-size: 16pt; font-weight: 800; color: #772432;

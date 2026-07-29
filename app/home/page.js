@@ -64,6 +64,7 @@ function renderItems() {
           <span class="date-badge-y">${year}</span>
         </div>
       </td>
+      <td class="td-club system-admin-only">${item.clubName || '—'}</td>
       <td class="td-theme">${theme}</td>
       <td class="td-no">${no}</td>
       <td class="td-updated">${ts}</td>
@@ -207,7 +208,7 @@ async function fetchList(date, page = 1) {
   currentPage = page;
   const tbody = document.getElementById('agendaTableBody');
   const pgBar = document.getElementById('paginationBar');
-  tbody.innerHTML = '<tr><td colspan="5"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>';
   pgBar.style.display = 'none';
 
   try {
@@ -219,7 +220,7 @@ async function fetchList(date, page = 1) {
     document.getElementById('badgeCount').textContent = `${total} 筆`;
 
     if (!items.length) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="table-empty">
+      tbody.innerHTML = `<tr><td colspan="6"><div class="table-empty">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <div>尚無符合的議程</div>
       </div></td></tr>`;
@@ -231,7 +232,7 @@ async function fetchList(date, page = 1) {
     renderItems();
     renderPagination(page, pages, total);
   } catch {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="table-empty">載入失敗，請確認後端已啟動</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6"><div class="table-empty">載入失敗，請確認後端已啟動</div></td></tr>';
   }
 }
 
@@ -403,6 +404,7 @@ export default function HomePage() {
                 <thead>
                   <tr>
                     <th className="sortable" data-key="meetingDate" onClick={() => sortBy('meetingDate')}>日期 <i className="sort-icon">↕</i></th>
+                    <th className="sortable system-admin-only" data-key="clubName" onClick={() => sortBy('clubName')}>分會 <i className="sort-icon">↕</i></th>
                     <th className="sortable" data-key="meetingTheme" onClick={() => sortBy('meetingTheme')}>會議主題 <i className="sort-icon">↕</i></th>
                     <th className="sortable" data-key="meetingNo" onClick={() => sortBy('meetingNo')}>編號 <i className="sort-icon">↕</i></th>
                     <th className="sortable" data-key="updatedAt" onClick={() => sortBy('updatedAt')}>最後更新 <i className="sort-icon">↕</i></th>
@@ -410,7 +412,7 @@ export default function HomePage() {
                   </tr>
                 </thead>
                 <tbody id="agendaTableBody">
-                  <tr><td colSpan="5"><div className="loading-spinner"><div className="spinner"></div></div></td></tr>
+                  <tr><td colSpan="6"><div className="loading-spinner"><div className="spinner"></div></div></td></tr>
                 </tbody>
               </table>
             </div>

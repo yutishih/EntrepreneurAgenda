@@ -493,17 +493,19 @@ table.agenda-list td {
   /* Table: fix layout so columns respect widths */
   .agenda-table-wrap { overflow-x: hidden; }
   table.agenda-list { table-layout: fixed; width: 100%; }
-  table.agenda-list th:nth-child(3),
-  table.agenda-list td:nth-child(3),
+  table.agenda-list th:nth-child(2),
+  table.agenda-list td:nth-child(2),
   table.agenda-list th:nth-child(4),
-  table.agenda-list td:nth-child(4) { display: none; }
+  table.agenda-list td:nth-child(4),
+  table.agenda-list th:nth-child(5),
+  table.agenda-list td:nth-child(5) { display: none; }
   table.agenda-list th { padding: 8px 8px; }
   table.agenda-list td { padding: 10px 8px; }
-  /* col 1 日期: fixed; col 2 主題: fills remaining; col 5 操作: fixed */
+  /* col 1 日期: fixed; col 3 主題: fills remaining; col 6 操作: fixed */
   table.agenda-list th:nth-child(1),
   table.agenda-list td:nth-child(1) { width: 66px; }
-  table.agenda-list th:nth-child(5),
-  table.agenda-list td:nth-child(5) { width: 80px; }
+  table.agenda-list th:nth-child(6),
+  table.agenda-list td:nth-child(6) { width: 80px; }
   .date-badge { min-width: 44px; padding: 4px 6px; }
   .date-badge-md { font-size: 12px; }
   .date-badge-y  { font-size: 9px; }

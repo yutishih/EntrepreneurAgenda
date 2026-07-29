@@ -358,7 +358,8 @@ def list_agendas(
                 else "updated_at DESC"
             )
             cur.execute(
-                f"SELECT id, data, updated_at, club_id FROM agendas {where}"
+                f"SELECT a.id, a.data, a.updated_at, a.club_id, c.name"
+                f" FROM agendas a LEFT JOIN clubs c ON c.id = a.club_id {where}"
                 f" ORDER BY {order_by} LIMIT %s OFFSET %s",
                 params + [limit, offset],
             )
@@ -373,6 +374,7 @@ def list_agendas(
             "meetingTheme": d.get("meetingTheme", ""),
             "updatedAt":    r[2].isoformat() if r[2] else "",
             "clubId":       r[3],
+            "clubName":     r[4],
         }
         if full:
             item["data"] = d

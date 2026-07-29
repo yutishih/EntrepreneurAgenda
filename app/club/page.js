@@ -161,7 +161,7 @@ function openModal(id = null, group = 'basic') {
   document.getElementById('modalGroupBasic').style.display = isTpl ? 'none' : '';
   document.getElementById('modalGroupTemplate').style.display = isTpl ? '' : 'none';
 
-  const tk = (c && c.template_key) || 'standard';
+  const tk = (c && c.template_key) || 'compact';
   // Universal fields (shared by every template).
   document.getElementById('fName').value = c ? (c.name || '') : '';
   document.getElementById('fNameZh').value = c ? (c.name_zh || '') : '';
@@ -254,7 +254,7 @@ function populateTemplateFields(c, tk) {
 }
 // Re-render fields when the template select changes (keeps saved values).
 function onTemplateChange() {
-  const tk = document.getElementById('fTemplate').value || 'standard';
+  const tk = document.getElementById('fTemplate').value || 'compact';
   const c = editingId ? clubs.find((x) => x.id === editingId) : null;
   renderTemplateFields(tk);
   populateTemplateFields(c, tk);
@@ -296,7 +296,7 @@ function closeModal() {
 function buildClubPayload() {
   const nn = (id) => { const el = document.getElementById(id); const v = el ? el.value.trim() : ''; return v || null; };
   const c = editingId ? clubs.find((x) => x.id === editingId) : null;
-  const tk = document.getElementById('fTemplate').value || 'standard';
+  const tk = document.getElementById('fTemplate').value || 'compact';
   const fields = (AGENDA_TEMPLATES[tk] || {}).settings || [];
   const payload = {
     name: document.getElementById('fName').value.trim(),

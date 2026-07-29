@@ -883,7 +883,7 @@ function updatePreview() {
   if (!preview || !pagesWrap) return;
   const club = getActiveClub();
   applyClubImages(club);
-  const tmpl = AGENDA_TEMPLATES[club && club.template_key] || AGENDA_TEMPLATES.standard;
+  const tmpl = AGENDA_TEMPLATES[club && club.template_key] || AGENDA_TEMPLATES.compact;
   applyTemplateFields(tmpl.key);
 
   // Language capability is declared per template (lib/agendaTemplates.js). A
@@ -1531,12 +1531,13 @@ function applyDefaultState() {
   syncDurationLabelInputs();
   document.getElementById('meetingDate').value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
   // Time/venue defaults: club's own setting → its template's fieldDefaults →
-  // the standard template's fieldDefaults (last-resort). All defaults live in
-  // lib/agendaTemplates.js, so nothing is hard-coded here.
+  // the compact template's fieldDefaults (last-resort, neutral — never another
+  // club's real info). All defaults live in lib/agendaTemplates.js, so nothing
+  // is hard-coded here.
   const _club = getActiveClub();
   const _set = (_club && _club.settings) || {};
-  const _fd = templateFieldDefaults(_club ? _club.template_key : 'standard');
-  const _std = templateFieldDefaults('standard');
+  const _fd = templateFieldDefaults(_club ? _club.template_key : 'compact');
+  const _std = templateFieldDefaults('compact');
   document.getElementById('timeRange').value = _set.timeRange || _fd.timeRange || _std.timeRange || '';
   document.getElementById('venueInfo').value = _set.venue || _fd.venue || _std.venue || '';
   speeches = [
@@ -1787,13 +1788,13 @@ function onAgendaClubChange(v) {
   const newClubId = v ? parseInt(v) : null;
   const oldClub = getActiveClub();
   const newClub = newClubId ? (allClubs || []).find((c) => c.id === newClubId) : null;
-  const oldKey = oldClub ? (oldClub.template_key || 'standard') : null;
-  const newKey = newClub ? (newClub.template_key || 'standard') : null;
+  const oldKey = oldClub ? (oldClub.template_key || 'compact') : null;
+  const newKey = newClub ? (newClub.template_key || 'compact') : null;
 
   if (oldKey && newKey && oldKey !== newKey) {
     pendingClubSwitch = { newClubId };
-    const oldLabel = (AGENDA_TEMPLATES[oldKey] || AGENDA_TEMPLATES.standard).label;
-    const newLabel = (AGENDA_TEMPLATES[newKey] || AGENDA_TEMPLATES.standard).label;
+    const oldLabel = (AGENDA_TEMPLATES[oldKey] || AGENDA_TEMPLATES.compact).label;
+    const newLabel = (AGENDA_TEMPLATES[newKey] || AGENDA_TEMPLATES.compact).label;
     const body = document.getElementById('clubTemplateSwitchBody');
     if (body) {
       body.innerHTML = `
@@ -2014,7 +2015,7 @@ export default function AgendaIndexPage() {
               <h1>議程表產生器</h1>
             </div>
 
-            <details open>
+            <details open data-tmpl="standard" style={{ display: 'none' }}>
               <summary>主題圖片 Theme Image</summary>
               <div className="form-section">
                 <div className="img-upload-row">
@@ -2033,7 +2034,7 @@ export default function AgendaIndexPage() {
                   <label>會議日期</label>
                   <input type="date" id="meetingDate" />
                 </div>
-                <div className="form-row">
+                <div className="form-row" data-tmpl="standard china" style={{ display: 'none' }}>
                   <label>會議編號 Meeting No.</label>
                   <input type="number" id="meetingNo" defaultValue={258} />
                 </div>
@@ -2041,7 +2042,7 @@ export default function AgendaIndexPage() {
                   <label>會議主題 Meeting Theme</label>
                   <input type="text" id="meetingTheme" placeholder="-Urban Legend-" />
                 </div>
-                <div className="form-row">
+                <div className="form-row" data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
                   <label>時間段 Time Range</label>
                   <input type="text" id="timeRange" placeholder="19:10 ~ 21:00" />
                 </div>
@@ -2052,7 +2053,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details>
+            <details data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
               <summary>⏱ 時間設定 Time Settings</summary>
               <div className="form-section">
                 <div className="time-override-row">
@@ -2248,39 +2249,41 @@ export default function AgendaIndexPage() {
                   <button className="btn-time-reset" onClick={() => resetDurationOverride('sharingMins')} title="還原自動">⟳</button>
                 </div>
 
-                <hr style={{ margin: '6px 0', borderColor: '#ddd' }} />
-                <p className="time-override-hint">
-                  <strong>講評區各列時長</strong>（議程表上直接顯示的字樣，可填區間）
-                </p>
-                <div className="time-override-row">
-                  <div className="time-override-label">個別講評 Evaluator</div>
-                  <input type="text" id="durlbl_evaluator" style={{ width: 74 }} placeholder="2'~3'"
-                    onInput={(e) => updateDurationLabel('evaluator', e.target.value)} />
-                </div>
-                <div className="time-override-row">
-                  <div className="time-override-label">計時員報告 Timer Report</div>
-                  <input type="text" id="durlbl_timerReport" style={{ width: 74 }} placeholder="1'"
-                    onInput={(e) => updateDurationLabel('timerReport', e.target.value)} />
-                </div>
-                <div className="time-override-row">
-                  <div className="time-override-label">贅語報告 Ah Report</div>
-                  <input type="text" id="durlbl_ahReport" style={{ width: 74 }} placeholder="1'"
-                    onInput={(e) => updateDurationLabel('ahReport', e.target.value)} />
-                </div>
-                <div className="time-override-row">
-                  <div className="time-override-label">語言講評 Language Eval</div>
-                  <input type="text" id="durlbl_langEval" style={{ width: 74 }} placeholder="3'~5'"
-                    onInput={(e) => updateDurationLabel('langEval', e.target.value)} />
-                </div>
-                <div className="time-override-row">
-                  <div className="time-override-label">總講評 General Eval</div>
-                  <input type="text" id="durlbl_generalEval" style={{ width: 74 }} placeholder="3'~5'"
-                    onInput={(e) => updateDurationLabel('generalEval', e.target.value)} />
+                <div data-tmpl="standard" style={{ display: 'none' }}>
+                  <hr style={{ margin: '6px 0', borderColor: '#ddd' }} />
+                  <p className="time-override-hint">
+                    <strong>講評區各列時長</strong>（議程表上直接顯示的字樣，可填區間）
+                  </p>
+                  <div className="time-override-row">
+                    <div className="time-override-label">個別講評 Evaluator</div>
+                    <input type="text" id="durlbl_evaluator" style={{ width: 74 }} placeholder="2'~3'"
+                      onInput={(e) => updateDurationLabel('evaluator', e.target.value)} />
+                  </div>
+                  <div className="time-override-row">
+                    <div className="time-override-label">計時員報告 Timer Report</div>
+                    <input type="text" id="durlbl_timerReport" style={{ width: 74 }} placeholder="1'"
+                      onInput={(e) => updateDurationLabel('timerReport', e.target.value)} />
+                  </div>
+                  <div className="time-override-row">
+                    <div className="time-override-label">贅語報告 Ah Report</div>
+                    <input type="text" id="durlbl_ahReport" style={{ width: 74 }} placeholder="1'"
+                      onInput={(e) => updateDurationLabel('ahReport', e.target.value)} />
+                  </div>
+                  <div className="time-override-row">
+                    <div className="time-override-label">語言講評 Language Eval</div>
+                    <input type="text" id="durlbl_langEval" style={{ width: 74 }} placeholder="3'~5'"
+                      onInput={(e) => updateDurationLabel('langEval', e.target.value)} />
+                  </div>
+                  <div className="time-override-row">
+                    <div className="time-override-label">總講評 General Eval</div>
+                    <input type="text" id="durlbl_generalEval" style={{ width: 74 }} placeholder="3'~5'"
+                      onInput={(e) => updateDurationLabel('generalEval', e.target.value)} />
+                  </div>
                 </div>
               </div>
             </details>
 
-            <details open>
+            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
               <summary>角色分配</summary>
               <div className="form-section">
                 <div className="form-row">
@@ -2291,7 +2294,7 @@ export default function AgendaIndexPage() {
                   <label>Calling Meeting to Order <span className="time-hint">1'</span></label>
                   <input type="text" id="callingToOrder" placeholder="Name, Title" className="member-ac" />
                 </div>
-                <div className="form-row">
+                <div className="form-row" data-tmpl="standard" style={{ display: 'none' }}>
                   <label>Welcome Guests &amp; TME 介紹者 <span className="time-hint">2'</span></label>
                   <input type="text" id="welcomeTME" placeholder="Name, Title" className="member-ac" />
                 </div>
@@ -2310,7 +2313,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details>
+            <details data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
               <summary>多元單元 Variety Session</summary>
               <div className="form-section">
                 <div className="form-row toggle-row">
@@ -2335,7 +2338,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open>
+            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
               <summary>指定演講 Prepared Speeches</summary>
               <div className="form-section">
                 <div id="speechesList"></div>
@@ -2343,7 +2346,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open>
+            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
               <summary>即席問答 Table Topics</summary>
               <div className="form-section">
                 <div className="form-row">
@@ -2353,7 +2356,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open>
+            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
               <summary>講評環節 Evaluation</summary>
               <div className="form-section">
                 <div className="form-row">
@@ -2368,10 +2371,10 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open>
+            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
               <summary>結束環節 Closing</summary>
               <div className="form-section">
-                <div className="form-row">
+                <div className="form-row" data-tmpl="standard" style={{ display: 'none' }}>
                   <label>Awards Presentation 頒獎 <span className="time-hint">3'</span></label>
                   <input type="text" id="awardsPresenter" placeholder="Name, Title" className="member-ac" />
                 </div>
@@ -2383,13 +2386,19 @@ export default function AgendaIndexPage() {
             </details>
 
             {/* Template-specific fields: shown only when the active club uses this template */}
-            <details open data-tmpl="chillhihigh" style={{ display: 'none' }}>
-              <summary>Chill Hi High 專屬欄位</summary>
+            <details open data-tmpl="chillhihigh china" style={{ display: 'none' }}>
+              <summary>主題題目 Table Topics Question</summary>
               <div className="form-section">
                 <div className="form-row">
                   <label>主題題目 Table Topics Question</label>
                   <textarea rows={3} id="tableTopicsQuestion" placeholder="你覺得「最不適合開玩笑」的議題是什麼？…"></textarea>
                 </div>
+              </div>
+            </details>
+
+            <details open data-tmpl="chillhihigh" style={{ display: 'none' }}>
+              <summary>Chill Hi High 專屬欄位</summary>
+              <div className="form-section">
                 <div className="form-row">
                   <label>白板記錄員 Board Writer</label>
                   <input type="text" id="boardWriter" placeholder="Name, Title" className="member-ac" />

@@ -150,6 +150,10 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+
 class PresignRequest(BaseModel):
     filename: str
     content_type: str
@@ -750,6 +754,33 @@ def update_user(username: str, req: UserUpdateRequest, user: dict = Depends(get_
             )
             if cur.rowcount == 0:
                 raise HTTPException(status_code=404, detail="找不到此使用者")
+    return {"ok": True}
+
+
+@app.put("/api/users/{username}/reset-password")
+def reset_password(username: str, req: ResetPasswordRequest, user: dict = Depends(require_club_admin_or_above)):
+    """system_admin/club_admin sets a new temporary password for another user.
+    Mirrors create_user's must_change_pw=true so the affected user is forced
+    through the existing self-service change-password flow on next login."""
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="新密碼至少需要 6 個字元")
+    new_hash = bcrypt.hashpw(req.new_password.encode(), bcrypt.gensalt()).decode()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            if user["role"] == "club_admin":
+                # club_admin 只能重設同分會一般會員的密碼，不可動其他管理員帳號
+                cur.execute(
+                    """UPDATE users SET password_hash=%s, must_change_pw=true
+                       WHERE username=%s AND club_id=%s AND role='club_member'""",
+                    (new_hash, username, user["club_id"]),
+                )
+            else:
+                cur.execute(
+                    "UPDATE users SET password_hash=%s, must_change_pw=true WHERE username=%s",
+                    (new_hash, username),
+                )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="找不到此使用者或無權限重設密碼")
     return {"ok": True}
 
 

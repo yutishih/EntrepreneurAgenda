@@ -226,6 +226,20 @@ table.member-list td { padding: 12px 16px; vertical-align: middle; }
 }
 .btn-modal-save:hover { background: #5a1a25; }
 
+.modal-field-resetpw { padding-top: 10px; border-top: 1px dashed #e2e8f0; }
+.modal-resetpw-row { display: flex; gap: 8px; }
+.modal-resetpw-row input { flex: 1; }
+.btn-resetpw {
+  padding: 0 16px; background: #f1f5f9; color: #772432;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s; flex-shrink: 0;
+}
+.btn-resetpw:hover { background: #fdeceb; border-color: #772432; }
+.resetpw-msg { font-size: 11.5px; margin-top: 6px; min-height: 14px; }
+.resetpw-msg.is-error { color: #dc2626; }
+.resetpw-msg.is-success { color: #16a34a; }
+
 @media (max-width: 640px) {
   .stats-row { grid-template-columns: 1fr; }
   .search-input { max-width: 100%; }

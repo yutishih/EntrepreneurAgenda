@@ -420,6 +420,10 @@ function openModal(username) {
   document.getElementById('fClubId').value = m.clubId ?? '';
   // admin's role is fixed — the backend rejects changing it.
   document.getElementById('fRole').disabled = username === 'admin';
+  document.getElementById('fResetPw').value = '';
+  const resetMsg = document.getElementById('resetPwMsg');
+  resetMsg.textContent = '';
+  resetMsg.className = 'resetpw-msg';
   document.getElementById('modal').classList.add('open');
   applyRoleUI();
   document.getElementById('fNameZh').focus();
@@ -428,6 +432,29 @@ function openModal(username) {
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
   editingUsername = null;
+}
+
+async function resetMemberPassword() {
+  const input = document.getElementById('fResetPw');
+  const msgEl = document.getElementById('resetPwMsg');
+  const pw = input.value.trim();
+  msgEl.textContent = '';
+  msgEl.className = 'resetpw-msg';
+  if (pw.length < 6) {
+    msgEl.textContent = '新密碼至少需要 6 個字元';
+    msgEl.classList.add('is-error');
+    return;
+  }
+  if (!confirm(`確定要將「${editingUsername}」的密碼重設為你輸入的臨時密碼嗎？\n對方下次登入時會被要求重新設定密碼。`)) return;
+  try {
+    await apiJson(`/users/${editingUsername}/reset-password`, { method: 'PUT', body: { new_password: pw } });
+    input.value = '';
+    msgEl.textContent = '密碼已重設，請將臨時密碼告知對方。';
+    msgEl.classList.add('is-success');
+  } catch (e) {
+    msgEl.textContent = e.message;
+    msgEl.classList.add('is-error');
+  }
 }
 
 async function saveMember() {
@@ -712,6 +739,14 @@ export default function MemberPage() {
             <select id="fClubId">
               <option value="">— 未分配 —</option>
             </select>
+          </div>
+          <div className="modal-field modal-field-resetpw">
+            <label>重設密碼</label>
+            <div className="modal-resetpw-row">
+              <input type="text" id="fResetPw" placeholder="輸入新的臨時密碼（至少 6 碼）" autoComplete="off" />
+              <button type="button" className="btn-resetpw" onClick={resetMemberPassword}>重設</button>
+            </div>
+            <div id="resetPwMsg" className="resetpw-msg"></div>
           </div>
           <div className="modal-actions">
             <button className="btn-modal-cancel" onClick={closeModal}>取消</button>

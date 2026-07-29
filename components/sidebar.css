@@ -63,6 +63,13 @@
   transition: color 0.15s; flex-shrink: 0;
 }
 .btn-logout-sidebar:hover { color: #f87171; }
+.btn-changepw-sidebar {
+  background: none; border: none; color: #64748b;
+  cursor: pointer; padding: 4px; border-radius: 4px;
+  display: flex; align-items: center;
+  transition: color 0.15s; flex-shrink: 0;
+}
+.btn-changepw-sidebar:hover { color: #60a5fa; }
 
 .main-area { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
 
@@ -109,6 +116,7 @@
   .sidebar-footer { padding: 10px 8px; }
   .sidebar-user { padding: 6px; justify-content: center; }
   .btn-logout-sidebar { display: none; }
+  .btn-changepw-sidebar { display: none; }
   .main-area { margin-left: 64px; }
   .topbar { padding: 0 20px; }
   .content { padding: 20px; }
@@ -134,6 +142,7 @@
   .sidebar-footer { padding: 14px 10px; }
   .sidebar-user { padding: 8px 10px; justify-content: flex-start; }
   .btn-logout-sidebar { display: flex; }
+  .btn-changepw-sidebar { display: flex; }
   .sidebar.sidebar-open { transform: translateX(0); }
   .sidebar-toggle-tab {
     display: flex;

@@ -9,6 +9,7 @@ export default function ChangePasswordPage() {
   const [notice, setNotice] = useState('您的帳號是首次登入，請先設定自己的密碼才能繼續使用系統。');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [forced, setForced] = useState(true);
 
   const oldPasswordRef = useRef(null);
   const newPasswordRef = useRef(null);
@@ -19,8 +20,12 @@ export default function ChangePasswordPage() {
       try {
         const data = await apiJson('/auth/verify');
         setAuth(data.username, data.role, data.club_id, data.must_change_pw);
-        if (!data.must_change_pw) { location.href = '/home'; return; }
-        setNotice(`${data.username}，您的帳號是首次登入，請先設定自己的密碼才能繼續使用系統。`);
+        setForced(!!data.must_change_pw);
+        setNotice(
+          data.must_change_pw
+            ? `${data.username}，您的帳號是首次登入，請先設定自己的密碼才能繼續使用系統。`
+            : `${data.username}，請輸入目前密碼與新密碼。`
+        );
       } catch {
         clearAuth();
         location.href = '/login';
@@ -66,7 +71,7 @@ export default function ChangePasswordPage() {
       <div className="notice-box" id="noticeBox">{notice}</div>
 
       <div className="field">
-        <label>目前密碼（由管理員提供）</label>
+        <label>{forced ? '目前密碼（由管理員提供）' : '目前密碼'}</label>
         <input
           type="password"
           ref={oldPasswordRef}
@@ -97,9 +102,11 @@ export default function ChangePasswordPage() {
       <button className="btn-submit" id="btnSubmit" disabled={busy} onClick={doChange}>
         {busy ? (<><span className="spinner" />處理中...</>) : '確認送出'}
       </button>
-      <p className="hint" id="skipHint" style={{ display: 'none' }}>
-        <a href="/home" style={{ color: '#004165' }}>暫時跳過，稍後再設定</a>
-      </p>
+      {!forced && (
+        <p className="hint" id="skipHint">
+          <a href="/home" style={{ color: '#004165' }}>取消，返回首頁</a>
+        </p>
+      )}
     </div>
   );
 }

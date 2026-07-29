@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, canWrite } from '@/lib/auth';
 import { MemberAC } from '@/lib/memberAutocomplete';
@@ -126,6 +126,17 @@ let roleById       = {};     // roleId → role descriptor
 let selectedClubId = null;
 let dateFrom       = '';     // inclusive meeting_date bounds; '' = unbounded
 let dateTo         = '';
+
+// Bridge to RolesPage's React state, same pattern as window.__rolesOnCellInput
+// below. The save button's disabled state used to be toggled by mutating
+// btn.disabled directly (like every other imperative DOM update in this
+// file), but that left it permanently unclickable — React re-applies the
+// JSX-declared `disabled` prop and wins the fight with the raw DOM mutation.
+// Routing it through real state removes the fight entirely. The button's
+// label rides the same state (rather than staying a raw textContent write)
+// so that a setSaveDisabled-triggered re-render can't stomp it mid-save.
+let setSaveDisabled = null;
+let setSaveLabel    = null;
 
 /** Safety net so an unbounded range cannot pull the whole history at once. */
 const MAX_COLUMNS = 40;
@@ -490,9 +501,8 @@ function refreshDecorations() {
 function updateSaveBar() {
   const dirty = dirtyMeetings();
   const n     = dirty.reduce((s, m) => s + m.dirty.size, 0);
-  const btn   = document.getElementById('btnSaveAll');
   const label = document.getElementById('saveState');
-  if (btn) btn.disabled = n === 0;
+  setSaveDisabled?.(n === 0);
   if (label) {
     label.textContent = n === 0 ? '已同步' : `${n} 項未儲存（${dirty.length} 場）`;
     label.className   = 'save-state' + (n === 0 ? '' : ' unsaved');
@@ -502,9 +512,8 @@ function updateSaveBar() {
 async function saveAll() {
   const dirty = dirtyMeetings();
   if (!dirty.length) return;
-  const btn = document.getElementById('btnSaveAll');
-  btn.disabled = true;
-  btn.textContent = '儲存中…';
+  setSaveDisabled?.(true);
+  setSaveLabel?.('儲存中…');
 
   let ok = 0;
   const failed = [];
@@ -532,7 +541,7 @@ async function saveAll() {
     }
   }
 
-  btn.textContent = '儲存變更';
+  setSaveLabel?.('儲存變更');
   refreshDecorations();
   updateSaveBar();
   if (failed.length) toast(`${ok} 場已儲存，${failed.length} 場失敗：${failed.join('、')}`, true);
@@ -565,9 +574,14 @@ function toast(msg, isError = false) {
 }
 
 export default function RolesPage() {
+  const [saveDisabled, setSaveDisabledState] = useState(true);
+  const [saveLabel, setSaveLabelState] = useState('儲存變更');
+
   useEffect(() => {
     // Bridge for oninput="..." strings inside renderMatrix()'s innerHTML.
     window.__rolesOnCellInput = onCellInput;
+    setSaveDisabled = setSaveDisabledState;
+    setSaveLabel = setSaveLabelState;
 
     applyRoleUI();
 
@@ -604,6 +618,8 @@ export default function RolesPage() {
 
     return () => {
       delete window.__rolesOnCellInput;
+      setSaveDisabled = null;
+      setSaveLabel = null;
       document.removeEventListener('keydown', onKeydown);
       window.removeEventListener('beforeunload', onBeforeUnload);
       cleanupAutocomplete?.();
@@ -620,7 +636,7 @@ export default function RolesPage() {
           <div className="topbar-actions">
             <span className="save-state" id="saveState">已同步</span>
             <button className="btn-ghost write-action" onClick={discardChanges}>捨棄變更</button>
-            <button className="btn-add write-action" id="btnSaveAll" onClick={saveAll} disabled>儲存變更</button>
+            <button className="btn-add write-action" id="btnSaveAll" onClick={saveAll} disabled={saveDisabled}>{saveLabel}</button>
           </div>
         </header>
 

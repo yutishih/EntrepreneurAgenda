@@ -1212,40 +1212,47 @@ details[open] summary::before { content: "▼ "; }
 }
 .tmpl-china .china-title-main { font-size: 16pt; font-weight: 800; color: #111827; letter-spacing: 1px; }
 .tmpl-china .china-title-accent { color: #c8102e; }
+.tmpl-china .china-titles { text-align: center; }
 .tmpl-china .china-name-zh { font-size: 10pt; font-weight: 600; }
 .tmpl-china .china-name-en { font-size: 8.5pt; color: #334155; }
-.tmpl-china .china-meta-right { text-align: right; color: #334155; line-height: 1.5; }
+.tmpl-china .china-meta-right { text-align: right; color: #0f172a; font-weight: 700; line-height: 1.5; }
 
 .tmpl-china .china-infobar {
   display: flex; flex-direction: column; gap: 0.5mm;
   padding: 1.5mm 0; border-bottom: 0.5pt solid #cbd5e1; margin-bottom: 1.5mm; color: #334155;
 }
 .tmpl-china .china-meetingbar {
-  display: flex; justify-content: space-between; font-weight: 700; color: #772432;
+  display: flex; justify-content: space-between; font-weight: 700; color: #0f172a;
   padding-bottom: 1mm; margin-bottom: 1mm;
 }
+.tmpl-china .china-date-val { color: #c8102e; }
 .tmpl-china .china-theme {
-  background: #fdf1d6; border-radius: 2px; padding: 1.5mm 2mm; margin-bottom: 1.5mm;
+  margin-bottom: 1.5mm;
 }
+.tmpl-china .china-theme strong { color: #2e6da4; }
 
 .tmpl-china .china-table { width: 100%; border-collapse: collapse; flex: 1; height: 0; }
 .tmpl-china .china-table th, .tmpl-china .china-table td {
-  border: 0.5pt solid #cbd5e1; padding: 0.8mm 1.5mm; vertical-align: middle;
+  border: 0.5pt solid #a9c3de; padding: 0.8mm 1.5mm; vertical-align: middle;
 }
-.tmpl-china .china-table thead th { background: #1e3a5f; color: #fff; font-weight: 600; }
+.tmpl-china .china-table thead th { background: #2e6da4; color: #fff; font-weight: 600; }
 .tmpl-china .china-time { text-align: center; color: #772432; width: 10mm; }
 .tmpl-china .china-dur { text-align: center; color: #64748b; width: 10mm; }
 .tmpl-china .china-assignee { width: auto; }
-.tmpl-china .china-row-section td { background: #f1f5f9; font-weight: 700; }
+.tmpl-china .china-row-section td { background: #2e6da4; color: #fff; font-weight: 700; }
 
 .tmpl-china .china-consent { font-size: 6pt; color: #64748b; margin-top: 1.5mm; line-height: 1.4; }
 
-.tmpl-china .china-qrrow { display: flex; align-items: center; gap: 8mm; margin-top: 2mm; }
+.tmpl-china .china-qrrow {
+  display: flex; align-items: center; gap: 8mm; margin-top: 2mm;
+  padding-top: 2mm; border-top: 0.75pt dashed #94a3b8;
+}
 .tmpl-china .china-qr-item { text-align: center; }
 .tmpl-china .china-qr-img { width: 20mm; height: 20mm; object-fit: contain; }
 .tmpl-china .china-qr-ph { width: 20mm; height: 20mm; border: 0.5pt dashed #cbd5e1; }
-.tmpl-china .china-qr-lbl { font-size: 6.5pt; font-weight: 600; margin-top: 0.5mm; }
-.tmpl-china .china-join { flex: 1; text-align: right; color: #772432; line-height: 1.5; }
+.tmpl-china .china-qr-lbl { font-size: 6.5pt; font-weight: 600; margin-bottom: 0.5mm; }
+.tmpl-china .china-join { flex: 1; text-align: left; color: #0f172a; line-height: 1.5; }
+.tmpl-china .china-join-title { color: #2e6da4; font-weight: 800; }
 
 /* ---- Page 2 ---- */
 .tmpl-china .china-recap {

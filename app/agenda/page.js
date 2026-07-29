@@ -972,6 +972,7 @@ function applyTemplateFields(templateKey) {
 let currentAgendaId = null;
 let selectedClubId = null; // system_admin: which club this agenda belongs to
 let allClubs = [];
+let pendingClubSwitch = null; // { newClubId } awaiting confirmation in clubTemplateSwitchModal
 
 function collectSaveData() {
   return {
@@ -1776,12 +1777,63 @@ async function loadAgendaClubs() {
   } catch { /* ignore */ }
 }
 
+// Switching the club (system_admin only) switches which template the agenda
+// renders with too — each club has its own template_key. Since the two
+// templates keep separate, mostly-incompatible field sets (e.g. china's
+// agendaRows/prevMeeting vs standard's speeches/evaluators), warn via
+// clubTemplateSwitchModal before swapping so already-typed template-specific
+// content doesn't silently vanish from view.
 function onAgendaClubChange(v) {
-  selectedClubId = v ? parseInt(v) : null;
+  const newClubId = v ? parseInt(v) : null;
+  const oldClub = getActiveClub();
+  const newClub = newClubId ? (allClubs || []).find((c) => c.id === newClubId) : null;
+  const oldKey = oldClub ? (oldClub.template_key || 'standard') : null;
+  const newKey = newClub ? (newClub.template_key || 'standard') : null;
+
+  if (oldKey && newKey && oldKey !== newKey) {
+    pendingClubSwitch = { newClubId };
+    const oldLabel = (AGENDA_TEMPLATES[oldKey] || AGENDA_TEMPLATES.standard).label;
+    const newLabel = (AGENDA_TEMPLATES[newKey] || AGENDA_TEMPLATES.standard).label;
+    const body = document.getElementById('clubTemplateSwitchBody');
+    if (body) {
+      body.innerHTML = `
+        <p>「${esc(newClub.name)}」使用不同的議程版型：</p>
+        <p class="tmpl-switch-diff"><strong>${esc(oldLabel)}</strong> → <strong>${esc(newLabel)}</strong></p>
+        <p>切換分會會一併切換議程版型，目前已填寫、僅原版型專屬的欄位內容可能會被隱藏或不適用。</p>
+      `;
+    }
+    const modal = document.getElementById('clubTemplateSwitchModal');
+    if (modal) modal.style.display = 'flex';
+    return;
+  }
+
+  commitClubSwitch(newClubId);
+}
+
+function cancelClubTemplateSwitch() {
+  pendingClubSwitch = null;
+  const sel = document.getElementById('agendaClubSelect');
+  if (sel) sel.value = selectedClubId ?? '';
+  const modal = document.getElementById('clubTemplateSwitchModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function confirmClubTemplateSwitch() {
+  const modal = document.getElementById('clubTemplateSwitchModal');
+  if (modal) modal.style.display = 'none';
+  if (!pendingClubSwitch) return;
+  const { newClubId } = pendingClubSwitch;
+  pendingClubSwitch = null;
+  commitClubSwitch(newClubId);
+}
+
+function commitClubSwitch(newClubId) {
+  selectedClubId = newClubId;
   _updateClubPickerHint();
   setSaveStatus('unsaved');
   memberRoster = [];
   fetchMemberDatalist();
+  updatePreview();
 }
 
 function _updateClubPickerHint() {
@@ -2556,6 +2608,20 @@ export default function AgendaIndexPage() {
             <div id="calendarGrid" className="cal-grid"></div>
           </div>
           <div id="agendaListBody" className="agenda-list-body"></div>
+        </div>
+      </div>
+
+      <div id="clubTemplateSwitchModal" className="modal-overlay" style={{ display: 'none' }} onClick={(e) => { if (e.target === e.currentTarget) cancelClubTemplateSwitch(); }}>
+        <div className="modal-box modal-box-confirm">
+          <div className="modal-header">
+            <h3>切換分會將同時切換議程版型</h3>
+            <button className="modal-close" onClick={cancelClubTemplateSwitch}>✕</button>
+          </div>
+          <div id="clubTemplateSwitchBody" className="modal-body"></div>
+          <div className="modal-actions">
+            <button className="modal-btn modal-btn-cancel" onClick={cancelClubTemplateSwitch}>取消</button>
+            <button className="modal-btn modal-btn-confirm" onClick={confirmClubTemplateSwitch}>確定切換</button>
+          </div>
         </div>
       </div>
 

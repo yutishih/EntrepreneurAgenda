@@ -138,6 +138,7 @@ let selectedClubId = null;
 let dateFrom       = '';     // inclusive meeting_date bounds; '' = unbounded
 let dateTo         = '';
 let allClubs       = [];     // full /clubs list (id, name, template_key, …) — resolves the active template
+let addingMeeting  = false;  // true while the "+" column's inline date picker is open
 
 /** The club whose roles are currently being planned (admin picks one; everyone else uses their own). */
 function activeClubId() {
@@ -304,6 +305,7 @@ async function loadRoster() {
 async function loadMeetings() {
   const wrap = document.getElementById('matrixWrap');
   wrap.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+  addingMeeting = false;
   try {
     const params = new URLSearchParams({
       full: '1', order: 'date', limit: String(MAX_COLUMNS), page: '1',
@@ -431,13 +433,27 @@ function fmtDate(iso) {
 
 function renderMatrix() {
   const wrap = document.getElementById('matrixWrap');
+  const readOnly = !canWrite();
+  const showAddCol = !readOnly; // read-only users can browse but not create meetings here
+
   if (!meetings.length) {
-    wrap.innerHTML = '<div class="matrix-empty">這個分會還沒有議程。請先到「新建議程」建立例會，再回來安排角色。</div>';
+    wrap.innerHTML = showAddCol ? `
+      <div class="matrix-empty">
+        這個分會在目前範圍內還沒有議程。
+        ${addingMeeting ? `
+          <div class="rm-add-form rm-add-form-empty">
+            <input type="date" id="newMeetingDate" class="picker-select picker-date">
+            <div class="rm-add-actions">
+              <button class="btn-pager" onclick="window.__rolesConfirmAddMeeting()">新增</button>
+              <button class="btn-ghost" onclick="window.__rolesCancelAddMeeting()">取消</button>
+            </div>
+          </div>` : `
+          <button class="btn-add" onclick="window.__rolesStartAddMeeting()">＋ 新增例會</button>`}
+      </div>`
+      : '<div class="matrix-empty">這個分會在目前範圍內還沒有議程。</div>';
     updateSaveBar();
     return;
   }
-
-  const readOnly = !canWrite();
 
   const head = meetings.map((m) => `
     <th class="rm-meeting" data-mid="${m.id}">
@@ -454,11 +470,27 @@ function renderMatrix() {
       </div>
     </th>`).join('');
 
+  // Trailing "+" column: a blank date picker that creates a new agenda and
+  // splices it in as a fillable column — no separate "new agenda" page needed.
+  const addColHead = !showAddCol ? '' : `
+    <th class="rm-meeting rm-add-col">
+      ${addingMeeting ? `
+        <div class="rm-add-form">
+          <input type="date" id="newMeetingDate" class="picker-select picker-date">
+          <div class="rm-add-actions">
+            <button class="btn-pager" onclick="window.__rolesConfirmAddMeeting()">新增</button>
+            <button class="btn-ghost" onclick="window.__rolesCancelAddMeeting()">取消</button>
+          </div>
+        </div>` : `
+        <button class="rm-add-btn" onclick="window.__rolesStartAddMeeting()" title="新增例會">＋</button>`}
+    </th>`;
+  const addColCell = !showAddCol ? '' : '<td class="rm-cell rm-add-col"></td>';
+
   const body = rows.map((r) => {
     if (r.type === 'group') {
       return `<tr class="rm-group-row">
         <th class="rm-role rm-group">${esc(r.label)}</th>
-        <td class="rm-group-fill" colspan="${meetings.length}"></td>
+        <td class="rm-group-fill" colspan="${meetings.length + (showAddCol ? 1 : 0)}"></td>
       </tr>`;
     }
     const rid = roleId(r.role);
@@ -472,7 +504,7 @@ function renderMatrix() {
         <th class="rm-role" title="${esc(lockTitle)}">
           <span class="rm-role-zh">${esc(r.role.label)}</span>
           <span class="rm-role-en">${esc(r.role.en || '')}</span>
-        </th>${cells}
+        </th>${cells}${addColCell}
       </tr>`;
     }
 
@@ -494,13 +526,13 @@ function renderMatrix() {
       <th class="rm-role" title="${esc(r.role.en || '')}">
         <span class="rm-role-zh">${esc(r.role.label)}</span>
         <span class="rm-role-en">${esc(r.role.en || '')}</span>
-      </th>${cells}
+      </th>${cells}${addColCell}
     </tr>`;
   }).join('');
 
   wrap.innerHTML = `
     <table class="role-matrix">
-      <thead><tr><th class="rm-corner">角色 / 例會</th>${head}</tr></thead>
+      <thead><tr><th class="rm-corner">角色 / 例會</th>${head}${addColHead}</tr></thead>
       <tbody>${body}</tbody>
     </table>`;
 
@@ -623,6 +655,58 @@ function discardChanges() {
 }
 
 // ================================================================
+// ADD MEETING (the matrix's trailing "+" column)
+// ================================================================
+function startAddMeeting() {
+  if (activeClubId() == null) return; // shouldn't happen — the column only renders once a club is picked
+  addingMeeting = true;
+  renderMatrix();
+  document.getElementById('newMeetingDate')?.focus();
+}
+
+function cancelAddMeeting() {
+  addingMeeting = false;
+  renderMatrix();
+}
+
+/**
+ * Creates a bare-minimum agenda (just `meetingDate`) via the same POST every
+ * other "new agenda" flow uses (app/agenda/page.js), then splices it straight
+ * into the in-memory `meetings` list so it shows up as a fillable column
+ * immediately — regardless of whether its date falls inside the currently
+ * selected date-range filter — rather than round-tripping through
+ * loadMeetings() (which would silently hide it if the filter excludes it).
+ */
+async function confirmAddMeeting() {
+  const dateEl = document.getElementById('newMeetingDate');
+  const date = dateEl?.value;
+  if (!date) { toast('請先選擇日期', true); return; }
+
+  const cid = activeClubId();
+  try {
+    const json = await apiJson('/agendas', {
+      method: 'POST',
+      body: { data: { meetingDate: date }, club_id: isSystemAdmin() ? cid : null },
+    });
+
+    const m = {
+      id: json.id, meetingDate: date, meetingNo: '', meetingTheme: '',
+      clubId: cid, data: { meetingDate: date }, draft: {}, dirty: new Set(),
+    };
+    meetings.push(m);
+    meetings.sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)));
+
+    addingMeeting = false;
+    buildRows();
+    meetings.forEach(resetDraft);
+    renderMatrix();
+    toast('已新增例會，可直接在矩陣中安排角色');
+  } catch {
+    toast('新增例會失敗', true);
+  }
+}
+
+// ================================================================
 // MISC
 // ================================================================
 function esc(s) {
@@ -645,8 +729,11 @@ export default function RolesPage() {
   const [saveLabel, setSaveLabelState] = useState('儲存變更');
 
   useEffect(() => {
-    // Bridge for oninput="..." strings inside renderMatrix()'s innerHTML.
+    // Bridge for oninput="..."/onclick="..." strings inside renderMatrix()'s innerHTML.
     window.__rolesOnCellInput = onCellInput;
+    window.__rolesStartAddMeeting = startAddMeeting;
+    window.__rolesCancelAddMeeting = cancelAddMeeting;
+    window.__rolesConfirmAddMeeting = confirmAddMeeting;
     setSaveDisabled = setSaveDisabledState;
     setSaveLabel = setSaveLabelState;
 
@@ -688,6 +775,9 @@ export default function RolesPage() {
 
     return () => {
       delete window.__rolesOnCellInput;
+      delete window.__rolesStartAddMeeting;
+      delete window.__rolesCancelAddMeeting;
+      delete window.__rolesConfirmAddMeeting;
       setSaveDisabled = null;
       setSaveLabel = null;
       document.removeEventListener('keydown', onKeydown);

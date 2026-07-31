@@ -140,6 +140,21 @@ table.role-matrix thead th.rm-corner {
 .rm-m-link { font-size: 10px; color: #004165; text-decoration: none; font-weight: 600; }
 .rm-m-link:hover { text-decoration: underline; }
 
+/* --- trailing "+" column: create a new agenda without leaving this page --- */
+th.rm-add-col { min-width: 64px; width: 64px; text-align: center; vertical-align: middle; }
+.rm-add-btn {
+  width: 34px; height: 34px; border-radius: 50%; border: 1px dashed #cbd5e1;
+  background: #fff; color: #94a3b8; font-size: 17px; line-height: 1; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.rm-add-btn:hover { border-color: #772432; color: #772432; background: #fdf2f2; }
+.rm-add-form { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 130px; }
+.rm-add-form .picker-date { width: 100%; }
+.rm-add-actions { display: flex; gap: 6px; }
+.rm-add-actions .btn-pager, .rm-add-actions .btn-ghost { flex: 1; padding: 4px 6px; font-size: 11px; }
+.rm-add-form-empty { margin-top: 14px; align-items: center; }
+td.rm-cell.rm-add-col { background: #fafbfc; }
+
 /* --- role name column --- */
 table.role-matrix th.rm-role {
   position: sticky; left: 0; z-index: 2;

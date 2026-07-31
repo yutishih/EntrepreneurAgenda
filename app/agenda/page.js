@@ -769,7 +769,6 @@ function collectData() {
     photographer: val('photographer'),
     voteCounter: val('voteCounter'),
     wordOfTheDay: val('wordOfTheDay'),
-    inductionHost: val('inductionHost'),
     quizHost: val('quizHost'),
     tableTopicsQuestion: val('tableTopicsQuestion'),
     signals,
@@ -991,7 +990,7 @@ function applyAgendaData(d) {
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
     'boardWriter', 'photographer', 'tableTopicsQuestion',
-    'voteCounter', 'wordOfTheDay', 'inductionHost', 'quizHost',
+    'voteCounter', 'wordOfTheDay', 'quizHost',
   ];
   fields.forEach((id) => {
     const el = document.getElementById(id);
@@ -1520,7 +1519,7 @@ function applyDefaultState() {
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
     'boardWriter', 'photographer', 'tableTopicsQuestion',
-    'voteCounter', 'wordOfTheDay', 'inductionHost', 'quizHost',
+    'voteCounter', 'wordOfTheDay', 'quizHost',
   ];
   fields.forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
   signals = defaultSignals();
@@ -2458,10 +2457,6 @@ export default function AgendaIndexPage() {
                 <div className="form-row">
                   <label>Word of the Day 每日一字</label>
                   <input type="text" id="wordOfTheDay" placeholder="Name, Title" className="member-ac" />
-                </div>
-                <div className="form-row">
-                  <label>Induction Ceremony 入會宣誓主持</label>
-                  <input type="text" id="inductionHost" placeholder="Name, Title" className="member-ac" />
                 </div>
                 <div className="form-row">
                   <label>Quiz Session 問答遊戲主持</label>

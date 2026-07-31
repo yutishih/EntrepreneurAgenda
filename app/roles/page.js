@@ -53,15 +53,7 @@ const ROLE_GROUPS = [
       { key: 'ahCounter',    label: '贅語記錄員', en: 'Ah-Counter' },
       { key: 'boardWriter',  label: '板書',       en: 'Board Writer', templates: ['chillhihigh'] },
       { key: 'photographer', label: '攝影',       en: 'Photographer', templates: ['chillhihigh'] },
-    ],
-  },
-  {
-    label: 'CHINA 專屬',
-    roles: [
-      { key: 'voteCounter',   label: '計票員',       en: 'Vote Counter', templates: ['china'] },
-      { key: 'wordOfTheDay',  label: '每日一字',     en: 'Word of the Day', templates: ['china'] },
-      { key: 'inductionHost', label: '入會宣誓主持', en: 'Induction Ceremony', templates: ['china'] },
-      { key: 'quizHost',      label: '問答遊戲主持', en: 'Quiz Session', templates: ['china'] },
+      { key: 'voteCounter',  label: '計票員',     en: 'Vote Counter', templates: ['china'] },
     ],
   },
   {
@@ -69,6 +61,8 @@ const ROLE_GROUPS = [
     roles: [
       { key: 'varietyHost',       label: '多元單元主持人', en: 'Variety Session Host', kind: 'variety', templates: ['standard', 'compact', 'entrepreneur', 'chillhihigh'] },
       { key: 'tableTopicsMaster', label: '即席問答主持人', en: 'Table Topics Master' },
+      { key: 'wordOfTheDay',      label: '每日一字',       en: 'Word of the Day', templates: ['china'] },
+      { key: 'quizHost',          label: '問答遊戲主持',   en: 'Quiz Session', templates: ['china'] },
     ],
   },
   { label: '指定演講', dynamic: 'speech' },

@@ -204,8 +204,9 @@ EntrepreneurAgenda/
 |------|------|------|
 | `callingToOrder` | standard／compact／entrepreneur／china | Chill Hi High 的「致歡迎詞 Opening Remarks」那列讀的是 `welcomeTME`，不再需要這格 |
 | `boardWriter`／`photographer` | chillhihigh | 只有 Chill Hi High 議程把板書、攝影列成獨立角色 |
+| `voteCounter` | china | CHINA 專屬的計票員（歸在「計時 / 記錄」組） |
 | `varietyHost` | standard／compact／entrepreneur／chillhihigh | CHINA 沒有多元單元 |
-| `voteCounter`／`wordOfTheDay`／`inductionHost`／`quizHost` | china | CHINA 專屬的計票員、每日一字、入會宣誓、問答遊戲，其他版型沒有這些流程 |
+| `wordOfTheDay`／`quizHost` | china | CHINA 專屬的每日一字、問答遊戲主持（歸在「單元主持」組） |
 
 其餘角色（`receptionHost`、`welcomeTME`、`tme`、`timer`、`ahCounter`、`tableTopicsMaster`、`speeches[i].speaker`、`evaluators[i]`、`langEvaluator`、`generalEvaluator`、`awardsPresenter`、`sharingFeedback`）沒有 `templates` 限制，5 個版型都共用。
 
@@ -214,9 +215,8 @@ EntrepreneurAgenda/
 | 分組 | 角色（`agendas.data` 欄位） |
 |------|------|
 | 會議主持 | `receptionHost`、`callingToOrder`、`welcomeTME`、`tme` |
-| 計時 / 記錄 | `timer`、`ahCounter`、`boardWriter`、`photographer` |
-| CHINA 專屬 | `voteCounter`、`wordOfTheDay`、`inductionHost`、`quizHost` |
-| 單元主持 | `varietyHost`（＝`varietySession.host`）、`tableTopicsMaster` |
+| 計時 / 記錄 | `timer`、`ahCounter`、`boardWriter`、`photographer`、`voteCounter` |
+| 單元主持 | `varietyHost`（＝`varietySession.host`）、`tableTopicsMaster`、`wordOfTheDay`、`quizHost` |
 | 指定演講 | `speeches[i].speaker`（動態，至少 3 列） |
 | 講評 | `evaluators[i]`（動態，至少 3 列）、`langEvaluator`、`generalEvaluator` |
 | 結尾 | `awardsPresenter`、`sharingFeedback` |

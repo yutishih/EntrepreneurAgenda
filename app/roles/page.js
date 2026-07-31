@@ -138,7 +138,6 @@ let selectedClubId = null;
 let dateFrom       = '';     // inclusive meeting_date bounds; '' = unbounded
 let dateTo         = '';
 let allClubs       = [];     // full /clubs list (id, name, template_key, …) — resolves the active template
-let addingMeeting  = false;  // true while the "+" column's inline date picker is open
 
 /** The club whose roles are currently being planned (admin picks one; everyone else uses their own). */
 function activeClubId() {
@@ -305,7 +304,7 @@ async function loadRoster() {
 async function loadMeetings() {
   const wrap = document.getElementById('matrixWrap');
   wrap.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
-  addingMeeting = false;
+  cancelAddMeeting(); // in case a reload happens while the modal is open
   try {
     const params = new URLSearchParams({
       full: '1', order: 'date', limit: String(MAX_COLUMNS), page: '1',
@@ -440,15 +439,7 @@ function renderMatrix() {
     wrap.innerHTML = showAddCol ? `
       <div class="matrix-empty">
         這個分會在目前範圍內還沒有議程。
-        ${addingMeeting ? `
-          <div class="rm-add-form rm-add-form-empty">
-            <input type="date" id="newMeetingDate" class="picker-select picker-date">
-            <div class="rm-add-actions">
-              <button class="btn-pager" onclick="window.__rolesConfirmAddMeeting()">新增</button>
-              <button class="btn-ghost" onclick="window.__rolesCancelAddMeeting()">取消</button>
-            </div>
-          </div>` : `
-          <button class="btn-add" onclick="window.__rolesStartAddMeeting()">＋ 新增例會</button>`}
+        <button class="btn-add matrix-empty-add" onclick="window.__rolesStartAddMeeting()">＋ 新增例會</button>
       </div>`
       : '<div class="matrix-empty">這個分會在目前範圍內還沒有議程。</div>';
     updateSaveBar();
@@ -471,19 +462,11 @@ function renderMatrix() {
       </div>
     </th>`).join('');
 
-  // Trailing "+" column: a blank date picker that creates a new agenda and
-  // splices it in as a fillable column — no separate "new agenda" page needed.
+  // Trailing "+" column: opens the "新增例會" modal, which creates a new agenda
+  // and splices it in as a fillable column — no separate "new agenda" page needed.
   const addColHead = !showAddCol ? '' : `
     <th class="rm-meeting rm-add-col">
-      ${addingMeeting ? `
-        <div class="rm-add-form">
-          <input type="date" id="newMeetingDate" class="picker-select picker-date">
-          <div class="rm-add-actions">
-            <button class="btn-pager" onclick="window.__rolesConfirmAddMeeting()">新增</button>
-            <button class="btn-ghost" onclick="window.__rolesCancelAddMeeting()">取消</button>
-          </div>
-        </div>` : `
-        <button class="rm-add-btn" onclick="window.__rolesStartAddMeeting()" title="新增例會">＋</button>`}
+      <button class="rm-add-btn" onclick="window.__rolesStartAddMeeting()" title="新增例會">＋</button>
     </th>`;
   const addColCell = !showAddCol ? '' : '<td class="rm-cell rm-add-col"></td>';
 
@@ -656,18 +639,20 @@ function discardChanges() {
 }
 
 // ================================================================
-// ADD MEETING (the matrix's trailing "+" column)
+// ADD MEETING (the matrix's trailing "+" column opens this modal)
 // ================================================================
 function startAddMeeting() {
   if (activeClubId() == null) return; // shouldn't happen — the column only renders once a club is picked
-  addingMeeting = true;
-  renderMatrix();
-  document.getElementById('newMeetingDate')?.focus();
+  const dateEl = document.getElementById('newMeetingDate');
+  if (dateEl) dateEl.value = '';
+  const modal = document.getElementById('addMeetingModal');
+  if (modal) modal.style.display = 'flex';
+  dateEl?.focus();
 }
 
 function cancelAddMeeting() {
-  addingMeeting = false;
-  renderMatrix();
+  const modal = document.getElementById('addMeetingModal');
+  if (modal) modal.style.display = 'none';
 }
 
 /**
@@ -697,7 +682,7 @@ async function confirmAddMeeting() {
     meetings.push(m);
     meetings.sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)));
 
-    addingMeeting = false;
+    cancelAddMeeting();
     buildRows();
     meetings.forEach(resetDraft);
     renderMatrix();
@@ -878,6 +863,26 @@ export default function RolesPage() {
 
       <div id="memberDropdown" className="member-dropdown"></div>
       <div id="toast" className="toast"></div>
+
+      <div id="addMeetingModal" className="modal-overlay" style={{ display: 'none' }}
+           onClick={(e) => { if (e.target === e.currentTarget) cancelAddMeeting(); }}>
+        <div className="modal-box modal-box-confirm">
+          <div className="modal-header">
+            <h3>新增例會</h3>
+            <button className="modal-close" onClick={cancelAddMeeting}>✕</button>
+          </div>
+          <div className="modal-body">
+            <label className="modal-field-label" htmlFor="newMeetingDate">例會日期</label>
+            <input type="date" id="newMeetingDate" className="modal-date-input"
+                   onKeyDown={(e) => { if (e.key === 'Enter') confirmAddMeeting(); }} />
+            <p className="modal-field-hint">建立後可以直接在矩陣的新欄位裡安排角色，其餘議程內容（場地、時間…）之後再到議程頁補齊即可。</p>
+          </div>
+          <div className="modal-actions">
+            <button className="modal-btn modal-btn-cancel" onClick={cancelAddMeeting}>取消</button>
+            <button className="modal-btn modal-btn-confirm" onClick={confirmAddMeeting}>新增</button>
+          </div>
+        </div>
+      </div>
     </>
   );
 }

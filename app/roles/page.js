@@ -457,6 +457,7 @@ function renderMatrix() {
 
   const head = meetings.map((m) => `
     <th class="rm-meeting" data-mid="${m.id}">
+      ${showAddCol ? `<button class="rm-m-del" onclick="window.__rolesDeleteMeeting(${m.id})" title="刪除這場例會">✕</button>` : ''}
       <div class="rm-m-date">${esc(fmtDate(m.meetingDate))}<span class="rm-dot" id="dot_${m.id}"></span></div>
       <div class="rm-m-no">${m.meetingNo ? `第 ${esc(m.meetingNo)} 次` : '—'}</div>
       ${META_FIELDS.map((f) => `
@@ -706,6 +707,26 @@ async function confirmAddMeeting() {
   }
 }
 
+async function deleteMeeting(id) {
+  const m = meetings.find((x) => x.id === id);
+  if (!m) return;
+  const label = fmtDate(m.meetingDate);
+  const warn = m.dirty.size > 0 ? '（此場有未儲存的變更也會一併消失）' : '';
+  if (!confirm(`確定要刪除「${label}」這場例會嗎？此動作無法復原，議程內容跟角色安排都會一起刪除。${warn}`)) return;
+
+  try {
+    await apiJson(`/agendas/${id}`, { method: 'DELETE' });
+    meetings = meetings.filter((x) => x.id !== id);
+    buildRows();
+    meetings.forEach(resetDraft);
+    renderMatrix();
+    updateRangeLabel(meetings.length);
+    toast('已刪除該場例會');
+  } catch {
+    toast('刪除失敗', true);
+  }
+}
+
 // ================================================================
 // MISC
 // ================================================================
@@ -734,6 +755,7 @@ export default function RolesPage() {
     window.__rolesStartAddMeeting = startAddMeeting;
     window.__rolesCancelAddMeeting = cancelAddMeeting;
     window.__rolesConfirmAddMeeting = confirmAddMeeting;
+    window.__rolesDeleteMeeting = deleteMeeting;
     setSaveDisabled = setSaveDisabledState;
     setSaveLabel = setSaveLabelState;
 
@@ -778,6 +800,7 @@ export default function RolesPage() {
       delete window.__rolesStartAddMeeting;
       delete window.__rolesCancelAddMeeting;
       delete window.__rolesConfirmAddMeeting;
+      delete window.__rolesDeleteMeeting;
       setSaveDisabled = null;
       setSaveLabel = null;
       document.removeEventListener('keydown', onKeydown);

@@ -184,6 +184,16 @@ table.role-matrix th.rm-role {
 .rm-input.rm-edited { background: #fef9e7; border-color: #e6c34a; }
 .rm-cell.rm-inactive .rm-input { opacity: 0.55; }
 
+/* Roles the active club's template doesn't use — shown (not removed) so the
+   matrix always reflects the full shared schema, but locked, greyed, and
+   excluded from the assignment tally. Distinct from .rm-inactive (a real slot
+   this specific meeting doesn't have yet); this is a whole-row, template-level lock. */
+tr.rm-locked-row th.rm-role { background: #f8fafc; }
+tr.rm-locked-row .rm-role-zh,
+tr.rm-locked-row .rm-role-en { color: #cbd5e1; }
+.rm-cell.rm-locked { background: #fafbfc; }
+.rm-cell.rm-locked .rm-input { cursor: not-allowed; }
+
 .matrix-empty { text-align: center; padding: 56px 24px; color: #94a3b8; font-size: 13px; line-height: 1.8; }
 .loading-spinner { display: flex; justify-content: center; padding: 48px; }
 .spinner {

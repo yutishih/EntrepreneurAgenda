@@ -324,6 +324,8 @@ def list_agendas(
                  does not have to issue one GET per agenda.
     `order=date` → sort by meeting_date instead of updated_at, for callers that
                  present a chronological window of meetings.
+    `order=date_asc` → same, but oldest-first — for callers that need "the next
+                 meeting after X" via date_from + limit=1.
     `date_from` / `date_to` → inclusive meeting_date range. Agendas with no
                  meeting_date are excluded once either bound is given, since they
                  cannot be placed on a timeline.
@@ -355,6 +357,7 @@ def list_agendas(
             total = cur.fetchone()[0]
             order_by = (
                 "meeting_date DESC NULLS LAST, id DESC" if order == "date"
+                else "meeting_date ASC NULLS LAST, id ASC" if order == "date_asc"
                 else "updated_at DESC"
             )
             cur.execute(

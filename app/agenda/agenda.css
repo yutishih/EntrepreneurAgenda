@@ -1263,6 +1263,7 @@ details[open] summary::before { content: "▼ "; }
 .tmpl-china .china-table thead th { background: #2e6da4; color: #fff; font-weight: 600; }
 .tmpl-china .china-time { text-align: center; color: #772432; width: 10mm; }
 .tmpl-china .china-dur { text-align: center; color: #64748b; width: 10mm; }
+.tmpl-china .china-program { white-space: pre-line; }
 .tmpl-china .china-assignee { width: auto; }
 .tmpl-china .china-row-section td { background: #2e6da4; color: #fff; font-weight: 700; }
 

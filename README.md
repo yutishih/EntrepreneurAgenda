@@ -192,18 +192,42 @@ EntrepreneurAgenda/
 - ✅ 在議程產生器改角色 → 回到此頁重新載入即同步。
 - ⚠️ 角色清單（`roles.js` 的 `ROLE_GROUPS`）是**從議程欄位推導**的。議程若新增角色欄位，記得同步加進 `ROLE_GROUPS`。
 
+### 全站共用同一份角色 schema——不適用的欄位鎖住，不是拿掉
+
+`agendas.data` 的角色欄位是**所有版型共用的同一份 schema**：每個角色（`ROLE_GROUPS` 裡的一筆定義）在每個分會的資料裡都是同一個欄位名，某個版型不需要的角色，該分會的資料裡就是空字串／未填，版型的 `render()` 自然不會讀它、也就不會印出來。
+
+角色安排矩陣**永遠顯示 `ROLE_GROUPS` 全部角色**（不會因為版型不同而整列消失）；只有「目前分會的版型不適用」的角色列會被**鎖住**（`role.locked`，灰階、輸入框 `disabled`，不管有沒有寫入權限都鎖），跟「這場例會剛好沒有這個名額」（`slotNote`，可以直接輸入把名額補上）是兩種不同的視覺語言，不要混淆。
+
+角色定義可加 `templates: string[]`，列出「哪些版型會用到這個角色」（不寫＝所有版型都用得到）：`buildRows()` 依 `activeTemplateKey()` 算出每個角色的 `locked` 旗標。目前有 `templates` 限制的角色：
+
+| 角色 | 適用版型 | 為什麼 |
+|------|------|------|
+| `callingToOrder` | standard／compact／entrepreneur／china | Chill Hi High 的「致歡迎詞 Opening Remarks」那列讀的是 `welcomeTME`，不再需要這格 |
+| `boardWriter`／`photographer` | chillhihigh | 只有 Chill Hi High 議程把板書、攝影列成獨立角色 |
+| `varietyHost` | standard／compact／entrepreneur／chillhihigh | CHINA 沒有多元單元 |
+| `voteCounter`／`wordOfTheDay`／`inductionHost`／`quizHost` | china | CHINA 專屬的計票員、每日一字、入會宣誓、問答遊戲，其他版型沒有這些流程 |
+
+其餘角色（`receptionHost`、`welcomeTME`、`tme`、`timer`、`ahCounter`、`tableTopicsMaster`、`speeches[i].speaker`、`evaluators[i]`、`langEvaluator`、`generalEvaluator`、`awardsPresenter`、`sharingFeedback`）沒有 `templates` 限制，5 個版型都共用。
+
 ### 角色清單（`ROLE_GROUPS`）
 
 | 分組 | 角色（`agendas.data` 欄位） |
 |------|------|
 | 會議主持 | `receptionHost`、`callingToOrder`、`welcomeTME`、`tme` |
 | 計時 / 記錄 | `timer`、`ahCounter`、`boardWriter`、`photographer` |
+| CHINA 專屬 | `voteCounter`、`wordOfTheDay`、`inductionHost`、`quizHost` |
 | 單元主持 | `varietyHost`（＝`varietySession.host`）、`tableTopicsMaster` |
 | 指定演講 | `speeches[i].speaker`（動態，至少 3 列） |
 | 講評 | `evaluators[i]`（動態，至少 3 列）、`langEvaluator`、`generalEvaluator` |
 | 結尾 | `awardsPresenter`、`sharingFeedback` |
 
-演講 / 講評的列數取**目前載入場次中的最大值**（最少 3 列）。
+演講 / 講評的列數取**目前載入場次中的最大值**（最少 3 列）——CHINA 的 3 篇指定演講／3 位個別講評也是走這同一套 `speeches`/`evaluators` 陣列，沒有另外的資料結構。
+
+### CHINA 版型：跟其他版型一樣的固定欄位
+
+CHINA 議程曾經是一份自由格式的逐列清單（`agendaRows`），已經改成跟其他版型相同的固定角色欄位——`templates.js` 的 `china` 版型內部有一張不對外匯出的 `CHINA_SCHEDULE`（該分會目前的週會流程表），每一列綁定要讀的欄位（例如 `Timer` 這一列讀 `data.timer`），純粹是 render() 排版用，角色安排矩陣完全不需要知道它的存在，就跟 standard/compact 一樣。
+
+CHINA 議程表右側原本每列都有一欄「下一場負責人」（`assigneeNext`），現在**不再存進資料庫**，改成**列印/預覽議程時即時查詢**：`app.js` 的 `ensureNextMeetingRoles()` 依「分會 + 這場日期」查詢同分會日期最近的下一場例會（`GET /api/agendas?order=date_asc&date_from=<+1天>&limit=1`），把該場的角色欄位整包當作 `ctx.nextMeetingRoles` 傳給 `render()`；查不到（還沒建立下一場）就顯示空白。查詢結果有 cache（只在分會/日期真的改變時才重查），不會每次打字都打 API。議程編輯頁因此不再有「下次 Next Meeting Assignee」的手動輸入欄。
 
 ### 欄標題可編輯的每場欄位（`META_FIELDS`）
 
@@ -522,12 +546,13 @@ DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
 
 > `club_admin` 只能看到 / 操作自己分會的議程；`system_admin` 可看到全部。
 
-`GET /api/agendas` 的兩個選用參數（供角色安排頁一次取多場）：
+`GET /api/agendas` 的選用參數：
 
 | 參數 | 說明 |
 |------|------|
-| `full=1` | 每筆額外回傳完整的 `data` JSONB，避免一場一次 GET 的 N+1 請求 |
+| `full=1` | 每筆額外回傳完整的 `data` JSONB，避免一場一次 GET 的 N+1 請求（角色安排頁一次取多場用） |
 | `order=date` | 改以 `meeting_date DESC NULLS LAST` 排序（預設為 `updated_at DESC`） |
+| `order=date_asc` | 同上，但由舊到新（`meeting_date ASC NULLS LAST`）——CHINA 議程頁靠 `date_from` + `limit=1` 查「日期最近的下一場」時用 |
 | `date_from` / `date_to` | `meeting_date` 範圍（起訖皆含），可只給單邊。給任一邊時，沒有 `meeting_date` 的議程會被排除 |
 
 > `total` 回傳的是**篩選後**的總數，因此可用來判斷是否被 `limit` 截斷。

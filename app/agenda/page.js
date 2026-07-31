@@ -10,7 +10,6 @@ import {
   templateFieldDefaults,
   templatePlaceholders,
   applyTmplVisibility,
-  CHINA_DEFAULT_ROWS,
 } from '@/lib/agendaTemplates';
 import './agenda.css';
 
@@ -73,11 +72,17 @@ let speeches = [
 
 let evaluators = ['', '', ''];
 
-// CHINA template only — generic dual-column agenda body (this club's real
-// sheet relabels/reorders rows freely week to week, so it isn't modeled as
-// fixed role fields like the other templates; see lib/agendaTemplates.js).
-let agendaRows = CHINA_DEFAULT_ROWS.map((r) => ({ ...r }));
+// CHINA template only — page-2 reference content (previous-meeting recap /
+// per-project purpose notes / next-meeting speaker preview). Role assignment
+// itself now goes through the same fixed fields every template uses.
 const CHINA_PROJECT_COUNT = 3;
+
+// CHINA template only — the next chronological meeting's role fields, looked
+// up live (see ensureNextMeetingRoles) so the printed "Next Meeting" column
+// is always accurate without a manually-typed/duplicated field. Keyed by
+// `${clubId}|${meetingDate}` so a lookup is only re-issued when either changes.
+let nextRolesCacheKey = null;
+let nextRolesCache = {};
 
 let lang = 'en';
 // When true (bilingual templates), member names render as "English 中文".
@@ -498,64 +503,14 @@ function removeSpeech(i) {
   updatePreview();
 }
 
-// ---- CHINA template: dual-column agenda row editor ----
-function renderAgendaRowForms() {
-  const container = document.getElementById('agendaRowsList');
-  if (!container) return;
-  container.innerHTML = agendaRows.map((r, i) => `
-    <div class="speech-entry" id="china-row-${i}">
-      <div class="speech-entry-header">
-        <span>Row #${i + 1}</span>
-        <button class="btn-remove" onclick="window.__idxRemoveAgendaRow(${i})">✕ 移除</button>
-      </div>
-      <div class="form-row">
-        <label>Time / min.</label>
-        <div style="display:flex; gap:6px">
-          <input type="text" style="flex:1" value="${esc(r.time)}" oninput="window.__idxUpdateAgendaRow(${i},'time',this.value)" placeholder="7:03">
-          <input type="text" style="flex:1" value="${esc(r.duration)}" oninput="window.__idxUpdateAgendaRow(${i},'duration',this.value)" placeholder="min.">
-        </div>
-      </div>
-      <div class="form-row">
-        <label>Program</label>
-        <input type="text" value="${esc(r.program)}" oninput="window.__idxUpdateAgendaRow(${i},'program',this.value)" placeholder="e.g. Timer">
-      </div>
-      <div class="form-row">
-        <label>本次 Assignee</label>
-        <input type="text" class="member-ac" value="${esc(r.assignee)}" oninput="window.__idxUpdateAgendaRow(${i},'assignee',this.value)">
-      </div>
-      <div class="form-row">
-        <label>下次 Next Meeting Assignee</label>
-        <input type="text" class="member-ac" value="${esc(r.assigneeNext)}" oninput="window.__idxUpdateAgendaRow(${i},'assigneeNext',this.value)">
-      </div>
-      <div class="form-row" style="margin-bottom:0">
-        <label><input type="checkbox" ${r.section ? 'checked' : ''} onchange="window.__idxUpdateAgendaRow(${i},'section',this.checked)"> 粗體區塊標題 (section)</label>
-      </div>
-    </div>
-  `).join('') + `<button class="btn-add" onclick="window.__idxAddAgendaRow()">+ 新增列 Row</button>`;
-}
 
-function addAgendaRow() {
-  agendaRows.push({ time: '', duration: '', program: '', assignee: '', assigneeNext: '', section: false });
-  renderAgendaRowForms();
-  updatePreview();
-}
-
-function removeAgendaRow(i) {
-  agendaRows.splice(i, 1);
-  renderAgendaRowForms();
-  updatePreview();
-}
-
-function updateAgendaRow(i, key, value) {
-  agendaRows[i][key] = value;
-  updatePreview();
-}
-
-// Push a loaded/reset CHINA payload into its (non-repeating) plain form
-// fields + the agendaRows list. `d` is `{}` when resetting to blank defaults.
+// Push a loaded/reset CHINA payload into its (non-repeating) page-2 plain
+// form fields. `d` is `{}` when resetting to blank defaults. Role fields
+// (including the 4 CHINA-only ones) ride the same generic `fields` list
+// applyAgendaData() already handles for every template — nothing CHINA-
+// specific needed there.
 function applyChinaFields(d) {
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
-  setVal('nextMeetingDate', d.nextMeetingDate);
 
   const pm = d.prevMeeting || {};
   ['date', 'attendMembers', 'attendGuests', 'bestSpeaker', 'bestEvaluator', 'bestTopicsSpeaker', 'bestSessionMaster']
@@ -574,11 +529,6 @@ function applyChinaFields(d) {
 
   const nexts = d.nextSpeakers || [];
   for (let i = 0; i < CHINA_PROJECT_COUNT; i++) setVal(`nextSpeaker_${i}`, nexts[i]);
-
-  agendaRows = (Array.isArray(d.agendaRows) && d.agendaRows.length)
-    ? d.agendaRows.map((r) => ({ ...r }))
-    : CHINA_DEFAULT_ROWS.map((r) => ({ ...r }));
-  renderAgendaRowForms();
 }
 
 function updateSpeech(i, key, value) {
@@ -817,11 +767,15 @@ function collectData() {
     // template-specific extra roles / fields (optional, cross-template safe)
     boardWriter: val('boardWriter'),
     photographer: val('photographer'),
+    voteCounter: val('voteCounter'),
+    wordOfTheDay: val('wordOfTheDay'),
+    inductionHost: val('inductionHost'),
+    quizHost: val('quizHost'),
     tableTopicsQuestion: val('tableTopicsQuestion'),
     signals,
-    // CHINA template only (ignored by other templates' render()s)
-    agendaRows: agendaRows.map((r) => ({ ...r })),
-    nextMeetingDate: val('nextMeetingDate'),
+    // CHINA template only — page-2 reference content (ignored by other
+    // templates' render()s). `nextMeetingDate`/`assigneeNext` are gone: the
+    // "Next Meeting" column is now resolved live (ensureNextMeetingRoles).
     prevMeeting: {
       label: 'The Fresh Start Before',
       date: val('pm_date'),
@@ -885,6 +839,7 @@ function updatePreview() {
   applyClubImages(club);
   const tmpl = AGENDA_TEMPLATES[club && club.template_key] || AGENDA_TEMPLATES.compact;
   applyTemplateFields(tmpl.key);
+  ensureNextMeetingRoles(tmpl.key === 'china' ? club : null, data.meetingDate);
 
   // Language capability is declared per template (lib/agendaTemplates.js). A
   // template that is inherently bilingual (langToggle:false, e.g. Chill Hi
@@ -940,12 +895,53 @@ function applyClubImages(club) {
   images.lineQr = (club && club.line_qr_url) || DEFAULT_IMAGES.lineQr;
 }
 
+function isoDatePlusOne(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * CHINA only — keeps `nextRolesCache` pointed at the role fields of the next
+ * chronological meeting for the same club, so the printed "Next Meeting"
+ * column is always live instead of a manually-typed/duplicated field. Only
+ * re-fetches when the club+date actually changes (updatePreview() runs on
+ * every keystroke, so this must not fire on every one of them); the current,
+ * possibly-stale cache is used synchronously and a fresh render is triggered
+ * once the fetch resolves.
+ */
+function ensureNextMeetingRoles(club, meetingDate) {
+  if (!club || !meetingDate) {
+    nextRolesCacheKey = null;
+    nextRolesCache = {};
+    return;
+  }
+  const key = `${club.id}|${meetingDate}`;
+  if (key === nextRolesCacheKey) return;
+  nextRolesCacheKey = key;
+
+  const params = new URLSearchParams({
+    date_from: isoDatePlusOne(meetingDate), order: 'date_asc', limit: '1', full: '1',
+  });
+  if (isSystemAdmin() && selectedClubId != null) params.set('club_id', selectedClubId);
+
+  apiJson(`/agendas?${params}`)
+    .then((json) => {
+      const item = (json.items || [])[0];
+      nextRolesCache = item ? { ...item.data, meetingDate: item.meetingDate } : {};
+    })
+    .catch(() => { nextRolesCache = {}; })
+    .finally(() => {
+      if (nextRolesCacheKey === key) updatePreview(); // still the relevant lookup → re-render with it
+    });
+}
+
 // Bundle the helpers/globals templates need, so lib/agendaTemplates.js stays decoupled.
 function buildRenderCtx() {
   return {
     t, esc, calcTimes, displayMember, buildSpeechAgendaLine,
     formatDate, varietySession, signals, durationLabels,
-    PATHWAYS, PATHWAYS_ZH, images, lang,
+    PATHWAYS, PATHWAYS_ZH, images, lang, nextMeetingRoles: nextRolesCache,
   };
 }
 
@@ -995,6 +991,7 @@ function applyAgendaData(d) {
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
     'boardWriter', 'photographer', 'tableTopicsQuestion',
+    'voteCounter', 'wordOfTheDay', 'inductionHost', 'quizHost',
   ];
   fields.forEach((id) => {
     const el = document.getElementById(id);
@@ -1523,6 +1520,7 @@ function applyDefaultState() {
     'tableTopicsMaster', 'generalEvaluator', 'langEvaluator',
     'awardsPresenter', 'sharingFeedback',
     'boardWriter', 'photographer', 'tableTopicsQuestion',
+    'voteCounter', 'wordOfTheDay', 'inductionHost', 'quizHost',
   ];
   fields.forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
   signals = defaultSignals();
@@ -1779,9 +1777,9 @@ async function loadAgendaClubs() {
 }
 
 // Switching the club (system_admin only) switches which template the agenda
-// renders with too — each club has its own template_key. Since the two
-// templates keep separate, mostly-incompatible field sets (e.g. china's
-// agendaRows/prevMeeting vs standard's speeches/evaluators), warn via
+// renders with too — each club has its own template_key. Since templates can
+// still have some non-overlapping fields (e.g. china's prevMeeting/speech
+// project reference cards on page 2, which nothing else uses), warn via
 // clubTemplateSwitchModal before swapping so already-typed template-specific
 // content doesn't silently vanish from view.
 function onAgendaClubChange(v) {
@@ -1910,9 +1908,6 @@ export default function AgendaIndexPage() {
     window.__idxCalSelectDate = calSelectDate;
     window.__idxLoadAgenda = loadAgenda;
     window.__idxDeleteAgenda = deleteAgenda;
-    window.__idxRemoveAgendaRow = removeAgendaRow;
-    window.__idxUpdateAgendaRow = updateAgendaRow;
-    window.__idxAddAgendaRow = addAgendaRow;
 
     const settingsOutsideClick = (e) => {
       const dd = document.getElementById('settingsDropdown');
@@ -1976,9 +1971,6 @@ export default function AgendaIndexPage() {
       delete window.__idxCalSelectDate;
       delete window.__idxLoadAgenda;
       delete window.__idxDeleteAgenda;
-      delete window.__idxRemoveAgendaRow;
-      delete window.__idxUpdateAgendaRow;
-      delete window.__idxAddAgendaRow;
     };
   }, []);
 
@@ -2015,7 +2007,7 @@ export default function AgendaIndexPage() {
               <h1>議程表產生器</h1>
             </div>
 
-            <details open data-tmpl="standard" style={{ display: 'none' }}>
+            <details open data-tmpl="standard entrepreneur" style={{ display: 'none' }}>
               <summary>主題圖片 Theme Image</summary>
               <div className="form-section">
                 <div className="img-upload-row">
@@ -2034,7 +2026,7 @@ export default function AgendaIndexPage() {
                   <label>會議日期</label>
                   <input type="date" id="meetingDate" />
                 </div>
-                <div className="form-row" data-tmpl="standard china" style={{ display: 'none' }}>
+                <div className="form-row" data-tmpl="standard compact entrepreneur china" style={{ display: 'none' }}>
                   <label>會議編號 Meeting No.</label>
                   <input type="number" id="meetingNo" defaultValue={258} />
                 </div>
@@ -2042,7 +2034,7 @@ export default function AgendaIndexPage() {
                   <label>會議主題 Meeting Theme</label>
                   <input type="text" id="meetingTheme" placeholder="-Urban Legend-" />
                 </div>
-                <div className="form-row" data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+                <div className="form-row" data-tmpl="standard compact entrepreneur chillhihigh" style={{ display: 'none' }}>
                   <label>時間段 Time Range</label>
                   <input type="text" id="timeRange" placeholder="19:10 ~ 21:00" />
                 </div>
@@ -2053,7 +2045,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+            <details data-tmpl="standard compact entrepreneur chillhihigh" style={{ display: 'none' }}>
               <summary>⏱ 時間設定 Time Settings</summary>
               <div className="form-section">
                 <div className="time-override-row">
@@ -2249,7 +2241,7 @@ export default function AgendaIndexPage() {
                   <button className="btn-time-reset" onClick={() => resetDurationOverride('sharingMins')} title="還原自動">⟳</button>
                 </div>
 
-                <div data-tmpl="standard" style={{ display: 'none' }}>
+                <div data-tmpl="standard compact entrepreneur" style={{ display: 'none' }}>
                   <hr style={{ margin: '6px 0', borderColor: '#ddd' }} />
                   <p className="time-override-hint">
                     <strong>講評區各列時長</strong>（議程表上直接顯示的字樣，可填區間）
@@ -2283,18 +2275,18 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+            <details open data-tmpl="standard compact entrepreneur chillhihigh china" style={{ display: 'none' }}>
               <summary>角色分配</summary>
               <div className="form-section">
                 <div className="form-row">
                   <label>Reception Host <span className="time-hint">18:50</span></label>
                   <input type="text" id="receptionHost" placeholder="Name, Title" className="member-ac" />
                 </div>
-                <div className="form-row">
+                <div className="form-row" data-tmpl="standard compact entrepreneur china" style={{ display: 'none' }}>
                   <label>Calling Meeting to Order <span className="time-hint">1'</span></label>
                   <input type="text" id="callingToOrder" placeholder="Name, Title" className="member-ac" />
                 </div>
-                <div className="form-row" data-tmpl="standard" style={{ display: 'none' }}>
+                <div className="form-row">
                   <label>Welcome Guests &amp; TME 介紹者 <span className="time-hint">2'</span></label>
                   <input type="text" id="welcomeTME" placeholder="Name, Title" className="member-ac" />
                 </div>
@@ -2313,7 +2305,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+            <details data-tmpl="standard compact entrepreneur chillhihigh" style={{ display: 'none' }}>
               <summary>多元單元 Variety Session</summary>
               <div className="form-section">
                 <div className="form-row toggle-row">
@@ -2338,7 +2330,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+            <details open data-tmpl="standard compact entrepreneur chillhihigh china" style={{ display: 'none' }}>
               <summary>指定演講 Prepared Speeches</summary>
               <div className="form-section">
                 <div id="speechesList"></div>
@@ -2346,7 +2338,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+            <details open data-tmpl="standard compact entrepreneur chillhihigh china" style={{ display: 'none' }}>
               <summary>即席問答 Table Topics</summary>
               <div className="form-section">
                 <div className="form-row">
@@ -2356,7 +2348,7 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+            <details open data-tmpl="standard compact entrepreneur chillhihigh china" style={{ display: 'none' }}>
               <summary>講評環節 Evaluation</summary>
               <div className="form-section">
                 <div className="form-row">
@@ -2371,10 +2363,10 @@ export default function AgendaIndexPage() {
               </div>
             </details>
 
-            <details open data-tmpl="standard chillhihigh" style={{ display: 'none' }}>
+            <details open data-tmpl="standard compact entrepreneur chillhihigh china" style={{ display: 'none' }}>
               <summary>結束環節 Closing</summary>
               <div className="form-section">
-                <div className="form-row" data-tmpl="standard" style={{ display: 'none' }}>
+                <div className="form-row">
                   <label>Awards Presentation 頒獎 <span className="time-hint">3'</span></label>
                   <input type="text" id="awardsPresenter" placeholder="Name, Title" className="member-ac" />
                 </div>
@@ -2457,13 +2449,25 @@ export default function AgendaIndexPage() {
 
             {/* Template-specific fields: shown only when the active club uses this template */}
             <details open data-tmpl="china" style={{ display: 'none' }}>
-              <summary>CHINA 專屬 — 議程列表（本次／下次雙欄）</summary>
+              <summary>CHINA 專屬角色</summary>
               <div className="form-section">
                 <div className="form-row">
-                  <label>下次會議日期 Next Meeting Date</label>
-                  <input type="date" id="nextMeetingDate" />
+                  <label>Vote Counter 計票員</label>
+                  <input type="text" id="voteCounter" placeholder="Name, Title" className="member-ac" />
                 </div>
-                <div id="agendaRowsList"></div>
+                <div className="form-row">
+                  <label>Word of the Day 每日一字</label>
+                  <input type="text" id="wordOfTheDay" placeholder="Name, Title" className="member-ac" />
+                </div>
+                <div className="form-row">
+                  <label>Induction Ceremony 入會宣誓主持</label>
+                  <input type="text" id="inductionHost" placeholder="Name, Title" className="member-ac" />
+                </div>
+                <div className="form-row">
+                  <label>Quiz Session 問答遊戲主持</label>
+                  <input type="text" id="quizHost" placeholder="Name, Title" className="member-ac" />
+                </div>
+                <p className="img-hint">「Next Meeting」欄位（議程右側）會在列印/預覽時自動抓下一場例會的資料，這裡不用手動填。</p>
               </div>
             </details>
 

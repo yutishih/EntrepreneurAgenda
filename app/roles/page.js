@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
-import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, canWrite } from '@/lib/auth';
+import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, canWrite, getClubId } from '@/lib/auth';
 import { MemberAC } from '@/lib/memberAutocomplete';
 import Sidebar from '@/components/Sidebar';
 import './roles.css';
@@ -28,12 +28,20 @@ import './roles.css';
 // ================================================================
 // ROLE DEFINITIONS  (mirrors the agenda fields in app/agenda/page.js)
 // ================================================================
+// Every club sees the same full role list — a role whose `templates` allow-list
+// doesn't include the active club's template renders as a locked (disabled,
+// greyed) row instead of being removed, per the site-wide rule that
+// `agendas.data` is one shared schema across templates: a template that
+// doesn't use a field just leaves it null/unrendered, and the matrix reflects
+// that by locking rather than hiding. No `templates` key = every template uses it.
 const ROLE_GROUPS = [
   {
     label: '會議主持',
     roles: [
       { key: 'receptionHost',  label: '報到接待',     en: 'Reception Host' },
-      { key: 'callingToOrder', label: '宣布例會開始', en: 'Calling to Order' },
+      // Chill Hi High has no separate "calling to order" row — its opening
+      // remarks row reads `welcomeTME` instead (see lib/agendaTemplates.js).
+      { key: 'callingToOrder', label: '宣布例會開始', en: 'Calling to Order', templates: ['standard', 'compact', 'entrepreneur', 'china'] },
       { key: 'welcomeTME',     label: '會長致歡迎詞', en: 'Welcome Guests & TME' },
       { key: 'tme',            label: '總主持人',     en: 'Toastmaster of the Evening' },
     ],
@@ -43,14 +51,23 @@ const ROLE_GROUPS = [
     roles: [
       { key: 'timer',        label: '計時員',     en: 'Timer' },
       { key: 'ahCounter',    label: '贅語記錄員', en: 'Ah-Counter' },
-      { key: 'boardWriter',  label: '板書',       en: 'Board Writer' },
-      { key: 'photographer', label: '攝影',       en: 'Photographer' },
+      { key: 'boardWriter',  label: '板書',       en: 'Board Writer', templates: ['chillhihigh'] },
+      { key: 'photographer', label: '攝影',       en: 'Photographer', templates: ['chillhihigh'] },
+    ],
+  },
+  {
+    label: 'CHINA 專屬',
+    roles: [
+      { key: 'voteCounter',   label: '計票員',       en: 'Vote Counter', templates: ['china'] },
+      { key: 'wordOfTheDay',  label: '每日一字',     en: 'Word of the Day', templates: ['china'] },
+      { key: 'inductionHost', label: '入會宣誓主持', en: 'Induction Ceremony', templates: ['china'] },
+      { key: 'quizHost',      label: '問答遊戲主持', en: 'Quiz Session', templates: ['china'] },
     ],
   },
   {
     label: '單元主持',
     roles: [
-      { key: 'varietyHost',       label: '多元單元主持人', en: 'Variety Session Host', kind: 'variety' },
+      { key: 'varietyHost',       label: '多元單元主持人', en: 'Variety Session Host', kind: 'variety', templates: ['standard', 'compact', 'entrepreneur', 'chillhihigh'] },
       { key: 'tableTopicsMaster', label: '即席問答主持人', en: 'Table Topics Master' },
     ],
   },
@@ -126,6 +143,18 @@ let roleById       = {};     // roleId → role descriptor
 let selectedClubId = null;
 let dateFrom       = '';     // inclusive meeting_date bounds; '' = unbounded
 let dateTo         = '';
+let allClubs       = [];     // full /clubs list (id, name, template_key, …) — resolves the active template
+
+/** The club whose roles are currently being planned (admin picks one; everyone else uses their own). */
+function activeClubId() {
+  return isSystemAdmin() ? selectedClubId : getClubId();
+}
+
+/** Drives which roles show up in the matrix — each template renders a different role set. */
+function activeTemplateKey() {
+  const club = allClubs.find((c) => c.id === activeClubId());
+  return (club && club.template_key) || 'standard';
+}
 
 // Bridge to RolesPage's React state, same pattern as window.__rolesOnCellInput
 // below. The save button's disabled state used to be toggled by mutating
@@ -224,15 +253,24 @@ async function checkRolesAuth() {
   }
 }
 
-async function loadClubs() {
+/**
+ * Loads the full club list (id/name/template_key/…) into `allClubs` — needed by
+ * every role (not just admins) so `activeTemplateKey()` can resolve the active
+ * club's template. Admins additionally get the club-picker dropdown populated
+ * from the same fetch, avoiding a second round-trip.
+ */
+async function loadClubsMeta() {
   try {
-    const allClubs = await apiJson('/clubs');
-    const sel = document.getElementById('clubPickerSelect');
-    sel.innerHTML = '<option value="">— 請選擇分會 —</option>' +
-      allClubs.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-    document.getElementById('clubPickerBar').style.display = '';
+    allClubs = await apiJson('/clubs');
+    if (isSystemAdmin()) {
+      const sel = document.getElementById('clubPickerSelect');
+      sel.innerHTML = '<option value="">— 請選擇分會 —</option>' +
+        allClubs.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      document.getElementById('clubPickerBar').style.display = '';
+    }
   } catch {
-    toast('載入分會失敗', true);
+    allClubs = [];
+    if (isSystemAdmin()) toast('載入分會失敗', true);
   }
 }
 
@@ -253,6 +291,7 @@ function showPickClubHint() {
     '<div class="matrix-empty">請先於上方選擇分會，以規劃該分會的例會角色</div>';
   updateSaveBar();
   document.getElementById('pagerLabel').textContent = '';
+  document.getElementById('templateLabel').textContent = '';
 }
 
 /** Roster that feeds the cell dropdowns. Guests can still be typed freely. */
@@ -289,6 +328,7 @@ async function loadMeetings() {
     meetings.forEach(resetDraft);
     renderMatrix();
     updateRangeLabel(json.total || 0);
+    updateTemplateLabel();
   } catch {
     wrap.innerHTML = '<div class="matrix-empty">載入例會失敗</div>';
     document.getElementById('pagerLabel').textContent = '';
@@ -311,24 +351,43 @@ function updateRangeLabel(total) {
     : `顯示 ${meetings.length} 場`;
 }
 
+const TEMPLATE_LABELS = { standard: '標準版', compact: '精簡版', entrepreneur: '企業家版', chillhihigh: 'Chill Hi High', china: 'CHINA' };
+
+/** Display name for the active club's template — used in the toolbar label and locked-row tooltips. */
+function activeTemplateLabel() {
+  return TEMPLATE_LABELS[activeTemplateKey()] || activeTemplateKey();
+}
+
+/** Surfaces which template's role set is currently shown — the list differs per template. */
+function updateTemplateLabel() {
+  const label = document.getElementById('templateLabel');
+  if (!label) return;
+  const club = allClubs.find((c) => c.id === activeClubId());
+  label.textContent = club ? `目前版型：${activeTemplateLabel()}` : '';
+}
+
 // ================================================================
 // MATRIX BUILD / RENDER
 // ================================================================
 function buildRows() {
-  // Show as many speech / evaluator slots as the busiest loaded meeting needs.
-  const maxSpeech = Math.max(3, ...meetings.map((m) => (m.data.speeches   || []).length));
-  const maxEval   = Math.max(3, ...meetings.map((m) => (m.data.evaluators || []).length));
-
   rows     = [];
   roleById = {};
 
+  const tmplKey = activeTemplateKey();
+  const locked = (role) => !!(role.templates && !role.templates.includes(tmplKey));
+
   const pushRole = (role) => {
-    roleById[roleId(role)] = role;
-    rows.push({ type: 'role', role });
+    const withLock = { ...role, locked: locked(role) };
+    roleById[roleId(withLock)] = withLock;
+    rows.push({ type: 'role', role: withLock });
   };
 
   // Resolvable by the save path, but intentionally absent from `rows`.
   META_FIELDS.forEach((f) => { roleById[f.key] = f; });
+
+  // Show as many speech / evaluator slots as the busiest loaded meeting needs.
+  const maxSpeech = Math.max(3, ...meetings.map((m) => (m.data.speeches   || []).length));
+  const maxEval   = Math.max(3, ...meetings.map((m) => (m.data.evaluators || []).length));
 
   ROLE_GROUPS.forEach((group) => {
     rows.push({ type: 'group', label: group.label });
@@ -409,6 +468,20 @@ function renderMatrix() {
       </tr>`;
     }
     const rid = roleId(r.role);
+
+    if (r.role.locked) {
+      const lockTitle = `${activeTemplateLabel()} 不使用這個角色`;
+      const cells = meetings.map(() => `<td class="rm-cell rm-locked">
+        <input type="text" class="rm-input" value="" disabled placeholder="—" title="${esc(lockTitle)}">
+      </td>`).join('');
+      return `<tr class="rm-locked-row">
+        <th class="rm-role" title="${esc(lockTitle)}">
+          <span class="rm-role-zh">${esc(r.role.label)}</span>
+          <span class="rm-role-en">${esc(r.role.en || '')}</span>
+        </th>${cells}
+      </tr>`;
+    }
+
     const cells = meetings.map((m) => {
       const v      = m.draft[rid] ?? '';
       const acLang = m.data.lang === 'zh' ? 'zh' : 'en';
@@ -609,8 +682,11 @@ export default function RolesPage() {
       dateTo   = r.to;
       syncDateInputs();
 
+      // Needed by everyone, not just admins — activeTemplateKey() resolves the
+      // active club's template from this list even for a single-club user.
+      await loadClubsMeta();
+
       if (isSystemAdmin()) {
-        await loadClubs();
         if (selectedClubId == null) { showPickClubHint(); return; }
       }
       await Promise.all([loadRoster(), loadMeetings()]);
@@ -674,6 +750,7 @@ export default function RolesPage() {
             <div className="toolbar-spacer"></div>
 
             <span className="roster-count" id="rosterCount"></span>
+            <span className="pager-label" id="templateLabel"></span>
             <span className="pager-label" id="pagerLabel"></span>
           </div>
 

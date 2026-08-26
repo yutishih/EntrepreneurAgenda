@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, canWrite, getClubId } from '@/lib/auth';
 import { MemberAC } from '@/lib/memberAutocomplete';
+import { MAX_EVAL_EVALUATORS } from '@/lib/agendaTemplates';
 import Sidebar from '@/components/Sidebar';
 import './roles.css';
 
@@ -74,6 +75,9 @@ const ROLE_GROUPS = [
       { key: 'langEvaluator',    label: '語言講評', en: 'Language Evaluator' },
       { key: 'generalEvaluator', label: '總講評',   en: 'General Evaluator' },
     ],
+    // …and these after `tail`, mirroring the agenda sheet, where 講評員講評
+    // closes out the evaluation block after 總講評.
+    tailDynamic: 'evalEvaluator',
   },
   {
     label: '結尾',
@@ -106,6 +110,7 @@ function blankSpeech() {
 function roleGet(data, role) {
   if (role.kind === 'speech')    return (data.speeches   || [])[role.idx]?.speaker || '';
   if (role.kind === 'evaluator') return (data.evaluators || [])[role.idx] || '';
+  if (role.kind === 'evalEvaluator') return (data.evalEvaluators || [])[role.idx] || '';
   if (role.kind === 'variety')   return data.varietySession?.host || '';
   return data[role.key] || '';
 }
@@ -119,6 +124,10 @@ function roleSet(data, role, value) {
     if (!Array.isArray(data.evaluators)) data.evaluators = [];
     while (data.evaluators.length <= role.idx) data.evaluators.push('');
     data.evaluators[role.idx] = value;
+  } else if (role.kind === 'evalEvaluator') {
+    if (!Array.isArray(data.evalEvaluators)) data.evalEvaluators = [];
+    while (data.evalEvaluators.length <= role.idx) data.evalEvaluators.push('');
+    data.evalEvaluators[role.idx] = value;
   } else if (role.kind === 'variety') {
     // Only the host is touched — whether the session runs stays the editor's call.
     if (!data.varietySession) data.varietySession = { enabled: false, duration: 15, host: '' };
@@ -383,6 +392,13 @@ function buildRows() {
   // Show as many speech / evaluator slots as the busiest loaded meeting needs.
   const maxSpeech = Math.max(3, ...meetings.map((m) => (m.data.speeches   || []).length));
   const maxEval   = Math.max(3, ...meetings.map((m) => (m.data.evaluators || []).length));
+  // 講評員講評 is optional, so there is no floor of 3 here — instead show one
+  // spare row past the busiest meeting (capped) so the next one can always be
+  // added from this page without leaving 3 near-always-empty rows behind.
+  const maxEvalEval = Math.min(
+    MAX_EVAL_EVALUATORS,
+    Math.max(0, ...meetings.map((m) => (m.data.evalEvaluators || []).length)) + 1,
+  );
 
   ROLE_GROUPS.forEach((group) => {
     rows.push({ type: 'group', label: group.label });
@@ -401,6 +417,13 @@ function buildRows() {
       }
     }
     (group.tail || []).forEach(pushRole);
+
+    if (group.tailDynamic === 'evalEvaluator') {
+      for (let i = 0; i < maxEvalEval; i++) {
+        pushRole({ key: `evalEvaluator${i + 1}`, kind: 'evalEvaluator', idx: i,
+                   label: `講評員講評 #${i + 1}`, en: `Evaluator's Evaluator #${i + 1}` });
+      }
+    }
   });
 }
 
@@ -418,6 +441,9 @@ function slotNote(m, role) {
   }
   if (role.kind === 'evaluator' && role.idx >= (m.data.evaluators || []).length) {
     return '此場原本沒有這個講評名額，填入並儲存後會為該議程新增一位講評員';
+  }
+  if (role.kind === 'evalEvaluator' && role.idx >= (m.data.evalEvaluators || []).length) {
+    return '此場原本沒有這個名額，填入並儲存後會在總講評之後新增一位講評員講評';
   }
   return '';
 }

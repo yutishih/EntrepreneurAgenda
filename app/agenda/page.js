@@ -6,6 +6,7 @@ import { apiJson, apiFetch } from '@/lib/api';
 import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, getUsername, getClubId, logout } from '@/lib/auth';
 import {
   AGENDA_TEMPLATES,
+  MAX_EVAL_EVALUATORS,
   templateAssetDefaults,
   templateFieldDefaults,
   templatePlaceholders,
@@ -72,6 +73,11 @@ let speeches = [
 
 let evaluators = ['', '', ''];
 
+// 講評員講評 — people who evaluate the individual evaluators. Printed right
+// after 總講評, still inside the evaluation block. Optional: a meeting normally
+// has none, and never more than MAX_EVAL_EVALUATORS (see lib/agendaTemplates.js).
+let evalEvaluators = [];
+
 // CHINA template only — page-2 reference content (previous-meeting recap /
 // per-project purpose notes / next-meeting speaker preview). Role assignment
 // itself now goes through the same fixed fields every template uses.
@@ -103,6 +109,7 @@ const TRANSLATIONS = {
     tableTopics: 'Table Topics Session',
     evaluation: 'Evaluation Session',
     evaluatorFor: (n) => `Individual Evaluator for Speaker #${n}`,
+    evalEvaluatorFor: (n) => `Evaluator's Evaluator #${n}`,
     timerReport: 'Timer Report',
     ahReport: 'Ah-counter Report',
     langEval: 'Language Evaluation',
@@ -145,6 +152,7 @@ const TRANSLATIONS = {
     tableTopics: '即席問答',
     evaluation: '講評時間',
     evaluatorFor: (n) => `個別講評員 #${n}`,
+    evalEvaluatorFor: (n) => `講評員講評 #${n}`,
     timerReport: '計時員報告',
     ahReport: '贅語記錄員報告',
     langEval: '語言講評',
@@ -202,6 +210,7 @@ function refreshInputsForLang() {
     if (sp.speaker) sp.speaker = displayMember(sp.speaker);
   });
   evaluators = evaluators.map((ev) => (ev ? displayMember(ev) : ev));
+  evalEvaluators = evalEvaluators.map((ev) => (ev ? displayMember(ev) : ev));
 
   if (varietySession.host) {
     varietySession.host = displayMember(varietySession.host);
@@ -211,6 +220,7 @@ function refreshInputsForLang() {
 
   renderSpeechForms();
   renderEvaluatorForms();
+  renderEvalEvaluatorForms();
 }
 
 // Every clock time shown in the agenda's time column can be pinned by hand.
@@ -232,7 +242,7 @@ const timeOverrides = {
 
 // Every block duration can likewise be pinned. Blank = auto:
 //   speechMins → Σ speech durations + 4' transition + TME hosting
-//   evalMins   → 3' per evaluator + 12' fixed reports + GE hosting
+//   evalMins   → 3' per evaluator (incl. 講評員講評) + 12' fixed reports + GE hosting
 //   topicsMins / intermissionMins → absorb the slack up to the target end time
 const durationOverrides = {
   receptionMins: '',
@@ -256,6 +266,7 @@ function defaultDurationLabels() {
     ahReport: "1'",
     langEval: "3'~5'",
     generalEval: "3'~5'",
+    evalEvaluator: "2'~3'",
   };
 }
 let durationLabels = defaultDurationLabels();
@@ -491,6 +502,44 @@ function removeEvaluator(i) {
   updatePreview();
 }
 
+// 講評員講評 — same list UI as the individual evaluators, but capped at
+// MAX_EVAL_EVALUATORS and empty by default (most meetings have none), so the
+// "+ 新增" button disappears once the cap is reached rather than silently
+// accepting a row no template would print.
+function renderEvalEvaluatorForms() {
+  const container = document.getElementById('evalEvaluatorsList');
+  if (!container) return;
+  const atMax = evalEvaluators.length >= MAX_EVAL_EVALUATORS;
+  container.innerHTML = evalEvaluators.map((ev, i) => `
+    <div class="speech-entry" style="padding:8px 10px">
+      <div class="speech-entry-header">
+        <span>講評員講評 #${i + 1} <span class="time-hint">2'~3'</span></span>
+        <button class="btn-remove" onclick="window.__idxRemoveEvalEvaluator(${i})">✕ 移除</button>
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <input type="text" value="${esc(ev)}"
+               oninput="window.__idxEvalEvalInput(${i}, this.value)"
+               placeholder="Name, Title" class="member-ac">
+      </div>
+    </div>
+  `).join('') + (atMax
+    ? `<p class="time-override-hint" style="margin:6px 0 0">已達上限 ${MAX_EVAL_EVALUATORS} 位。</p>`
+    : `<button class="btn-add" onclick="window.__idxAddEvalEvaluator()">+ 新增講評員講評</button>`);
+}
+
+function addEvalEvaluator() {
+  if (evalEvaluators.length >= MAX_EVAL_EVALUATORS) return;
+  evalEvaluators.push('');
+  renderEvalEvaluatorForms();
+  updatePreview();
+}
+
+function removeEvalEvaluator(i) {
+  evalEvaluators.splice(i, 1);
+  renderEvalEvaluatorForms();
+  updatePreview();
+}
+
 function addSpeech() {
   speeches.push({ title: '', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' });
   renderSpeechForms();
@@ -577,8 +626,10 @@ function calcTimes(spList) {
   const speechMins = getDur('speechMins',
     spList.reduce((s, sp) => s + parseDurationMax(sp.duration), 0) + 4 + durationSettings.tmeMins);
   const photoMins = getDur('photoMins', 5);
-  // eval: 3' per evaluator + timer(1) + ah(1) + LE(5) + GE(5) + GE hosting
-  const evalMins = getDur('evalMins', evaluators.length * 3 + 12 + durationSettings.geMins);
+  // eval: 3' per evaluator (individual + 講評員講評) + timer(1) + ah(1)
+  //       + LE(5) + GE(5) + GE hosting
+  const evalMins = getDur('evalMins',
+    (evaluators.length + evalEvaluators.length) * 3 + 12 + durationSettings.geMins);
   const closingMins = getDur('closingMins', 6);
   const sharingMins = getDur('sharingMins', 5);
 
@@ -759,6 +810,7 @@ function collectData() {
     ahCounter: val('ahCounter'),
     speeches,
     evaluators: evaluators.slice(),
+    evalEvaluators: evalEvaluators.slice(),
     tableTopicsMaster: val('tableTopicsMaster'),
     generalEvaluator: val('generalEvaluator'),
     langEvaluator: val('langEvaluator'),
@@ -999,6 +1051,9 @@ function applyAgendaData(d) {
 
   speeches = d.speeches || [];
   evaluators = d.evaluators || [];
+  // Absent on every agenda saved before this field existed → none, not "keep
+  // the previous agenda's". Capped defensively, same as the templates do.
+  evalEvaluators = (d.evalEvaluators || []).slice(0, MAX_EVAL_EVALUATORS);
 
   // Clear first — this state outlives a single load, so keys the saved agenda
   // omits must fall back to auto rather than keep the previous agenda's value.
@@ -1088,6 +1143,7 @@ function applyAgendaData(d) {
   applyChinaFields(d);
   renderSpeechForms();
   renderEvaluatorForms();
+  renderEvalEvaluatorForms();
   updatePreview();
 }
 
@@ -1543,6 +1599,7 @@ function applyDefaultState() {
     { title: '', speaker: '', duration: "5'-7'", speechLang: 'en', pathwayCode: '', pathwayLevel: '', pathwayProject: '' },
   ];
   evaluators = ['', '', ''];
+  evalEvaluators = [];
   Object.keys(timeOverrides).forEach((k) => {
     timeOverrides[k] = '';
     const el = document.getElementById(`to_${k}`);
@@ -1561,6 +1618,7 @@ function applyDefaultState() {
   applyChinaFields({});
   renderSpeechForms();
   renderEvaluatorForms();
+  renderEvalEvaluatorForms();
   updatePreview();
 }
 
@@ -1904,6 +1962,9 @@ export default function AgendaIndexPage() {
     window.__idxRemoveEvaluator = removeEvaluator;
     window.__idxAddEvaluator = addEvaluator;
     window.__idxEvalInput = (i, value) => { evaluators[i] = value; updatePreview(); };
+    window.__idxRemoveEvalEvaluator = removeEvalEvaluator;
+    window.__idxAddEvalEvaluator = addEvalEvaluator;
+    window.__idxEvalEvalInput = (i, value) => { evalEvaluators[i] = value; updatePreview(); };
     window.__idxCalSelectDate = calSelectDate;
     window.__idxLoadAgenda = loadAgenda;
     window.__idxDeleteAgenda = deleteAgenda;
@@ -1967,6 +2028,9 @@ export default function AgendaIndexPage() {
       delete window.__idxRemoveEvaluator;
       delete window.__idxAddEvaluator;
       delete window.__idxEvalInput;
+      delete window.__idxRemoveEvalEvaluator;
+      delete window.__idxAddEvalEvaluator;
+      delete window.__idxEvalEvalInput;
       delete window.__idxCalSelectDate;
       delete window.__idxLoadAgenda;
       delete window.__idxDeleteAgenda;
@@ -2270,6 +2334,11 @@ export default function AgendaIndexPage() {
                     <input type="text" id="durlbl_generalEval" style={{ width: 74 }} placeholder="3'~5'"
                       onInput={(e) => updateDurationLabel('generalEval', e.target.value)} />
                   </div>
+                  <div className="time-override-row">
+                    <div className="time-override-label">講評員講評 Eval&apos;s Eval</div>
+                    <input type="text" id="durlbl_evalEvaluator" style={{ width: 74 }} placeholder="2'~3'"
+                      onInput={(e) => updateDurationLabel('evalEvaluator', e.target.value)} />
+                  </div>
                 </div>
               </div>
             </details>
@@ -2359,6 +2428,11 @@ export default function AgendaIndexPage() {
                   <label>Language Evaluator 語言講評 <span className="time-hint">3'~5'</span></label>
                   <input type="text" id="langEvaluator" placeholder="Name, Title" className="member-ac" />
                 </div>
+                <hr style={{ margin: '12px 0 8px', borderColor: '#ddd' }} />
+                <p className="time-override-hint" style={{ marginTop: 0 }}>
+                  <strong>講評員講評 Evaluator&apos;s Evaluator</strong>（排在總講評之後，可不設，最多 {MAX_EVAL_EVALUATORS} 位）
+                </p>
+                <div id="evalEvaluatorsList"></div>
               </div>
             </details>
 

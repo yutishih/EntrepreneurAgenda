@@ -118,6 +118,7 @@ EntrepreneurAgenda/
 - `boardWriter`、`photographer`、`tableTopicsQuestion`
 - `signals`：時間管理綠/黃/紅牌（每類別可手動編輯，預設帶入標準計時規則）
 - `speeches[].speechLang`：每篇演講語言（`en` / `zh`）。**Chill Hi High** 依此把對應（同索引）的個別講評員標示為「英語講評員 / 國語講評員」。
+- `evalEvaluators[]`：**講評員講評**（Evaluator's Evaluator）——負責講評個別講評員的人。排在**總講評之後**、仍在講評環節內，**可以沒有，最多 3 位**（`MAX_EVAL_EVALUATORS`）。舊議程沒有這個鍵＝沒有這個角色，5 個版型都支援；`evalMins` 的自動值也會把它算進去。
 - `timeOverrides`／`durationOverrides`／`durationLabels`：議程表上的時刻與時長覆寫（見下）
 
 ---
@@ -142,13 +143,13 @@ EntrepreneurAgenda/
 | 欄位 | 自動計算 |
 |------|----------|
 | `speechMins` | Σ 各篇演講時長上限 + 4′ 換場 + 總主持人串場（`durationSettings.tmeMins`） |
-| `evalMins` | 每位個別講評 3′ + 固定報告 12′ + 總講評串場（`durationSettings.geMins`） |
+| `evalMins` | （個別講評 + 講評員講評）每位 3′ + 固定報告 12′ + 總講評串場（`durationSettings.geMins`） |
 | `topicsMins`／`intermissionMins` | 吸收距離 `endTime` 的剩餘時間（各上限 +10′）；任一邊被手動指定時，另一邊才吸收剩餘 |
 | 其他 | 固定預設值（報到 20′、開幕 10′、拍照 5′、結尾 6′、分享 5′） |
 
 ### 講評區固定列時長（`durationLabels`）
 
-`個別講評 2'~3'`、`計時員報告 1'`、`贅語報告 1'`、`語言講評 3'~5'`、`總講評 3'~5'` 原本寫死在版型裡，現在改為每場可編輯的**顯示字串**（可填區間，不參與加總運算），與 `signals` 同一套模式：載入時 merge 到預設值上，舊議程自動沿用原本字樣。
+`個別講評 2'~3'`、`計時員報告 1'`、`贅語報告 1'`、`語言講評 3'~5'`、`總講評 3'~5'`、`講評員講評 2'~3'` 原本寫死在版型裡，現在改為每場可編輯的**顯示字串**（可填區間，不參與加總運算），與 `signals` 同一套模式：載入時 merge 到預設值上，舊議程自動沿用原本字樣。
 
 > 版型端從 `ctx.durationLabels` 取用，並以 `templates.js` 的 `DEFAULT_DURATION_LABELS` 作最後防線。`standard` 與 `compact` 已改為資料驅動；`chillhihigh` 的講評列本來就用 `signals` 的綠/黃/紅欄，不受影響。
 
@@ -174,9 +175,28 @@ EntrepreneurAgenda/
 > 「版型設定」modal 欄位、預設值/預設圖、分會版型下拉（`TEMPLATE_OPTIONS`）皆會**自動跟上**——欄位只需在 manifest 宣告一次。
 
 > 內建版型：
-> - `standard`（標準版／企業家）
+> - `standard`（標準版／企業家，**舊版**）
 > - `compact`（精簡單欄示範版）
 > - `chillhihigh`（雙語幽默版／Chill Hi High：中英混用、內嵌綠/黃/紅時間牌欄、個別講評員依演講語言標示、底部 Meeting Roles 說明；**兩頁**：議程頁 + 宣傳後頁）
+> - `china`（CHINA Toastmasters／CHANGE IN ACTION：固定流程表 `CHINA_SCHEDULE`、全英文、附「下一場」角色欄；**兩頁**）
+> - `entrepreneur`（企業家版）
+
+#### `standard` 與 `entrepreneur`：分家了，不再共用 render
+
+`entrepreneur` 一開始是 `{ ...AGENDA_TEMPLATES.standard }` 的 spread clone，兩者共用**同一個** `render` 與同一份 `assetDefaults` / `fieldDefaults` / `placeholders` / `settings` 物件參照。現在 `entrepreneur` 是 `AGENDA_TEMPLATES` 裡一個完整獨立的 entry，**自己的 `render()`、自己的預設值常數（`ENTREPRENEUR_*`）、自己的 `settings` manifest**——改企業家版不會動到標準版，反之亦然。
+
+- `entrepreneur` 是**活的**：企業家分會版面要改就改這裡。
+- `standard` 是**凍結的**：留著只為了讓 `template_key='standard'` 的舊分會記錄維持原樣，不要再改它。
+- 分家當下兩者輸出**完全一致**，所以既有議程不受影響。
+
+**CSS 也拆了。** `agenda.css` 原本這段版面樣式是全域選擇器（`.agenda-table`、`.doc-header`、`.rp-cell` …），兩個版型共用；現在拆成 `.tmpl-standard` 與 `.tmpl-entrepreneur` **兩份各自獨立的完整副本**（各 61 條規則，拆分當下內容相同），跟 `compact` / `chillhihigh` / `china` 一樣收進 `.tmpl-<key>` 命名空間。改其中一份不會影響另一份。
+
+仍然保持全域的只有兩樣，都是刻意的：
+
+| 選擇器 | 為什麼不收進命名空間 |
+|--------|------------------|
+| `.agenda-page` | 所有版型共用的 A4 紙張外框（尺寸、邊距、字型、陰影），`page.js` 對每個版型都掛這個 class |
+| `.tc-g` / `.tc-y` / `.tc-r` | 時間規則的紅黃綠色塊，標準版／企業家版的右側面板與 **CHINA 第二頁**的 Time Control 表格共用 |
 
 ---
 
@@ -214,7 +234,7 @@ EntrepreneurAgenda/
 | `varietyHost` | standard／compact／entrepreneur／chillhihigh | CHINA 沒有多元單元 |
 | `wordOfTheDay`／`quizHost` | china | CHINA 專屬的每日一字、問答遊戲主持（歸在「單元主持」組） |
 
-其餘角色（`receptionHost`、`welcomeTME`、`tme`、`timer`、`ahCounter`、`tableTopicsMaster`、`speeches[i].speaker`、`evaluators[i]`、`langEvaluator`、`generalEvaluator`、`awardsPresenter`、`sharingFeedback`）沒有 `templates` 限制，5 個版型都共用。
+其餘角色（`receptionHost`、`welcomeTME`、`tme`、`timer`、`ahCounter`、`tableTopicsMaster`、`speeches[i].speaker`、`evaluators[i]`、`langEvaluator`、`generalEvaluator`、`evalEvaluators[i]`、`awardsPresenter`、`sharingFeedback`）沒有 `templates` 限制，5 個版型都共用。
 
 ### 角色清單（`ROLE_GROUPS`）
 
@@ -224,10 +244,12 @@ EntrepreneurAgenda/
 | 計時 / 記錄 | `timer`、`ahCounter`、`boardWriter`、`photographer`、`voteCounter` |
 | 單元主持 | `varietyHost`（＝`varietySession.host`）、`tableTopicsMaster`、`wordOfTheDay`、`quizHost` |
 | 指定演講 | `speeches[i].speaker`（動態，至少 3 列） |
-| 講評 | `evaluators[i]`（動態，至少 3 列）、`langEvaluator`、`generalEvaluator` |
+| 講評 | `evaluators[i]`（動態，至少 3 列）、`langEvaluator`、`generalEvaluator`、`evalEvaluators[i]`（動態，0～3 列） |
 | 結尾 | `awardsPresenter`、`sharingFeedback` |
 
 演講 / 講評的列數取**目前載入場次中的最大值**（最少 3 列）——CHINA 的 3 篇指定演講／3 位個別講評也是走這同一套 `speeches`/`evaluators` 陣列，沒有另外的資料結構。
+
+`evalEvaluators[i]`（講評員講評）排在 `generalEvaluator` **之後**，跟議程表上的順序一致。它是選配角色，所以不設「最少 3 列」的底線，而是顯示「載入場次中的最大值 + 1」列（上限 3）——永遠留一格空的可以往下加，也不會在多數用不到的場次留下 3 排空格。
 
 ### CHINA 版型：跟其他版型一樣的固定欄位
 

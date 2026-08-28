@@ -798,6 +798,7 @@ function buildImportPlan(sheet) {
   const byDate = new Map(meetings.map((m) => [String(m.meetingDate), m]));
   const unmatched = new Map();      // sheet name → how many cells used it
   const columns = [];
+  const conflicts = [];             // cells whose current value is non-empty and different
   let skippedLocked = 0;
 
   sheet.columns.forEach((col) => {
@@ -816,10 +817,15 @@ function buildImportPlan(sheet) {
         value = hit.value;
         if (!hit.matched) unmatched.set(raw, (unmatched.get(raw) || 0) + 1);
       }
+      const before = m ? String(roleGet(m.data, role) || '') : '';
       // An existing meeting that already says the same thing is not a change.
-      if (m && String(roleGet(m.data, role) || '') === value) { same++; return; }
+      if (m && before === value) { same++; return; }
       changes[id] = value;
       if (role.hidden) hidden++;
+      // Filling a blank and replacing a name are very different acts — the
+      // second one silently undoes an edit made on this page, so it is listed
+      // in full rather than folded into the "待填欄位" count.
+      if (before) conflicts.push({ date: col.date, label: role.label || id, from: before, to: value });
     });
 
     columns.push({
@@ -831,6 +837,7 @@ function buildImportPlan(sheet) {
   return {
     columns,
     unmatched: [...unmatched.entries()].map(([name, n]) => ({ name, n })),
+    conflicts,
     ignored: sheet.ignored, unknown: sheet.unknown, badDates: sheet.badDates,
     skippedLocked,
   };
@@ -892,6 +899,9 @@ function renderImportPreview() {
   const cells = toSet.reduce((s, c) => s + c.changeCount, 0);
   const hidden = toSet.reduce((s, c) => s + c.hidden, 0);
   const same   = plan.columns.reduce((s, c) => s + c.same, 0);
+  // Conflicts only exist against meetings already on the board, which always
+  // survive the "create empty slots" filter — so the whole list is in play.
+  const conf = plan.conflicts;
 
   const list = (items) => items.map((s) => `<li>${esc(s)}</li>`).join('');
   const block = (cls, title, inner) =>
@@ -900,10 +910,27 @@ function renderImportPreview() {
   let html = `
     <div class="imp-stats">
       <div class="imp-stat"><b>${toAdd.length}</b><span>新增例會</span></div>
-      <div class="imp-stat"><b>${cells}</b><span>待填欄位</span></div>
+      <div class="imp-stat"><b>${cells - conf.length}</b><span>填入空格</span></div>
+      <div class="imp-stat${conf.length ? ' imp-stat-warn' : ''}"><b>${conf.length}</b><span>覆蓋既有</span></div>
       <div class="imp-stat"><b>${toSet.length}</b><span>異動場次</span></div>
       <div class="imp-stat imp-stat-muted"><b>${same}</b><span>已相同</span></div>
     </div>`;
+
+  if (conf.length) {
+    const CAP = 40;
+    const rows = conf.slice(0, CAP).map((c) => `
+      <li>
+        <span class="imp-conf-m">${esc(fmtDate(c.date))}</span>
+        <span class="imp-conf-r">${esc(c.label)}</span>
+        <span class="imp-conf-a">${esc(c.from)}</span>
+        <span class="imp-conf-x">→</span>
+        <span class="imp-conf-b">${esc(c.to)}</span>
+      </li>`).join('');
+    html += block('imp-warn', `${conf.length} 格會覆蓋既有內容`,
+      '<p>這些格子目前已經有人，且與試算表不同——多半是後來在這頁改過的。試算表的值會蓋過去。</p>' +
+      `<ul class="imp-conf">${rows}</ul>` +
+      (conf.length > CAP ? `<p>…另有 ${conf.length - CAP} 格未列出。</p>` : ''));
+  }
 
   if (toAdd.length) {
     html += block('', `將新增 ${toAdd.length} 場例會`,

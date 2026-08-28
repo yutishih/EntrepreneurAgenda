@@ -340,13 +340,13 @@ tr.rm-locked-row .rm-role-en { color: #cbd5e1; }
 .modal-box-import { width: 560px; }
 .imp-body { max-height: 60vh; overflow-y: auto; }
 
-.imp-stats { display: flex; gap: 8px; margin-bottom: 14px; }
+.imp-stats { display: flex; gap: 6px; margin-bottom: 14px; }
 .imp-stat {
-  flex: 1; text-align: center; padding: 10px 6px;
+  flex: 1; min-width: 0; text-align: center; padding: 10px 4px;
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 9px;
 }
 .imp-stat b { display: block; font-size: 19px; color: #004165; line-height: 1.2; }
-.imp-stat span { font-size: 11px; color: #64748b; }
+.imp-stat span { font-size: 10.5px; color: #64748b; white-space: nowrap; }
 .imp-stat-muted b { color: #94a3b8; }
 
 .imp-block {
@@ -368,3 +368,21 @@ tr.rm-locked-row .rm-role-en { color: #cbd5e1; }
   font-size: 11.5px; color: #64748b; cursor: pointer;
 }
 .imp-toggle input { cursor: pointer; }
+
+/* Overwrite warnings: cells that already hold someone else's name. Listed one
+   per line (meeting · role · old → new) because a bare count cannot tell
+   "filled a blank" apart from "undid an edit made on this page". */
+.imp-stat-warn { background: #fffbeb; border-color: #fde68a; }
+.imp-stat-warn b { color: #b45309; }
+
+.imp-block ul.imp-conf { list-style: none; padding: 0; margin: 6px 0 0; }
+.imp-block ul.imp-conf li {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  padding: 4px 0; border-top: 1px solid #fde68a; line-height: 1.6;
+}
+.imp-block ul.imp-conf li:first-child { border-top: none; }
+.imp-conf-m { color: #92400e; font-weight: 700; white-space: nowrap; }
+.imp-conf-r { color: #64748b; white-space: nowrap; }
+.imp-conf-a { color: #a8a29e; text-decoration: line-through; }
+.imp-conf-x { color: #b45309; }
+.imp-conf-b { color: #0f172a; font-weight: 600; }

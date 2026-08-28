@@ -248,16 +248,16 @@ function renderPagination(page, pages, total) {
   const end = Math.min(page * PAGE_SIZE, total);
   pgInfo.textContent = `顯示 ${start}–${end}，共 ${total} 筆`;
 
-  let html = `<button class="pg-btn" onclick="window.__homeFetchList(currentDate,${page - 1})" ${page === 1 ? 'disabled' : ''}>‹</button>`;
+  let html = `<button class="pg-btn" onclick="window.__homePage(${page - 1})" ${page === 1 ? 'disabled' : ''}>‹</button>`;
   const delta = 2;
   const lo = Math.max(1, page - delta);
   const hi = Math.min(pages, page + delta);
-  if (lo > 1) html += `<button class="pg-btn" onclick="window.__homeFetchList(currentDate,1)">1</button>${lo > 2 ? '<span style="padding:0 4px;color:#94a3b8">…</span>' : ''}`;
+  if (lo > 1) html += `<button class="pg-btn" onclick="window.__homePage(1)">1</button>${lo > 2 ? '<span style="padding:0 4px;color:#94a3b8">…</span>' : ''}`;
   for (let p = lo; p <= hi; p++) {
-    html += `<button class="pg-btn ${p === page ? 'active' : ''}" onclick="window.__homeFetchList(currentDate,${p})">${p}</button>`;
+    html += `<button class="pg-btn ${p === page ? 'active' : ''}" onclick="window.__homePage(${p})">${p}</button>`;
   }
-  if (hi < pages) html += `${hi < pages - 1 ? '<span style="padding:0 4px;color:#94a3b8">…</span>' : ''}<button class="pg-btn" onclick="window.__homeFetchList(currentDate,${pages})">${pages}</button>`;
-  html += `<button class="pg-btn" onclick="window.__homeFetchList(currentDate,${page + 1})" ${page === pages ? 'disabled' : ''}>›</button>`;
+  if (hi < pages) html += `${hi < pages - 1 ? '<span style="padding:0 4px;color:#94a3b8">…</span>' : ''}<button class="pg-btn" onclick="window.__homePage(${pages})">${pages}</button>`;
+  html += `<button class="pg-btn" onclick="window.__homePage(${page + 1})" ${page === pages ? 'disabled' : ''}>›</button>`;
   pgBtns.innerHTML = html;
 }
 
@@ -281,7 +281,9 @@ export default function HomePage() {
     window.__homeEditAgenda = editAgenda;
     window.__homeDeleteItem = deleteItem;
     window.__homeCalSelectDate = homeCalSelectDate;
-    window.__homeFetchList = fetchList;
+    // Takes only a page number: an inline onclick runs in global scope, so it
+    // cannot read this module's `currentDate` — the bridge supplies it instead.
+    window.__homePage = (page) => fetchList(currentDate, page);
 
     const outsideClickHandler = (e) => {
       const panel = document.getElementById('homeCalCard');
@@ -310,7 +312,7 @@ export default function HomePage() {
       delete window.__homeEditAgenda;
       delete window.__homeDeleteItem;
       delete window.__homeCalSelectDate;
-      delete window.__homeFetchList;
+      delete window.__homePage;
     };
   }, []);
 

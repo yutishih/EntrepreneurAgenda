@@ -5,6 +5,7 @@ import { apiJson } from '@/lib/api';
 import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, canWrite, getClubId } from '@/lib/auth';
 import { MemberAC } from '@/lib/memberAutocomplete';
 import { MAX_EVAL_EVALUATORS } from '@/lib/agendaTemplates';
+import { parseRolesSheet, resolveMemberName, isPersonField, META_IDS } from '@/lib/rolesSheet';
 import Sidebar from '@/components/Sidebar';
 import './roles.css';
 
@@ -51,6 +52,9 @@ const ROLE_GROUPS = [
     label: '計時 / 記錄',
     roles: [
       { key: 'timer',        label: '計時員',     en: 'Timer' },
+      // Chill Hi High's planning sheet staffs a second timer; no other template
+      // has the row, so it locks everywhere else (same rule as boardWriter).
+      { key: 'timerAssistant', label: '計時員幫手', en: 'Assistant Timer', templates: ['chillhihigh'] },
       { key: 'ahCounter',    label: '贅語記錄員', en: 'Ah-Counter' },
       { key: 'boardWriter',  label: '板書',       en: 'Board Writer', templates: ['chillhihigh'] },
       { key: 'photographer', label: '攝影',       en: 'Photographer', templates: ['chillhihigh'] },
@@ -96,7 +100,9 @@ const ROLE_GROUPS = [
  * not member fields, so they get no autocomplete.
  */
 const META_FIELDS = [
-  { key: 'meetingTheme', label: '例會主題', placeholder: '未設定主題' },
+  { key: 'meetingNo',     label: '場次編號', placeholder: '場次編號' },
+  { key: 'meetingTheme',  label: '例會主題', placeholder: '未設定主題' },
+  { key: 'themeQuestion', label: '主題題目', placeholder: '主題題目', templates: ['chillhihigh'] },
 ];
 
 /** Same shape app/agenda/page.js uses, so a row added here stays valid in the editor. */
@@ -108,18 +114,21 @@ function blankSpeech() {
 }
 
 function roleGet(data, role) {
-  if (role.kind === 'speech')    return (data.speeches   || [])[role.idx]?.speaker || '';
-  if (role.kind === 'evaluator') return (data.evaluators || [])[role.idx] || '';
+  if (role.kind === 'speech')        return (data.speeches      || [])[role.idx]?.speaker || '';
+  if (role.kind === 'speechField')   return (data.speeches      || [])[role.idx]?.[role.field] || '';
+  if (role.kind === 'evaluator')     return (data.evaluators    || [])[role.idx] || '';
   if (role.kind === 'evalEvaluator') return (data.evalEvaluators || [])[role.idx] || '';
-  if (role.kind === 'variety')   return data.varietySession?.host || '';
+  if (role.kind === 'variety')       return data.varietySession?.host || '';
   return data[role.key] || '';
 }
 
 function roleSet(data, role, value) {
-  if (role.kind === 'speech') {
+  if (role.kind === 'speech' || role.kind === 'speechField') {
     if (!Array.isArray(data.speeches)) data.speeches = [];
     while (data.speeches.length <= role.idx) data.speeches.push(blankSpeech());
-    data.speeches[role.idx].speaker = value;
+    // `speechField` carries the speech's title / pathway, which the matrix has
+    // no row for — only the Google Sheet import writes them (see applyImport).
+    data.speeches[role.idx][role.kind === 'speech' ? 'speaker' : role.field] = value;
   } else if (role.kind === 'evaluator') {
     if (!Array.isArray(data.evaluators)) data.evaluators = [];
     while (data.evaluators.length <= role.idx) data.evaluators.push('');
@@ -129,9 +138,13 @@ function roleSet(data, role, value) {
     while (data.evalEvaluators.length <= role.idx) data.evalEvaluators.push('');
     data.evalEvaluators[role.idx] = value;
   } else if (role.kind === 'variety') {
-    // Only the host is touched — whether the session runs stays the editor's call.
+    // Naming a host is what marks the session as happening — a host planned
+    // here while the session stayed switched off would simply never appear on
+    // the agenda. One-way only: clearing the host does *not* switch the session
+    // back off, that stays the agenda editor's call.
     if (!data.varietySession) data.varietySession = { enabled: false, duration: 15, host: '' };
     data.varietySession.host = value;
+    if (value) data.varietySession.enabled = true;
   } else {
     data[role.key] = value;
   }
@@ -157,6 +170,21 @@ function activeClubId() {
 function activeTemplateKey() {
   const club = allClubs.find((c) => c.id === activeClubId());
   return (club && club.template_key) || 'standard';
+}
+
+/** The active club, or null before one is picked. */
+function activeClub() {
+  return allClubs.find((c) => c.id === activeClubId()) || null;
+}
+
+/**
+ * Header fields for the active template. Unlike role rows — which stay visible
+ * but locked — a meta field the template does not use is dropped outright:
+ * the column header has no room for a row of greyed-out placeholders.
+ */
+function activeMetaFields() {
+  const tk = activeTemplateKey();
+  return META_FIELDS.filter((f) => !f.templates || f.templates.includes(tk));
 }
 
 // Bridge to RolesPage's React state, same pattern as window.__rolesOnCellInput
@@ -295,6 +323,7 @@ function showPickClubHint() {
   updateSaveBar();
   document.getElementById('pagerLabel').textContent = '';
   document.getElementById('templateLabel').textContent = '';
+  updateImportButton();
 }
 
 /** Roster that feeds the cell dropdowns. Guests can still be typed freely. */
@@ -333,9 +362,15 @@ async function loadMeetings() {
     renderMatrix();
     updateRangeLabel(json.total || 0);
     updateTemplateLabel();
+    return true;
   } catch {
     wrap.innerHTML = '<div class="matrix-empty">載入例會失敗</div>';
     document.getElementById('pagerLabel').textContent = '';
+    // `meetings` deliberately keeps its previous contents so the page has
+    // something to fall back on — which makes the outcome reportable rather
+    // than silent: a caller that *diffs* against the list (the sheet importer)
+    // must know it is looking at a stale one.
+    return false;
   }
 }
 
@@ -368,6 +403,7 @@ function updateTemplateLabel() {
   if (!label) return;
   const club = allClubs.find((c) => c.id === activeClubId());
   label.textContent = club ? `目前版型：${activeTemplateLabel()}` : '';
+  updateImportButton();
 }
 
 // ================================================================
@@ -434,7 +470,9 @@ function buildRows() {
  */
 function slotNote(m, role) {
   if (role.kind === 'variety' && !m.data.varietySession?.enabled) {
-    return '此場未啟用多元單元';
+    // Saving a host switches the session on (roleSet), so the note only stands
+    // while the cell is still empty.
+    return m.draft[role.key] ? '' : '此場未啟用多元單元';
   }
   if (role.kind === 'speech' && role.idx >= (m.data.speeches || []).length) {
     return '此場原本沒有這個演講名額，填入並儲存後會為該議程新增一篇演講';
@@ -476,8 +514,7 @@ function renderMatrix() {
     <th class="rm-meeting" data-mid="${m.id}">
       ${showAddCol ? `<button class="rm-m-del" onclick="window.__rolesDeleteMeeting(${m.id})" title="刪除這場例會">✕</button>` : ''}
       <div class="rm-m-date">${esc(fmtDate(m.meetingDate))}<span class="rm-dot" id="dot_${m.id}"></span></div>
-      <div class="rm-m-no">${m.meetingNo ? `第 ${esc(m.meetingNo)} 次` : '—'}</div>
-      ${META_FIELDS.map((f) => `
+      ${activeMetaFields().map((f) => `
         <input type="text" class="rm-m-meta" id="cell_${m.id}_${f.key}"
                value="${esc(m.draft[f.key] ?? '')}" data-mid="${m.id}" data-rid="${f.key}"
                placeholder="${esc(f.placeholder)}" ${readOnly ? 'disabled' : ''}
@@ -528,7 +565,6 @@ function renderMatrix() {
         <input type="text" class="member-ac rm-input" id="cell_${m.id}_${rid}"
                value="${esc(v)}" data-ac-lang="${acLang}" data-mid="${m.id}" data-rid="${rid}"
                placeholder="${note ? '＋' : '—'}" ${readOnly ? 'disabled' : ''}
-               data-base-title="${esc(note)}"
                oninput="window.__rolesOnCellInput(this)">
       </td>`;
     }).join('');
@@ -581,10 +617,15 @@ function refreshDecorations() {
       const rid = roleId(r.role);
       const el  = document.getElementById(`cell_${m.id}_${rid}`);
       if (!el) return;
+      // Recomputed rather than replayed from render time: a note can change as
+      // the cell is typed into (a variety host switches its session on).
+      const note = slotNote(m, r.role);
       if (norm(m.draft[rid])) filled++;
-      if (norm(m.draft[rid]) || !slotNote(m, r.role)) slots++;
+      if (norm(m.draft[rid]) || !note) slots++;
       el.classList.toggle('rm-edited', m.dirty.has(rid));
-      el.title = el.dataset.baseTitle || '';
+      el.title       = note;
+      el.placeholder = note ? '＋' : '—';
+      el.parentElement?.classList.toggle('rm-inactive', !!note);
     });
 
     // Header fields: edited highlight only — they take no part in the tally.
@@ -643,6 +684,7 @@ async function saveAll() {
       m.data = fresh;
       // Keep the list-level mirrors in step with what the API would now return.
       m.meetingTheme = fresh.meetingTheme || '';
+      m.meetingNo    = fresh.meetingNo    || '';
       m.dirty.clear();
       ok++;
     } catch {
@@ -662,6 +704,295 @@ function discardChanges() {
   if (!confirm('確定要捨棄所有未儲存的變更嗎？')) return;
   meetings.forEach(resetDraft);
   renderMatrix();
+}
+
+// ================================================================
+// GOOGLE SHEET IMPORT
+// ================================================================
+// Pulls the club's season-planning sheet (the URL lives in the club's 版型
+// settings and is fetched *server-side* — see GET /api/clubs/{id}/roles-sheet)
+// and lands it in the matrix as ordinary unsaved edits. Nothing is written to
+// an existing agenda here: the values go into `draft` + `dirty`, so the user
+// reviews the yellow cells and presses 儲存變更 like any other change, and the
+// merge-based saveAll() still protects fields the sheet has no column for.
+//
+// The one immediate write is creating agendas for meetings the sheet has and
+// the database does not — a column has to exist before it can be filled.
+
+/** Speech sub-fields carried by the sheet but absent from the matrix rows. */
+const SPEECH_FIELDS = {
+  title:   { field: 'title',          label: '演講題目' },
+  pwcode:  { field: 'pathwayCode',    label: '學習路徑' },
+  pwlevel: { field: 'pathwayLevel',   label: '路徑等級' },
+  project: { field: 'pathwayProject', label: '專案名稱' },
+};
+
+let importPlan = null;   // built by buildImportPlan(), consumed by applyImport()
+
+function sheetUrl() {
+  const club = activeClub();
+  return (club && club.settings && club.settings.roles_sheet_url) || '';
+}
+
+/** The button only makes sense for a writer, on a club that has a sheet bound. */
+function updateImportButton() {
+  const btn = document.getElementById('btnImportSheet');
+  if (btn) btn.style.display = (canWrite() && activeClubId() != null && sheetUrl()) ? '' : 'none';
+}
+
+/**
+ * Resolve a sheet field id to something roleSet() understands.
+ *
+ * Ids the matrix has no row for — speech titles/pathways, and speech or
+ * evaluator slots beyond the rows currently drawn — are registered as hidden
+ * descriptors so the save path can still write them; the preview reports how
+ * many there are rather than dropping them silently.
+ * Returns null for a role the active template locks.
+ */
+function importRole(id) {
+  const sf = id.match(/^speech(\d+)_(title|pwcode|pwlevel|project)$/);
+  if (sf) {
+    const spec = SPEECH_FIELDS[sf[2]];
+    return (roleById[id] = {
+      key: id, kind: 'speechField', idx: Number(sf[1]) - 1, field: spec.field,
+      label: `#${sf[1]} ${spec.label}`, hidden: true,
+    });
+  }
+  if (roleById[id]) return roleById[id].locked ? null : roleById[id];
+
+  const slot = id.match(/^(evalEvaluator|speech|evaluator)(\d+)$/);
+  if (slot) {
+    const noun = { speech: '指定演講者', evaluator: '個別講評員', evalEvaluator: '講評員講評' }[slot[1]];
+    return (roleById[id] = {
+      key: id, kind: slot[1], idx: Number(slot[2]) - 1,
+      label: `${noun} #${slot[2]}`, hidden: true,
+    });
+  }
+  return null;
+}
+
+/**
+ * Widen the date filter so every meeting the sheet mentions is on screen —
+ * importing into columns the current range hides would look like a no-op.
+ *
+ * Returns false if the reload failed: the plan is a diff against `meetings`,
+ * and diffing against a stale (still-narrow) list would read meetings that
+ * simply were not loaded as meetings that do not exist — and create duplicate
+ * agendas for them.
+ */
+async function ensureRangeCovers(dates) {
+  const min = dates.reduce((a, b) => (a < b ? a : b));
+  const max = dates.reduce((a, b) => (a > b ? a : b));
+  const fromOk = !dateFrom || dateFrom <= min;
+  const toOk   = !dateTo   || dateTo   >= max;
+  if (fromOk && toOk) return true;
+  if (!fromOk) dateFrom = min;
+  if (!toOk)   dateTo   = max;
+  syncDateInputs();
+  return loadMeetings();
+}
+
+/** Diff the parsed sheet against what is on the board right now. */
+function buildImportPlan(sheet) {
+  const roster = MemberAC.getRoster();
+  const byDate = new Map(meetings.map((m) => [String(m.meetingDate), m]));
+  const unmatched = new Map();      // sheet name → how many cells used it
+  const columns = [];
+  let skippedLocked = 0;
+
+  sheet.columns.forEach((col) => {
+    const m    = byDate.get(col.date);
+    const lang = m && m.data.lang === 'zh' ? 'zh' : 'en';
+    const changes = {};
+    let same = 0, hidden = 0;
+
+    Object.entries(col.values).forEach(([id, raw]) => {
+      const role = importRole(id);
+      if (!role) { skippedLocked++; return; }
+
+      let value = raw;
+      if (isPersonField(id)) {
+        const hit = resolveMemberName(raw, roster, lang, MemberAC.formatMember);
+        value = hit.value;
+        if (!hit.matched) unmatched.set(raw, (unmatched.get(raw) || 0) + 1);
+      }
+      // An existing meeting that already says the same thing is not a change.
+      if (m && String(roleGet(m.data, role) || '') === value) { same++; return; }
+      changes[id] = value;
+      if (role.hidden) hidden++;
+    });
+
+    columns.push({
+      date: col.date, existing: m || null, roleCount: col.roleCount,
+      changes, changeCount: Object.keys(changes).length, same, hidden,
+    });
+  });
+
+  return {
+    columns,
+    unmatched: [...unmatched.entries()].map(([name, n]) => ({ name, n })),
+    ignored: sheet.ignored, unknown: sheet.unknown, badDates: sheet.badDates,
+    skippedLocked,
+  };
+}
+
+/** Columns that will actually be acted on, given the "create empty slots" toggle. */
+function plannedColumns(plan) {
+  const withEmpty = document.getElementById('importIncludeEmpty')?.checked;
+  return plan.columns.filter((c) => c.existing || c.roleCount > 0 || withEmpty);
+}
+
+async function startSheetImport() {
+  const cid = activeClubId();
+  if (cid == null || !canWrite()) return;
+
+  const btn = document.getElementById('btnImportSheet');
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '讀取中…'; }
+  try {
+    const { csv } = await apiJson(`/clubs/${cid}/roles-sheet`);
+    const sheet = parseRolesSheet(csv);
+    if (!sheet.columns.length) { toast('試算表裡找不到可辨識的例會日期', true); return; }
+
+    // Asked only once the sheet is in hand: from here on the board really is
+    // reloaded (widening the range) and re-seeded (applyImport), but a failed
+    // fetch above discards nothing, and warning about it beforehand would have
+    // been a false alarm.
+    if (!confirmDiscard()) return;
+
+    if (!await ensureRangeCovers(sheet.columns.map((c) => c.date))) {
+      toast('重新載入例會失敗，已取消匯入以免建立重複的場次', true);
+      return;
+    }
+    importPlan = buildImportPlan(sheet);
+    const empty = document.getElementById('importIncludeEmpty');
+    if (empty) empty.checked = false;      // opt-in again on every import
+    document.getElementById('importPreviewModal').style.display = 'flex';
+    renderImportPreview();
+  } catch (e) {
+    toast(e.message || '讀取 Google Sheet 失敗', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
+}
+
+function cancelImport() {
+  const modal = document.getElementById('importPreviewModal');
+  if (modal) modal.style.display = 'none';
+  importPlan = null;
+}
+
+function renderImportPreview() {
+  const body = document.getElementById('importPreviewBody');
+  if (!body || !importPlan) return;
+  const plan  = importPlan;
+  const cols  = plannedColumns(plan);
+  const toAdd = cols.filter((c) => !c.existing);
+  const toSet = cols.filter((c) => c.changeCount > 0);
+  const cells = toSet.reduce((s, c) => s + c.changeCount, 0);
+  const hidden = toSet.reduce((s, c) => s + c.hidden, 0);
+  const same   = plan.columns.reduce((s, c) => s + c.same, 0);
+
+  const list = (items) => items.map((s) => `<li>${esc(s)}</li>`).join('');
+  const block = (cls, title, inner) =>
+    `<div class="imp-block ${cls}"><div class="imp-block-t">${title}</div>${inner}</div>`;
+
+  let html = `
+    <div class="imp-stats">
+      <div class="imp-stat"><b>${toAdd.length}</b><span>新增例會</span></div>
+      <div class="imp-stat"><b>${cells}</b><span>待填欄位</span></div>
+      <div class="imp-stat"><b>${toSet.length}</b><span>異動場次</span></div>
+      <div class="imp-stat imp-stat-muted"><b>${same}</b><span>已相同</span></div>
+    </div>`;
+
+  if (toAdd.length) {
+    html += block('', `將新增 ${toAdd.length} 場例會`,
+      `<div class="imp-dates">${toAdd.map((c) => esc(fmtDate(c.date))).join('、')}</div>`);
+  }
+  if (hidden) {
+    html += block('', `另含 ${hidden} 個矩陣未顯示的欄位`,
+      '<p>演講題目、學習路徑等資訊沒有對應的角色列，會一併寫入議程，儲存後可在議程頁看到。</p>');
+  }
+  if (plan.unmatched.length) {
+    html += block('imp-warn', `${plan.unmatched.length} 個名字不在會員名冊中`,
+      `<p>會照試算表原文填入（來賓、他會會員通常如此）。</p><ul>${
+        list(plan.unmatched.map((u) => `${u.name}（${u.n} 格）`))}</ul>`);
+  }
+  const skipped = [
+    ...plan.ignored.map((i) => `${i.label} — ${i.reason}`),
+    ...plan.unknown.map((u) => `${u} — 系統沒有對應的角色`),
+    ...(plan.skippedLocked ? [`${plan.skippedLocked} 格 — 目前版型不使用該角色`] : []),
+    ...plan.badDates.map((d) => `${d} — 無法辨識的日期，整欄略過`),
+  ];
+  if (skipped.length) html += block('imp-warn', '未匯入的內容', `<ul>${list(skipped)}</ul>`);
+
+  html += block('imp-note', '不會被覆蓋的資料',
+    '<p>試算表的空白格一律略過，報到接待、會長致歡迎詞、贈感謝狀、會後分享等表上沒有的角色也不受影響。' +
+    '匯入後只是把值放進矩陣（以黃底標示未儲存），確認無誤再按「儲存變更」才會寫入。</p>');
+
+  body.innerHTML = html;
+
+  const btn = document.getElementById('importConfirmBtn');
+  if (btn) {
+    const nothing = !toAdd.length && !cells;
+    btn.disabled = nothing;
+    btn.textContent = nothing ? '沒有需要匯入的內容' : `匯入 ${cells} 個欄位`;
+  }
+}
+
+async function applyImport() {
+  if (!importPlan) return;
+  const plan = importPlan;
+  const cols = plannedColumns(plan);
+  const cid  = activeClubId();
+
+  const btn = document.getElementById('importConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '匯入中…'; }
+
+  // 1. Create the meetings the sheet has and the database does not.
+  const failed = [];
+  for (const col of cols.filter((c) => !c.existing)) {
+    try {
+      const json = await apiJson('/agendas', {
+        method: 'POST',
+        body: { data: { meetingDate: col.date }, club_id: isSystemAdmin() ? cid : null },
+      });
+      const m = {
+        id: json.id, meetingDate: col.date, meetingNo: '', meetingTheme: '',
+        clubId: cid, data: { meetingDate: col.date }, draft: {}, dirty: new Set(),
+      };
+      meetings.push(m);
+      col.existing = m;
+    } catch {
+      failed.push(fmtDate(col.date));
+    }
+  }
+
+  // 2. Redraw the board around the new columns before touching any draft —
+  //    buildRows() resets roleById, so importRole() has to run after it.
+  meetings.sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)));
+  buildRows();
+  meetings.forEach(resetDraft);
+
+  // 3. Land the sheet values as ordinary unsaved edits.
+  let applied = 0;
+  cols.forEach((col) => {
+    const m = col.existing;
+    if (!m) return;
+    Object.entries(col.changes).forEach(([id, value]) => {
+      if (!importRole(id)) return;
+      m.draft[id] = value;
+      m.dirty.add(id);
+      applied++;
+    });
+  });
+
+  renderMatrix();
+  cancelImport();
+
+  if (failed.length) toast(`${failed.length} 場例會建立失敗：${failed.join('、')}`, true);
+  else if (applied)  toast(`已載入 ${applied} 個欄位，請確認後按「儲存變更」`);
+  else               toast('沒有需要匯入的內容');
 }
 
 // ================================================================
@@ -865,6 +1196,13 @@ export default function RolesPage() {
               <button className="btn-pager" onClick={() => applyPreset('shift', 1)} title="範圍整段往後一個月">→</button>
             </div>
 
+            {/* Shown only for a writer on a club whose 版型設定 binds a sheet. */}
+            <button className="btn-sheet" id="btnImportSheet" style={{ display: 'none' }}
+                    onClick={startSheetImport} title="從分會設定的 Google Sheet 讀取角色安排">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+              從 Google Sheet 匯入
+            </button>
+
             <div className="toolbar-spacer"></div>
 
             <span className="roster-count" id="rosterCount"></span>
@@ -889,6 +1227,27 @@ export default function RolesPage() {
 
       <div id="memberDropdown" className="member-dropdown"></div>
       <div id="toast" className="toast"></div>
+
+      <div id="importPreviewModal" className="modal-overlay" style={{ display: 'none' }}
+           onClick={(e) => { if (e.target === e.currentTarget) cancelImport(); }}>
+        <div className="modal-box modal-box-import">
+          <div className="modal-header">
+            <h3>從 Google Sheet 匯入角色</h3>
+            <button className="modal-close" onClick={cancelImport}>✕</button>
+          </div>
+          <div className="modal-body imp-body" id="importPreviewBody"></div>
+          <div className="modal-actions imp-actions">
+            <label className="imp-toggle">
+              <input type="checkbox" id="importIncludeEmpty" onChange={renderImportPreview} />
+              一併建立沒有角色資料的空場次
+            </label>
+            <div className="imp-actions-btns">
+              <button className="modal-btn modal-btn-cancel" onClick={cancelImport}>取消</button>
+              <button className="modal-btn modal-btn-confirm" id="importConfirmBtn" onClick={applyImport}>匯入</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div id="addMeetingModal" className="modal-overlay" style={{ display: 'none' }}
            onClick={(e) => { if (e.target === e.currentTarget) cancelAddMeeting(); }}>

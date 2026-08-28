@@ -894,3 +894,72 @@ def image_proxy(
     data = obj["Body"].read()
     content_type = obj.get("ContentType", "image/jpeg")
     return Response(content=data, media_type=content_type, headers={"Cache-Control": "max-age=3600"})
+
+
+# ------------------------------------------------------------------ roles sheet
+# Server-side fetch of a club's Google Sheet role plan. The URL is *not* taken
+# from the request — it is read from clubs.settings.roles_sheet_url (edited in
+# the 版型 modal on /club) — so this endpoint cannot be pointed at an arbitrary
+# host, and the browser never has to deal with Google's CORS rules.
+_GS_ID_RE  = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
+_GS_GID_RE = re.compile(r"[#&?]gid=([0-9]+)")
+
+
+def _sheet_csv_url(url: str) -> str:
+    """Turn any Google Sheets link into its CSV export URL for the pinned tab."""
+    if not url:
+        raise HTTPException(status_code=400, detail="這個分會尚未設定 Google Sheet 網址")
+    m = _GS_ID_RE.search(url)
+    if not m or "docs.google.com" not in url:
+        raise HTTPException(status_code=400, detail="網址格式不正確，請貼上 Google Sheet 的連結")
+    gid = _GS_GID_RE.search(url)
+    # No #gid= in the link means the first tab — which is rarely the roles tab,
+    # so ask for an explicit one rather than silently importing the wrong sheet.
+    if not gid:
+        raise HTTPException(
+            status_code=400,
+            detail="網址缺少分頁編號（#gid=…），請在該分頁上複製網址列的完整連結",
+        )
+    return (
+        f"https://docs.google.com/spreadsheets/d/{m.group(1)}"
+        f"/export?format=csv&gid={gid.group(1)}"
+    )
+
+
+@app.get("/api/clubs/{club_id}/roles-sheet")
+def fetch_roles_sheet(club_id: int, user: dict = Depends(require_club_admin_or_above)):
+    if user["role"] != "system_admin" and user["club_id"] != club_id:
+        raise HTTPException(status_code=403, detail="無權存取其他分會的資料")
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT settings FROM clubs WHERE id=%s", (club_id,))
+            row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="找不到此分會")
+
+    settings = parse_jsonb(row[0])
+    csv_url = _sheet_csv_url((settings.get("roles_sheet_url") or "").strip())
+
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(csv_url, headers={"User-Agent": "EntrepreneurAgenda/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as res:
+            # Google answers a private sheet with a 302 to an HTML sign-in page
+            # rather than a 4xx, so check what actually came back.
+            if "text/csv" not in res.headers.get("Content-Type", ""):
+                raise HTTPException(
+                    status_code=400,
+                    detail="無法讀取試算表，請將共用設定改為「知道連結的任何人可檢視」",
+                )
+            body = res.read(4 * 1024 * 1024)
+    except HTTPException:
+        raise
+    except urllib.error.HTTPError as e:
+        detail = "找不到這個分頁（gid），請確認網址" if e.code == 404 else f"讀取試算表失敗（{e.code}）"
+        raise HTTPException(status_code=400, detail=detail)
+    except Exception:
+        raise HTTPException(status_code=502, detail="連線 Google Sheet 失敗，請稍後再試")
+
+    return {"csv": body.decode("utf-8-sig", errors="replace"), "sourceUrl": csv_url}

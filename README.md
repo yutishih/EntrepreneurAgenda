@@ -230,6 +230,7 @@ EntrepreneurAgenda/
 |------|------|------|
 | `callingToOrder` | standard／compact／entrepreneur／china | Chill Hi High 的「致歡迎詞 Opening Remarks」那列讀的是 `welcomeTME`，不再需要這格 |
 | `boardWriter`／`photographer` | chillhihigh | 只有 Chill Hi High 議程把板書、攝影列成獨立角色 |
+| `timerAssistant` | chillhihigh | Chill Hi High 的例會角色表另外排一位計時員幫手 |
 | `voteCounter` | china | CHINA 專屬的計票員（歸在「計時 / 記錄」組） |
 | `varietyHost` | standard／compact／entrepreneur／chillhihigh | CHINA 沒有多元單元 |
 | `wordOfTheDay`／`quizHost` | china | CHINA 專屬的每日一字、問答遊戲主持（歸在「單元主持」組） |
@@ -241,7 +242,7 @@ EntrepreneurAgenda/
 | 分組 | 角色（`agendas.data` 欄位） |
 |------|------|
 | 會議主持 | `receptionHost`、`callingToOrder`、`welcomeTME`、`tme` |
-| 計時 / 記錄 | `timer`、`ahCounter`、`boardWriter`、`photographer`、`voteCounter` |
+| 計時 / 記錄 | `timer`、`timerAssistant`、`ahCounter`、`boardWriter`、`photographer`、`voteCounter` |
 | 單元主持 | `varietyHost`（＝`varietySession.host`）、`tableTopicsMaster`、`wordOfTheDay`、`quizHost` |
 | 指定演講 | `speeches[i].speaker`（動態，至少 3 列） |
 | 講評 | `evaluators[i]`（動態，至少 3 列）、`langEvaluator`、`generalEvaluator`、`evalEvaluators[i]`（動態，0～3 列） |
@@ -259,15 +260,44 @@ CHINA 議程表右側原本每列都有一欄「下一場負責人」（`assigne
 
 ### 欄標題可編輯的每場欄位（`META_FIELDS`）
 
-欄標題的**例會主題**（`meetingTheme`）也可直接編輯，走與角色**完全相同**的 draft / dirty / merge 流程，但刻意**不列入角色列**——因此不算進「已指派」計數（主題不是人），且不套用會員自動完成。
+欄標題的**場次編號**（`meetingNo`）、**例會主題**（`meetingTheme`）、**主題題目**（`themeQuestion`）都可直接編輯，走與角色**完全相同**的 draft / dirty / merge 流程，但刻意**不列入角色列**——因此不算進「已指派」計數（主題不是人），且不套用會員自動完成。
 
-要再開放其他每場欄位（例如 `meetingNo`），在 `roles.js` 的 `META_FIELDS` 加一筆即可：
+`META_FIELDS` 也吃 `templates` 允許清單，但與角色列相反：**不適用的欄位直接不顯示**（欄標題塞不下一排灰掉的空欄位），由 `activeMetaFields()` 過濾。要再開放其他每場欄位，加一筆即可：
 
 ```js
 const META_FIELDS = [
-  { key: 'meetingTheme', label: '例會主題', placeholder: '未設定主題' },
+  { key: 'meetingNo',     label: '場次編號', placeholder: '場次編號' },
+  { key: 'meetingTheme',  label: '例會主題', placeholder: '未設定主題' },
+  { key: 'themeQuestion', label: '主題題目', placeholder: '主題題目', templates: ['chillhihigh'] },
 ];
 ```
+
+### 從 Google Sheet 匯入（`roles_sheet_url`）
+
+不少分會的年度角色是先在 Google Sheet 上排的。那張表其實是角色矩陣的**轉置**——第一欄是角色名稱、每一欄是一場例會——所以可以整張對進來。
+
+**綁定網址**：分會列表 →「版型」按鈕 → `例會角色匯入（Google Sheet）` 區塊的「角色表網址」。這是版型 manifest（`lib/agendaTemplates.js` 的 `chillhihigh.settings`）裡的一筆 `store: 'setting'` 欄位，因此存進 `clubs.settings.roles_sheet_url`，**不需要 migration**，也自動生出輸入框（同一套 manifest 驅動的 modal）。網址必須帶分頁編號（`#gid=…`）——請在該分頁上直接複製網址列的完整連結，否則抓到的會是第一個分頁。試算表的共用權限要設成「知道連結的任何人可檢視」。
+
+**讀取**：`GET /api/clubs/{id}/roles-sheet`（`club_admin` 以上，且只能讀自己分會）。網址**不從 request 帶**，而是後端自己去 `clubs.settings` 讀出來再轉成 CSV export URL——因此這個端點無法被指向任意主機，瀏覽器也不必處理 Google 的 CORS。私有試算表 Google 會回 302 到登入頁而不是 4xx，所以後端額外檢查回應的 `Content-Type` 是不是 `text/csv`。
+
+**對照**：`lib/rolesSheet.js` 是一支純函式模組（不碰 DOM、不發網路請求），把 CSV 轉成「每場例會一包 `{ 角色 id: 值 }`」，用的就是 `/roles` 既有的角色 id。幾個判斷：
+
+| 試算表 | 對到 | 備註 |
+|------|------|------|
+| `會議時間` | 欄（`meetingDate`） | 認得 `2026/07/03`、`2026-7-3`、`2026.07.03`；認不出來的整欄略過 |
+| `會議編號`／`會議主題`／`主題題目` | `META_FIELDS` | 欄標題欄位，不算角色 |
+| `單元號N`（`PM 4-1`） | `speeches[N].pathwayCode` + `pathwayLevel` | 一格拆成兩個欄位；前兩碼要在 PATHWAYS 清單裡才當作路徑代碼 |
+| `標題N`／`單元N` | `speeches[N].title`／`pathwayProject` | 矩陣沒有這幾列，以隱藏欄位寫入（預覽會告知數量） |
+| `特別單元`／`無法參加的成員` | — | 不是角色欄位，不匯入；預覽會列出原因 |
+
+人名比對：試算表寫的是 `Leah Kao 高莉雅`，而從下拉選單填的格子存的是 MemberAC 的正規形式 `Name, LEVEL`。對得上名冊就換成正規形式（這樣 `displayMember()` 才能雙語呈現），對不上就**原文保留**——來賓、他會會員本來就不在名冊裡。`NA`／`TBD`／`-` 這類佔位字一律視為空白。
+
+**流程**：按工具列的「從 Google Sheet 匯入」（只有寫入權限 + 該分會有設網址時才出現）→ 日期範圍自動撐開到涵蓋整張表 → 預覽 modal 列出「新增幾場／填幾格／幾格已相同／哪些名字比對不到／哪些列沒匯入」→ 確認後：
+
+1. 試算表有、資料庫沒有的場次，用跟「＋」欄同一支 `POST /api/agendas` 建立（預設**跳過只有場次編號、沒有任何角色**的空欄位，可勾選一併建立）；
+2. 其餘值全部放進 `draft` + `dirty`，也就是**一般的未儲存編輯**（黃底），確認無誤後按「儲存變更」才真的寫入。
+
+因此匯入沿用了既有的 merge 存檔：`saveAll()` 會重讀議程、只覆寫動過的欄位，**試算表的空白格一律略過**，表上沒有的角色（`receptionHost`、`welcomeTME`、`awardsPresenter`、`sharingFeedback`）完全不受影響。
 
 ### 人選輸入：下拉建議 + 可自由輸入
 
@@ -285,10 +315,10 @@ const META_FIELDS = [
 | 行為 | 說明 |
 |------|------|
 | 未儲存標示 | 改過的格子（含欄標題的例會主題）變黃底；該欄標題出現橘點；上方顯示未儲存項目數 |
-| 例會主題 | 欄標題的主題平時看起來就是說明文字，hover / focus 才浮出輸入框，改完與角色一起儲存 |
+| 欄標題欄位 | 場次編號 / 例會主題 / 主題題目平時看起來就是說明文字，hover / focus 才浮出輸入框，改完與角色一起儲存 |
 | 已指派計數 | 每欄顯示 `已指派 / 該場角色數` |
 | 額外名額 | 某場原本沒有的演講 / 講評名額，格子淡化並以 `＋` 提示：填入並儲存**會為該議程新增一列** |
-| 未啟用多元單元 | 該場 `varietySession.enabled` 為 false 時淡化提示（只寫 host，不會自動啟用單元） |
+| 未啟用多元單元 | 該場 `varietySession.enabled` 為 false **且該格仍是空的**時淡化提示；一旦填入主持人，儲存時 `roleSet()` 會**一併把該場的多元單元設為啟用**（否則排了主持人卻不會出現在議程上）。單向：清空主持人**不會**把單元關掉，那仍是議程編輯器的決定 |
 | 日期範圍 | 以**例會日期**篩選要顯示的場次（起訖皆含），欄位由左至右由舊到新。預設為今天往前 2 個月 ～ 往後 3 個月——會往回抓，是因為分會最新一場議程往往已經過去，只看「未來」會開在空白畫面。快捷鍵：`←` / `→` 整段平移一個月，另有「近期 / 未來 / 今年 / 全部」。單邊留空即為不限。上限 40 欄，超過時提示縮小範圍（保留最新的場次） |
 | 快捷鍵 | `Ctrl/Cmd + S` 儲存全部；有未儲存變更時離開頁面會提示 |
 | 權限 | `club_member` 唯讀（欄位 disabled、寫入按鈕隱藏）；`club_admin` 以上可儲存 |
@@ -595,6 +625,7 @@ DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
 | POST   | `/api/clubs` | 新增分會（可帶品牌欄位 + `template_key`） | `system_admin` |
 | PUT    | `/api/clubs/{id}` | 更新分會名稱與品牌 / 版型 | `system_admin` |
 | DELETE | `/api/clubs/{id}` | 刪除分會 | `system_admin` |
+| GET    | `/api/clubs/{id}/roles-sheet` | 後端代抓該分會 `settings.roles_sheet_url` 綁定的 Google Sheet，回傳 CSV 原文（角色安排頁匯入用） | `club_admin`（限自己分會） |
 
 > `/api/clubs` 回傳每個分會的 `name_zh / name_en / charter_no / founded_date / fee / logo_url / fb_qr_url / line_qr_url / template_key / settings`。Logo/QR 透過既有的 `/api/upload/presign` 上傳至 R2 後，URL 存進對應欄位。
 

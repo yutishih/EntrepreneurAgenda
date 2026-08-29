@@ -963,3 +963,1211 @@ def fetch_roles_sheet(club_id: int, user: dict = Depends(require_club_admin_or_a
         raise HTTPException(status_code=502, detail="連線 Google Sheet 失敗，請稍後再試")
 
     return {"csv": body.decode("utf-8-sig", errors="replace"), "sourceUrl": csv_url}
+
+
+# ------------------------------------------------------------------ social posts
+# Phase 0 of the 社群發文 feature: a composer + draft box. Nothing is published
+# to Facebook / Instagram / Threads from here yet — every platform gates its
+# publishing permissions behind an app review, which is calendar time rather
+# than code. What this does give is the part that stays useful either way:
+# per-platform copy, images, and a preview, ready to be copied out by hand
+# today and handed to the platform APIs later without reshaping the data.
+
+SOCIAL_PLATFORMS = ("facebook", "instagram", "threads")
+
+# Only what the copywriter needs to know. The UI keeps its own copy of these
+# (lib/socialPlatforms.js) for the character counters and preview cards.
+_PLATFORM_BRIEF = {
+    "facebook":  "Facebook 粉絲專頁：連結可點，字數寬鬆，語氣完整、資訊齊全，hashtag 最多 2-3 個。",
+    "instagram": "Instagram：貼文一定要配圖；內文連結不可點，需要時請寫「報名連結在個人簡介」；"
+                 "開頭第一行要抓住注意力，段落簡短，結尾放 5-10 個相關 hashtag；上限 2200 字。",
+    "threads":   "Threads：上限 500 字，口語、像在跟朋友說話，最多 1-2 個 hashtag，不要條列式。",
+}
+
+_STATUSES = ("draft", "ready", "posted")
+
+
+def _social_scope(user: dict, club_id: Optional[int]) -> Optional[int]:
+    """Resolve which club a request may act on, mirroring the agendas rules."""
+    if user["role"] == "system_admin":
+        return club_id
+    if club_id is not None and club_id != user["club_id"]:
+        raise HTTPException(status_code=403, detail="無權存取其他分會的資料")
+    return user["club_id"]
+
+
+def _social_row(r):
+    return {
+        "id": r[0], "clubId": r[1], "agendaId": r[2],
+        "title": r[3], "status": r[4], "body": r[5],
+        "variants": r[6] or {}, "images": r[7] or [],
+        "createdAt": r[8].isoformat() if r[8] else "",
+        "updatedAt": r[9].isoformat() if r[9] else "",
+        "published": r[10] or {},
+    }
+
+
+_SOCIAL_COLS = ("id, club_id, agenda_id, title, status, body, variants, images,"
+                " created_at, updated_at, published")
+
+
+class SocialPostRequest(BaseModel):
+    club_id:   Optional[int] = None
+    agenda_id: Optional[int] = None
+    title:     str = ""
+    status:    str = "draft"
+    body:      str = ""
+    variants:  Dict[str, Any] = {}
+    images:    List[Any] = []
+
+
+class SocialGenerateRequest(BaseModel):
+    club_id:   Optional[int] = None
+    agenda_id: Optional[int] = None
+    brief:     str = ""              # free-text steer from the user
+    platforms: List[str] = []
+    provider:  str = "anthropic"     # whose account writes it — see COPY_WRITERS
+
+
+@app.get("/api/social-posts")
+def list_social_posts(
+    club_id: Optional[int] = Query(default=None),
+    user: dict = Depends(get_current_user),
+):
+    cid = _social_scope(user, club_id)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            if cid is None:
+                # Only a system_admin reaches here (no club filter chosen).
+                cur.execute(f"SELECT {_SOCIAL_COLS} FROM social_posts"
+                            " ORDER BY created_at DESC LIMIT 200")
+            else:
+                cur.execute(f"SELECT {_SOCIAL_COLS} FROM social_posts WHERE club_id=%s"
+                            " ORDER BY created_at DESC LIMIT 200", (cid,))
+            rows = cur.fetchall()
+    return [_social_row(r) for r in rows]
+
+
+@app.post("/api/social-posts")
+def create_social_post(req: SocialPostRequest,
+                       user: dict = Depends(require_club_admin_or_above)):
+    cid = _social_scope(user, req.club_id)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO social_posts"
+                " (club_id, agenda_id, title, status, body, variants, images)"
+                " VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb) RETURNING id",
+                (cid, req.agenda_id, req.title[:200], req.status, req.body,
+                 json.dumps(req.variants), json.dumps(req.images)),
+            )
+            new_id = cur.fetchone()[0]
+    return {"id": new_id}
+
+
+def _load_social_post(cur, post_id: int, user: dict):
+    cur.execute(f"SELECT {_SOCIAL_COLS} FROM social_posts WHERE id=%s", (post_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="找不到這則貼文")
+    if user["role"] != "system_admin" and row[1] != user["club_id"]:
+        raise HTTPException(status_code=403, detail="無權存取其他分會的資料")
+    return row
+
+
+@app.get("/api/social-posts/{post_id}")
+def get_social_post(post_id: int, user: dict = Depends(get_current_user)):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            return _social_row(_load_social_post(cur, post_id, user))
+
+
+@app.put("/api/social-posts/{post_id}")
+def update_social_post(post_id: int, req: SocialPostRequest,
+                       user: dict = Depends(require_club_admin_or_above)):
+    if req.status not in _STATUSES:
+        raise HTTPException(status_code=400, detail="狀態不正確")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            _load_social_post(cur, post_id, user)   # 404 / 403 before writing
+            cur.execute(
+                "UPDATE social_posts SET agenda_id=%s, title=%s, status=%s, body=%s,"
+                " variants=%s::jsonb, images=%s::jsonb, updated_at=NOW() WHERE id=%s",
+                (req.agenda_id, req.title[:200], req.status, req.body,
+                 json.dumps(req.variants), json.dumps(req.images), post_id),
+            )
+    return {"ok": True}
+
+
+@app.delete("/api/social-posts/{post_id}")
+def delete_social_post(post_id: int, user: dict = Depends(require_club_admin_or_above)):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            _load_social_post(cur, post_id, user)
+            cur.execute("DELETE FROM social_posts WHERE id=%s", (post_id,))
+    return {"ok": True}
+
+
+def _meeting_brief(cur, agenda_id: int, user: dict) -> str:
+    """Flatten one agenda into the few lines a copywriter actually needs."""
+    cur.execute("SELECT a.data, a.club_id, c.name FROM agendas a"
+                " LEFT JOIN clubs c ON c.id = a.club_id WHERE a.id=%s", (agenda_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="找不到這場議程")
+    if user["role"] != "system_admin" and row[1] != user["club_id"]:
+        raise HTTPException(status_code=403, detail="無權存取其他分會的資料")
+
+    d = parse_jsonb(row[0])
+    lines = [f"分會：{row[2] or ''}"]
+    for key, label in (("meetingDate", "日期"), ("meetingNo", "場次"),
+                       ("meetingTheme", "主題"), ("venue", "地點")):
+        if d.get(key):
+            lines.append(f"{label}：{d[key]}")
+
+    for i, sp in enumerate(d.get("speeches") or [], start=1):
+        if not isinstance(sp, dict):
+            continue
+        bits = [b for b in (sp.get("speaker"), sp.get("title"), sp.get("pathwayProject")) if b]
+        if bits:
+            lines.append(f"演講{i}：{' / '.join(bits)}")
+
+    vs = d.get("varietySession") or {}
+    if vs.get("enabled") and vs.get("host"):
+        lines.append(f"暖場活動主持人：{vs['host']}")
+    for key, label in (("tme", "總主持人"), ("tableTopicsMaster", "即席問答主持人")):
+        if d.get(key):
+            lines.append(f"{label}：{d[key]}")
+    return "\n".join(lines)
+
+
+# Two ways to write the same thing. Both are handed the identical system
+# prompt, user text and JSON schema, and both must return the parsed dict — the
+# endpoint below does not care which one ran. Keeping them as separate
+# functions (rather than branching inside one) is what stops the Anthropic and
+# OpenAI call shapes from bleeding into each other as either SDK moves on.
+
+def _copy_via_anthropic(api_key: str, system: str, user_text: str, schema: dict) -> dict:
+    try:
+        import anthropic
+    except ImportError:
+        raise HTTPException(status_code=503, detail="伺服器缺少 anthropic 套件，請聯絡管理員")
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        response = client.messages.create(
+            model="claude-opus-5",
+            max_tokens=16000,
+            system=system,
+            messages=[{"role": "user", "content": user_text}],
+            thinking={"type": "adaptive"},
+            # `medium` rather than the default `high`: this is a short creative
+            # write-up behind a browser request, and the extra latency of a
+            # deeper pass costs more here than it buys.
+            output_config={"effort": "medium",
+                           "format": {"type": "json_schema", "schema": schema}},
+        )
+    except anthropic.RateLimitError:
+        raise HTTPException(status_code=429, detail="Claude 忙碌中，請稍後再試")
+    except anthropic.APIStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Claude 回應異常（{e.status_code}）")
+    except anthropic.APIConnectionError:
+        raise HTTPException(status_code=502, detail="無法連線至 Claude，請稍後再試")
+
+    if response.stop_reason == "refusal":
+        raise HTTPException(status_code=400,
+                            detail="Claude 拒絕產生這則內容，請調整補充指示後再試")
+
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    return _parse_copy_json(text)
+
+
+# Model ids move faster than this file does, so the choice is an env var with a
+# widely-available default. A wrong id surfaces as OpenAI's own error rather
+# than as something invented here.
+OPENAI_TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", "gpt-4o")
+
+
+def _copy_via_openai(api_key: str, system: str, user_text: str, schema: dict) -> dict:
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise HTTPException(status_code=503, detail="伺服器缺少 openai 套件，請聯絡管理員")
+
+    try:
+        response = OpenAI(api_key=api_key).chat.completions.create(
+            model=OPENAI_TEXT_MODEL,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user_text}],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "social_copy", "strict": True, "schema": schema},
+            },
+        )
+    except Exception as e:
+        detail = getattr(e, "message", None) or str(e)
+        raise HTTPException(status_code=502, detail=f"OpenAI 產生文案失敗：{detail}"[:400])
+
+    choice = (response.choices or [None])[0]
+    if choice is None or not getattr(choice.message, "content", None):
+        raise HTTPException(status_code=502, detail="OpenAI 沒有回傳文案")
+    return _parse_copy_json(choice.message.content)
+
+
+def _parse_copy_json(text: str) -> dict:
+    try:
+        return json.loads(text)
+    except ValueError:
+        raise HTTPException(status_code=502, detail="AI 回傳的格式無法解析，請再試一次")
+
+
+COPY_WRITERS = {"anthropic": _copy_via_anthropic, "openai": _copy_via_openai}
+
+
+@app.post("/api/social-posts/generate")
+def generate_social_copy(req: SocialGenerateRequest,
+                         user: dict = Depends(require_club_admin_or_above)):
+    provider = req.provider if req.provider in COPY_WRITERS else "anthropic"
+
+    # The caller's own connected account is what pays. Anthropic additionally
+    # falls back to the server-wide key, so a club that has connected nothing
+    # still works out of the box; OpenAI has no such fallback by design — there
+    # is no server OpenAI account to spend.
+    api_key = _load_api_key(user["username"], provider)
+    if not api_key and provider == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        label = "Anthropic" if provider == "anthropic" else "OpenAI"
+        raise HTTPException(
+            status_code=400,
+            detail=f"你還沒有連接 {label} 帳號，請先在「AI 帳號」設定金鑰",
+        )
+
+    platforms = [p for p in req.platforms if p in SOCIAL_PLATFORMS] or list(SOCIAL_PLATFORMS)
+    _social_scope(user, req.club_id)   # permission check only
+
+    context = ""
+    if req.agenda_id:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                context = _meeting_brief(cur, req.agenda_id, user)
+
+    if not context and not req.brief.strip():
+        raise HTTPException(status_code=400, detail="請先選擇一場例會，或寫幾句想發的內容")
+
+    rules = "\n".join(f"- {_PLATFORM_BRIEF[p]}" for p in platforms)
+    system = (
+        "你是台灣一個 Toastmasters 國際演講會分會的社群小編，負責撰寫招募與例會宣傳貼文。\n"
+        "寫作要求：\n"
+        "- 一律使用繁體中文（台灣用語），可自然夾雜英文專有名詞。\n"
+        "- 語氣真誠、有溫度，像社團成員在分享，不要像廣告文案或新聞稿。\n"
+        "- 不要編造任何沒有提供的資訊（時間、地點、講者、費用一律以資料為準）。\n"
+        "- 不要使用誇大的行銷字眼，也不要用 emoji 洗版（每則最多 3 個）。\n"
+        "先寫一段各平台共用的主文案，再依各平台特性改寫：\n" + rules
+    )
+
+    parts = []
+    if context:
+        parts.append(f"這場例會的資料：\n{context}")
+    if req.brief.strip():
+        parts.append(f"補充指示：\n{req.brief.strip()}")
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string",
+                      "description": "這則貼文的內部標題，10 字以內，只給管理者辨識用"},
+            "body":  {"type": "string", "description": "各平台共用的主文案"},
+            "variants": {
+                "type": "object",
+                "properties": {p: {"type": "string"} for p in platforms},
+                "required": platforms,
+                "additionalProperties": False,
+            },
+        },
+        "required": ["title", "body", "variants"],
+        "additionalProperties": False,
+    }
+
+    data = COPY_WRITERS[provider](api_key, system, "\n\n".join(parts), schema)
+
+    return {
+        "title": data.get("title", ""),
+        "body": data.get("body", ""),
+        # Normalised to the stored shape so the client can drop it straight in.
+        "variants": {p: {"text": (data.get("variants") or {}).get(p, ""), "enabled": True}
+                     for p in platforms},
+    }
+
+
+# ------------------------------------------------------------------ AI credentials
+# Users connect their own AI accounts, so their API keys live in the database
+# — which means they must be encrypted at rest and must never travel back to
+# the browser. Two rules hold everywhere below:
+#   1. Nothing writes a key to the DB except through _seal(); nothing reads one
+#      except _open(), and _open() is only ever called server-side, seconds
+#      before the outbound API call that needs it.
+#   2. No endpoint returns a key. The UI gets a masked hint and a boolean.
+#
+# CREDENTIALS_SECRET_KEY is the master secret. There is no fallback and no
+# default: without it, storing a key fails loudly rather than silently landing
+# in plaintext. Generate one with `openssl rand -base64 32`.
+CREDENTIALS_SECRET_KEY = os.getenv("CREDENTIALS_SECRET_KEY", "")
+
+AI_PROVIDERS = ("openai", "anthropic")
+
+
+def _fernet():
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:
+        raise HTTPException(status_code=503, detail="伺服器缺少 cryptography 套件，請聯絡管理員")
+    if not CREDENTIALS_SECRET_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="伺服器尚未設定 CREDENTIALS_SECRET_KEY，為了避免金鑰以明文存放，暫時無法儲存",
+        )
+    import base64
+    import hashlib
+    # Fernet needs exactly 32 urlsafe-base64 bytes; accept any passphrase and
+    # fold it down, so the operator can paste whatever `openssl rand` gave them.
+    digest = hashlib.sha256(CREDENTIALS_SECRET_KEY.encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _seal(api_key: str) -> str:
+    return _fernet().encrypt(api_key.encode("utf-8")).decode("ascii")
+
+
+def _open(cipher: str) -> str:
+    try:
+        return _fernet().decrypt(cipher.encode("ascii")).decode("utf-8")
+    except HTTPException:
+        raise
+    except Exception:
+        # Wrong/rotated CREDENTIALS_SECRET_KEY, or a corrupted row.
+        raise HTTPException(status_code=400,
+                            detail="無法解開已儲存的金鑰，請重新設定一次 API 金鑰")
+
+
+def _key_hint(api_key: str) -> str:
+    tail = api_key[-4:] if len(api_key) >= 4 else ""
+    return f"…{tail}"
+
+
+def _load_api_key(username: str, provider: str) -> Optional[str]:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key_cipher FROM user_ai_credentials"
+                        " WHERE username=%s AND provider=%s", (username, provider))
+            row = cur.fetchone()
+    return _open(row[0]) if row else None
+
+
+class AiCredentialRequest(BaseModel):
+    api_key: str
+
+
+@app.get("/api/me/ai-credentials")
+def list_ai_credentials(user: dict = Depends(get_current_user)):
+    """Which providers this user has connected — hints only, never the keys."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT provider, key_hint, updated_at FROM user_ai_credentials"
+                        " WHERE username=%s", (user["username"],))
+            rows = cur.fetchall()
+    have = {r[0]: {"provider": r[0], "hint": r[1],
+                   "updatedAt": r[2].isoformat() if r[2] else ""} for r in rows}
+    return [have.get(p, {"provider": p, "hint": "", "updatedAt": ""}) for p in AI_PROVIDERS]
+
+
+@app.put("/api/me/ai-credentials/{provider}")
+def set_ai_credential(provider: str, req: AiCredentialRequest,
+                      user: dict = Depends(get_current_user)):
+    if provider not in AI_PROVIDERS:
+        raise HTTPException(status_code=400, detail="不支援這個 AI 服務")
+    key = req.api_key.strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="API 金鑰不得為空")
+
+    cipher = _seal(key)      # fails before touching the DB if the secret is unset
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO user_ai_credentials (username, provider, key_cipher, key_hint)"
+                " VALUES (%s,%s,%s,%s)"
+                " ON CONFLICT (username, provider) DO UPDATE"
+                " SET key_cipher=EXCLUDED.key_cipher, key_hint=EXCLUDED.key_hint,"
+                "     updated_at=NOW()",
+                (user["username"], provider, cipher, _key_hint(key)),
+            )
+    return {"ok": True, "hint": _key_hint(key)}
+
+
+@app.delete("/api/me/ai-credentials/{provider}")
+def delete_ai_credential(provider: str, user: dict = Depends(get_current_user)):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM user_ai_credentials WHERE username=%s AND provider=%s",
+                        (user["username"], provider))
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ AI jobs
+# Image generation takes long enough (tens of seconds) that hanging the browser
+# on one HTTP response is the wrong shape: close the laptop lid, lose a picture
+# OpenAI has already charged for. So the *row* owns the result, not the
+# response, and the client polls it:
+#
+#   POST /api/ai-jobs           → creates a 'queued' row, returns its id at once
+#   POST /api/ai-jobs/{id}/run  → claims the row and does the work (fire-and-forget)
+#   GET  /api/ai-jobs/{id}      → what the browser polls while it spins
+#
+# What this does NOT do is move the work off the request. There is no worker
+# process on serverless, so /run still has to finish inside the function's
+# maxDuration — the win is that the browser is no longer coupled to it, a
+# dropped connection no longer loses the result, and the user can keep editing
+# meanwhile. `updated_at` is what lets a poller call a job dead when its
+# invocation was killed mid-flight, instead of spinning forever.
+
+_JOB_KINDS = ("image",)
+_IMAGE_SIZES = ("1024x1024", "1024x1536", "1536x1024")
+_JOB_STALE_SECONDS = 300
+_JOB_COLS = "id, kind, status, result, error, created_at, updated_at"
+
+
+class AiJobRequest(BaseModel):
+    kind:    str = "image"
+    club_id: Optional[int] = None
+    params:  Dict[str, Any] = {}
+
+
+def _job_row(r):
+    return {
+        "id": r[0], "kind": r[1], "status": r[2],
+        "result": r[3], "error": r[4],
+        "createdAt": r[5].isoformat() if r[5] else "",
+        "updatedAt": r[6].isoformat() if r[6] else "",
+    }
+
+
+def _generate_image(username: str, club_id: Optional[int], params: dict) -> dict:
+    """One OpenAI image, uploaded to R2. Returns the stored-image shape."""
+    prompt = str(params.get("prompt") or "").strip()
+    size = params.get("size") or "1024x1024"
+    if not prompt:
+        raise HTTPException(status_code=400, detail="請先描述想要的圖片內容")
+    if size not in _IMAGE_SIZES:
+        raise HTTPException(status_code=400, detail="不支援這個圖片尺寸")
+
+    api_key = _load_api_key(username, "openai")
+    if not api_key:
+        raise HTTPException(status_code=400,
+                            detail="你還沒有連接 OpenAI 帳號，請先在「AI 帳號」設定金鑰")
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise HTTPException(status_code=503, detail="伺服器缺少 openai 套件，請聯絡管理員")
+
+    try:
+        result = OpenAI(api_key=api_key).images.generate(
+            model="gpt-image-1", prompt=prompt, size=size, n=1,
+        )
+    except Exception as e:
+        # Surface OpenAI's own wording — it is what tells the user their key is
+        # wrong, their quota is spent, or their org is not verified for this
+        # model (a common first-run blocker on gpt-image-1).
+        detail = getattr(e, "message", None) or str(e)
+        raise HTTPException(status_code=502, detail=f"OpenAI 生圖失敗：{detail}"[:400])
+
+    item = (result.data or [None])[0]
+    if item is None:
+        raise HTTPException(status_code=502, detail="OpenAI 沒有回傳圖片")
+
+    import base64
+    if getattr(item, "b64_json", None):
+        raw = base64.b64decode(item.b64_json)
+    elif getattr(item, "url", None):
+        import urllib.request
+        with urllib.request.urlopen(item.url, timeout=60) as res:
+            raw = res.read(16 * 1024 * 1024)
+    else:
+        raise HTTPException(status_code=502, detail="OpenAI 回傳的圖片格式無法讀取")
+
+    # Straight into R2: Instagram and Threads can only publish an image the
+    # platform itself can fetch over HTTP, so a post's images have to live at a
+    # public URL anyway. Phase 1 gets that for free.
+    base = f"media/clubs/{club_id}/social" if club_id else "media/social"
+    key = f"{base}/{uuid.uuid4()}.png"
+    try:
+        _r2().put_object(Bucket=R2_BUCKET_NAME, Key=key, Body=raw, ContentType="image/png")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="圖片產生成功，但上傳雲端失敗")
+
+    return {"url": f"{R2_PUBLIC_URL}/{key}", "name": "AI 生成圖片"}
+
+
+_JOB_RUNNERS = {"image": _generate_image}
+
+
+@app.post("/api/ai-jobs")
+def create_ai_job(req: AiJobRequest, user: dict = Depends(require_club_admin_or_above)):
+    if req.kind not in _JOB_KINDS:
+        raise HTTPException(status_code=400, detail="不支援這種工作")
+    cid = _social_scope(user, req.club_id)
+    job_id = uuid.uuid4().hex
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO ai_jobs (id, username, club_id, kind, status, params)"
+                " VALUES (%s,%s,%s,%s,'queued',%s::jsonb)",
+                (job_id, user["username"], cid, req.kind, json.dumps(req.params)),
+            )
+    return {"id": job_id, "status": "queued"}
+
+
+@app.post("/api/ai-jobs/{job_id}/run")
+def run_ai_job(job_id: str, user: dict = Depends(require_club_admin_or_above)):
+    """Claim and execute. Safe to call twice — only the first caller wins."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            # Atomic claim: a duplicate fire (double click, a retry) must not
+            # buy a second image from OpenAI.
+            cur.execute(
+                "UPDATE ai_jobs SET status='running', updated_at=NOW()"
+                " WHERE id=%s AND username=%s AND status='queued'"
+                " RETURNING kind, club_id, params",
+                (job_id, user["username"]),
+            )
+            claimed = cur.fetchone()
+            if claimed is None:
+                cur.execute(f"SELECT {_JOB_COLS} FROM ai_jobs WHERE id=%s AND username=%s",
+                            (job_id, user["username"]))
+                row = cur.fetchone()
+                if row is None:
+                    raise HTTPException(status_code=404, detail="找不到這個工作")
+                return _job_row(row)          # already running, or already finished
+            kind, club_id, params = claimed[0], claimed[1], parse_jsonb(claimed[2])
+
+    try:
+        result = _JOB_RUNNERS[kind](user["username"], club_id, params)
+        status, payload, err = "done", json.dumps(result), None
+    except HTTPException as e:
+        status, payload, err = "error", None, str(e.detail)
+    except Exception:
+        status, payload, err = "error", None, "產生失敗，請稍後再試"
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE ai_jobs SET status=%s, result=%s::jsonb, error=%s, updated_at=NOW()"
+                " WHERE id=%s",
+                (status, payload, err, job_id),
+            )
+            cur.execute(f"SELECT {_JOB_COLS} FROM ai_jobs WHERE id=%s", (job_id,))
+            return _job_row(cur.fetchone())
+
+
+@app.get("/api/ai-jobs/{job_id}")
+def get_ai_job(job_id: str, user: dict = Depends(get_current_user)):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT {_JOB_COLS} FROM ai_jobs WHERE id=%s AND username=%s",
+                        (job_id, user["username"]))
+            row = cur.fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="找不到這個工作")
+
+            job = _job_row(row)
+            # The invocation doing the work can be killed without ever writing a
+            # result. Without this the browser would spin forever.
+            if job["status"] == "running" and row[6] is not None:
+                age = (datetime.now(timezone.utc) - row[6]).total_seconds()
+                if age > _JOB_STALE_SECONDS:
+                    cur.execute("UPDATE ai_jobs SET status='error', error=%s,"
+                                " updated_at=NOW() WHERE id=%s",
+                                ("產生逾時，請再試一次", job_id))
+                    job["status"], job["error"] = "error", "產生逾時，請再試一次"
+            return job
+
+
+# ==================================================================
+# META (Facebook / Instagram / Threads)
+# ==================================================================
+# Everything that talks to Meta lives in this one section on purpose: none of
+# it can be exercised without a real App, a real review, and real tokens, so
+# when it first meets the live API the blast radius should be one file region
+# rather than the whole backend. Every failure re-raises Meta's own message
+# verbatim — that is what will actually tell you which of the many setup steps
+# is missing.
+#
+# Credentials model, and why it differs from the AI keys:
+#   * AI keys are per *user* — a personal account is being billed.
+#   * A Page is a *club* asset. The president connects it; the education VP
+#     must be able to post to it. So App credentials and access tokens are
+#     per club (club_secrets / club_social_accounts).
+#
+# The App ID / App Secret are per club rather than one global pair because
+# App Review is granted per App: a club that registers its own App can post to
+# its own Pages in development mode without any review at all, which is the
+# only route that does not involve a multi-week approval. A server-wide pair is
+# still honoured as a fallback for whoever does get reviewed.
+
+META_GRAPH_VERSION = os.getenv("META_GRAPH_VERSION", "v21.0")
+META_GRAPH_HOST    = "https://graph.facebook.com"
+THREADS_GRAPH_HOST = "https://graph.threads.net"
+
+# Server-wide fallback App, used only when a club has not registered its own.
+META_APP_ID     = os.getenv("META_APP_ID", "")
+META_APP_SECRET = os.getenv("META_APP_SECRET", "")
+
+# What each connection asks Meta for. `pages_manage_posts` and
+# `instagram_content_publish` are the two that require App Review before they
+# work for anyone who is not a developer/tester on the App.
+META_SCOPES = [
+    "pages_show_list",
+    "pages_read_engagement",
+    "pages_manage_posts",
+    "instagram_basic",
+    "instagram_content_publish",
+    "business_management",
+]
+THREADS_SCOPES = ["threads_basic", "threads_content_publish"]
+
+SOCIAL_ACCOUNT_PLATFORMS = ("facebook", "instagram", "threads")
+
+
+# ------------------------------------------------------------------ club secrets
+def _set_club_secret(club_id: int, name: str, value: str) -> str:
+    cipher = _seal(value)          # refuses if CREDENTIALS_SECRET_KEY is unset
+    hint = _key_hint(value)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO club_secrets (club_id, name, value_cipher, hint)"
+                " VALUES (%s,%s,%s,%s)"
+                " ON CONFLICT (club_id, name) DO UPDATE"
+                " SET value_cipher=EXCLUDED.value_cipher, hint=EXCLUDED.hint,"
+                "     updated_at=NOW()",
+                (club_id, name, cipher, hint),
+            )
+    return hint
+
+
+def _get_club_secret(club_id: int, name: str) -> Optional[str]:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value_cipher FROM club_secrets"
+                        " WHERE club_id=%s AND name=%s", (club_id, name))
+            row = cur.fetchone()
+    return _open(row[0]) if row else None
+
+
+def _club_secret_hint(club_id: int, name: str) -> str:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT hint FROM club_secrets WHERE club_id=%s AND name=%s",
+                        (club_id, name))
+            row = cur.fetchone()
+    return row[0] if row else ""
+
+
+def _meta_app(club_id: Optional[int]) -> tuple:
+    """(app_id, app_secret) for this club, falling back to the server-wide pair."""
+    app_id = ""
+    if club_id is not None:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT settings FROM clubs WHERE id=%s", (club_id,))
+                row = cur.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="找不到此分會")
+        app_id = (parse_jsonb(row[0]).get("meta_app_id") or "").strip()
+
+    secret = _get_club_secret(club_id, "meta_app_secret") if club_id is not None else None
+    if not app_id or not secret:
+        app_id, secret = app_id or META_APP_ID, secret or META_APP_SECRET
+    if not app_id or not secret:
+        raise HTTPException(
+            status_code=400,
+            detail="這個分會還沒有填 Meta App ID / App Secret，請先到分會設定填寫",
+        )
+    return app_id, secret
+
+
+# ------------------------------------------------------------------ graph calls
+def _graph(url: str, params: dict = None, method: str = "GET") -> dict:
+    """One Graph API call. Meta's own error text is what comes back on failure."""
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    payload = urllib.parse.urlencode({k: v for k, v in (params or {}).items()
+                                      if v is not None})
+    if method == "GET":
+        req = urllib.request.Request(f"{url}?{payload}" if payload else url)
+    else:
+        req = urllib.request.Request(url, data=payload.encode("utf-8"), method=method)
+
+    try:
+        with urllib.request.urlopen(req, timeout=45) as res:
+            return json.loads(res.read(8 * 1024 * 1024).decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+            msg = (body.get("error") or {}).get("message") or str(body)
+        except Exception:
+            msg = f"HTTP {e.code}"
+        raise HTTPException(status_code=502, detail=f"Meta 回應錯誤：{msg}"[:400])
+    except Exception:
+        raise HTTPException(status_code=502, detail="無法連線至 Meta，請稍後再試")
+
+
+def _fb(path: str, params: dict = None, method: str = "GET") -> dict:
+    return _graph(f"{META_GRAPH_HOST}/{META_GRAPH_VERSION}/{path}", params, method)
+
+
+def _th(path: str, params: dict = None, method: str = "GET") -> dict:
+    return _graph(f"{THREADS_GRAPH_HOST}/{path}", params, method)
+
+
+# ------------------------------------------------------------------ accounts
+def _save_social_account(club_id: int, platform: str, account_id: str,
+                         account_name: str, token: str, expires_in: Optional[int]):
+    expires_at = None
+    if expires_in:
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO club_social_accounts"
+                " (club_id, platform, account_id, account_name, token_cipher, expires_at)"
+                " VALUES (%s,%s,%s,%s,%s,%s)"
+                " ON CONFLICT (club_id, platform) DO UPDATE"
+                " SET account_id=EXCLUDED.account_id, account_name=EXCLUDED.account_name,"
+                "     token_cipher=EXCLUDED.token_cipher, expires_at=EXCLUDED.expires_at,"
+                "     updated_at=NOW()",
+                (club_id, platform, account_id, account_name, _seal(token), expires_at),
+            )
+
+
+def _load_social_account(club_id: int, platform: str) -> Optional[dict]:
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT account_id, account_name, token_cipher, expires_at"
+                        " FROM club_social_accounts WHERE club_id=%s AND platform=%s",
+                        (club_id, platform))
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return {"accountId": row[0], "accountName": row[1],
+            "token": _open(row[2]), "expiresAt": row[3]}
+
+
+class ClubSocialConfigRequest(BaseModel):
+    meta_app_id:     Optional[str] = None
+    meta_app_secret: Optional[str] = None   # write-only; never returned
+
+
+@app.get("/api/clubs/{club_id}/social-config")
+def get_club_social_config(club_id: int, user: dict = Depends(require_club_admin_or_above)):
+    """Setup state for the club settings screen. No secrets, no tokens."""
+    _social_scope(user, club_id)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT settings FROM clubs WHERE id=%s", (club_id,))
+            row = cur.fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="找不到此分會")
+            cur.execute("SELECT platform, account_name, expires_at FROM club_social_accounts"
+                        " WHERE club_id=%s", (club_id,))
+            accounts = cur.fetchall()
+
+    settings = parse_jsonb(row[0])
+    connected = {a[0]: {"platform": a[0], "accountName": a[1],
+                        "expiresAt": a[2].isoformat() if a[2] else ""} for a in accounts}
+    return {
+        "metaAppId": settings.get("meta_app_id") or "",
+        "metaAppSecretHint": _club_secret_hint(club_id, "meta_app_secret"),
+        "serverFallback": bool(META_APP_ID and META_APP_SECRET),
+        "accounts": [connected.get(p, {"platform": p, "accountName": "", "expiresAt": ""})
+                     for p in SOCIAL_ACCOUNT_PLATFORMS],
+    }
+
+
+@app.put("/api/clubs/{club_id}/social-config")
+def set_club_social_config(club_id: int, req: ClubSocialConfigRequest,
+                           user: dict = Depends(require_club_admin_or_above)):
+    _social_scope(user, club_id)
+    if req.meta_app_id is not None:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                # Merge into settings rather than replacing: other keys
+                # (roles_sheet_url, template fields) live in the same JSONB.
+                cur.execute(
+                    "UPDATE clubs SET settings = COALESCE(settings, '{}'::jsonb)"
+                    " || jsonb_build_object('meta_app_id', %s::text) WHERE id=%s",
+                    (req.meta_app_id.strip(), club_id),
+                )
+                if cur.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="找不到此分會")
+    if req.meta_app_secret:
+        _set_club_secret(club_id, "meta_app_secret", req.meta_app_secret.strip())
+    return {"ok": True}
+
+
+@app.delete("/api/clubs/{club_id}/social-accounts/{platform}")
+def disconnect_social_account(club_id: int, platform: str,
+                              user: dict = Depends(require_club_admin_or_above)):
+    _social_scope(user, club_id)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM club_social_accounts WHERE club_id=%s AND platform=%s",
+                        (club_id, platform))
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ oauth
+@app.get("/api/clubs/{club_id}/meta/oauth-url")
+def meta_oauth_url(club_id: int, redirect_uri: str = Query(...),
+                   provider: str = Query(default="facebook"),
+                   user: dict = Depends(require_club_admin_or_above)):
+    """
+    The URL to send the browser to. `redirect_uri` must match one of the
+    App's Valid OAuth Redirect URIs exactly, so the caller supplies it (the
+    frontend knows its own origin; the API does not).
+    """
+    _social_scope(user, club_id)
+    app_id, _ = _meta_app(club_id)
+    import urllib.parse
+
+    # `state` carries the club through the round trip so the callback knows
+    # which club it is completing, and guards against a stray callback.
+    state = f"{club_id}:{uuid.uuid4().hex}"
+    if provider == "threads":
+        # Threads is a separate authorisation surface from the Facebook Login
+        # dialog, with its own host and scopes.
+        qs = urllib.parse.urlencode({
+            "client_id": app_id, "redirect_uri": redirect_uri,
+            "scope": ",".join(THREADS_SCOPES), "response_type": "code", "state": state,
+        })
+        return {"url": f"https://threads.net/oauth/authorize?{qs}", "state": state}
+
+    qs = urllib.parse.urlencode({
+        "client_id": app_id, "redirect_uri": redirect_uri,
+        "scope": ",".join(META_SCOPES), "response_type": "code", "state": state,
+    })
+    return {"url": f"https://www.facebook.com/{META_GRAPH_VERSION}/dialog/oauth?{qs}",
+            "state": state}
+
+
+class MetaConnectRequest(BaseModel):
+    code:         str
+    redirect_uri: str
+    provider:     str = "facebook"
+
+
+@app.post("/api/clubs/{club_id}/meta/connect")
+def meta_connect(club_id: int, req: MetaConnectRequest,
+                 user: dict = Depends(require_club_admin_or_above)):
+    """
+    Finish the OAuth round trip: short-lived code → long-lived token.
+
+    For Facebook this stores nothing yet — it returns the Pages the user
+    manages so they can pick one (a person often administers several). Threads
+    has no such fan-out, so it connects in one step.
+    """
+    _social_scope(user, club_id)
+    app_id, app_secret = _meta_app(club_id)
+
+    if req.provider == "threads":
+        short = _th("oauth/access_token", {
+            "client_id": app_id, "client_secret": app_secret,
+            "grant_type": "authorization_code",
+            "redirect_uri": req.redirect_uri, "code": req.code,
+        }, method="POST")
+        token = short.get("access_token")
+        user_id = str(short.get("user_id") or "")
+        if not token:
+            raise HTTPException(status_code=502, detail="Threads 沒有回傳 access token")
+
+        # Short-lived tokens last about an hour; exchange for the 60-day one.
+        long = _th("access_token", {
+            "grant_type": "th_exchange_token",
+            "client_secret": app_secret, "access_token": token,
+        })
+        token = long.get("access_token", token)
+
+        me = _th(f"{user_id}", {"fields": "username", "access_token": token}) if user_id else {}
+        _save_social_account(club_id, "threads", user_id,
+                             me.get("username", "Threads"), token,
+                             long.get("expires_in"))
+        return {"connected": ["threads"]}
+
+    short = _fb("oauth/access_token", {
+        "client_id": app_id, "client_secret": app_secret,
+        "redirect_uri": req.redirect_uri, "code": req.code,
+    })
+    token = short.get("access_token")
+    if not token:
+        raise HTTPException(status_code=502, detail="Meta 沒有回傳 access token")
+
+    long = _fb("oauth/access_token", {
+        "grant_type": "fb_exchange_token",
+        "client_id": app_id, "client_secret": app_secret, "fb_exchange_token": token,
+    })
+    user_token = long.get("access_token", token)
+
+    # The user token is parked server-side until a Page is chosen. Page tokens
+    # are long-lived credentials, so they are fetched at selection time and go
+    # straight into the encrypted store — they never travel to the browser.
+    _set_club_secret(club_id, "meta_user_token", user_token)
+
+    pages = _fb("me/accounts", {
+        "fields": "id,name,instagram_business_account{id,username}",
+        "access_token": user_token,
+    })
+    return {"pages": [
+        {
+            "id": p.get("id"),
+            "name": p.get("name", ""),
+            "instagram": (p.get("instagram_business_account") or {}).get("id", ""),
+            "instagramName": (p.get("instagram_business_account") or {}).get("username", ""),
+        }
+        for p in (pages.get("data") or [])
+    ]}
+
+
+class MetaSelectPageRequest(BaseModel):
+    page_id: str
+
+
+@app.post("/api/clubs/{club_id}/meta/select-page")
+def meta_select_page(club_id: int, req: MetaSelectPageRequest,
+                     user: dict = Depends(require_club_admin_or_above)):
+    """
+    Commit the chosen Page (and its linked Instagram account, if any).
+
+    Only the Page *id* comes from the browser. The token is fetched here with
+    the user token parked during /meta/connect, so a long-lived Page credential
+    never leaves the server — and a caller cannot smuggle in a token for a Page
+    they do not actually administer.
+    """
+    _social_scope(user, club_id)
+    if not req.page_id:
+        raise HTTPException(status_code=400, detail="缺少粉專資訊")
+
+    user_token = _get_club_secret(club_id, "meta_user_token")
+    if not user_token:
+        raise HTTPException(status_code=400, detail="授權已失效，請重新連接一次")
+
+    page = _fb(req.page_id, {
+        "fields": "id,name,access_token,instagram_business_account{id,username}",
+        "access_token": user_token,
+    })
+    page_token = page.get("access_token")
+    if not page_token:
+        raise HTTPException(status_code=403, detail="你沒有這個粉專的管理權限")
+
+    # Page tokens derived from a long-lived user token do not themselves
+    # expire, so no expires_in is recorded here.
+    _save_social_account(club_id, "facebook", page["id"], page.get("name", ""),
+                         page_token, None)
+    connected = ["facebook"]
+
+    ig = page.get("instagram_business_account") or {}
+    if ig.get("id"):
+        # Instagram publishing is authorised by the *Page* token.
+        _save_social_account(club_id, "instagram", ig["id"],
+                             ig.get("username") or "Instagram", page_token, None)
+        connected.append("instagram")
+    return {"connected": connected}
+
+
+# ------------------------------------------------------------------ publishing
+# Three different shapes for "post this":
+#   Facebook  — one call for text, /photos for a single image, unpublished
+#               photo ids stitched onto /feed for several.
+#   Instagram — always two steps (create a container, then publish it), and it
+#               refuses to post without media. Several images means a carousel:
+#               a container per child, then a CAROUSEL parent.
+#   Threads   — same two-step container/publish idea as Instagram, on its own
+#               host, but text-only is allowed.
+#
+# All three take the image as a URL Meta fetches for itself; none of them
+# accept bytes. That is why generated and uploaded images go to R2 first.
+
+def _require_account(club_id: int, platform: str) -> dict:
+    account = _load_social_account(club_id, platform)
+    if account is None:
+        raise HTTPException(status_code=400,
+                            detail=f"這個分會還沒有連接 {platform}，請先到分會設定完成授權")
+    if account["expiresAt"] and account["expiresAt"] < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400,
+                            detail=f"{platform} 的授權已過期，請重新連接")
+    return account
+
+
+def _publish_facebook(account: dict, text: str, images: list) -> dict:
+    page, token = account["accountId"], account["token"]
+
+    if not images:
+        res = _fb(f"{page}/feed", {"message": text, "access_token": token}, method="POST")
+    elif len(images) == 1:
+        res = _fb(f"{page}/photos",
+                  {"url": images[0], "caption": text, "access_token": token}, method="POST")
+    else:
+        # Upload each photo unpublished, then attach them all to one feed post.
+        media_ids = [
+            _fb(f"{page}/photos",
+                {"url": url, "published": "false", "access_token": token},
+                method="POST").get("id")
+            for url in images
+        ]
+        params = {"message": text, "access_token": token}
+        for i, mid in enumerate(m for m in media_ids if m):
+            params[f"attached_media[{i}]"] = json.dumps({"media_fbid": mid})
+        res = _fb(f"{page}/feed", params, method="POST")
+
+    post_id = res.get("post_id") or res.get("id") or ""
+    return {"id": post_id,
+            "url": f"https://www.facebook.com/{post_id}" if post_id else ""}
+
+
+def _publish_instagram(account: dict, text: str, images: list) -> dict:
+    ig, token = account["accountId"], account["token"]
+    if not images:
+        raise HTTPException(status_code=400, detail="Instagram 貼文一定要有圖片")
+
+    if len(images) == 1:
+        container = _fb(f"{ig}/media",
+                        {"image_url": images[0], "caption": text, "access_token": token},
+                        method="POST")
+    else:
+        children = [
+            _fb(f"{ig}/media",
+                {"image_url": url, "is_carousel_item": "true", "access_token": token},
+                method="POST").get("id")
+            for url in images
+        ]
+        container = _fb(f"{ig}/media", {
+            "media_type": "CAROUSEL",
+            "children": ",".join(c for c in children if c),
+            "caption": text, "access_token": token,
+        }, method="POST")
+
+    creation_id = container.get("id")
+    if not creation_id:
+        raise HTTPException(status_code=502, detail="Instagram 沒有建立貼文容器")
+
+    res = _fb(f"{ig}/media_publish",
+              {"creation_id": creation_id, "access_token": token}, method="POST")
+    media_id = res.get("id", "")
+    permalink = ""
+    if media_id:
+        permalink = _fb(media_id, {"fields": "permalink", "access_token": token}).get("permalink", "")
+    return {"id": media_id, "url": permalink}
+
+
+def _publish_threads(account: dict, text: str, images: list) -> dict:
+    th, token = account["accountId"], account["token"]
+
+    params = {"text": text, "access_token": token}
+    if images:
+        # Only the first image: a Threads carousel is a different container
+        # shape, and one picture is what these posts actually use.
+        params.update({"media_type": "IMAGE", "image_url": images[0]})
+    else:
+        params["media_type"] = "TEXT"
+
+    container = _th(f"{th}/threads", params, method="POST")
+    creation_id = container.get("id")
+    if not creation_id:
+        raise HTTPException(status_code=502, detail="Threads 沒有建立貼文容器")
+
+    res = _th(f"{th}/threads_publish",
+              {"creation_id": creation_id, "access_token": token}, method="POST")
+    post_id = res.get("id", "")
+    permalink = ""
+    if post_id:
+        permalink = _th(post_id, {"fields": "permalink", "access_token": token}).get("permalink", "")
+    return {"id": post_id, "url": permalink}
+
+
+_PUBLISHERS = {
+    "facebook":  _publish_facebook,
+    "instagram": _publish_instagram,
+    "threads":   _publish_threads,
+}
+
+
+def _run_publish_job(username: str, club_id: Optional[int], params: dict) -> dict:
+    """
+    Publish one post to the platforms named in `params`.
+
+    Runs as an ai_jobs job because it is several sequential Graph calls per
+    platform — the browser polls it exactly like image generation does.
+    Per-platform outcomes are collected rather than aborting the whole run:
+    Instagram failing is no reason to un-post Facebook.
+    """
+    post_id   = params.get("post_id")
+    platforms = [p for p in (params.get("platforms") or []) if p in _PUBLISHERS]
+    if not post_id or not platforms:
+        raise HTTPException(status_code=400, detail="沒有指定要發布的貼文或平台")
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT club_id, body, variants, images, published"
+                        " FROM social_posts WHERE id=%s", (post_id,))
+            row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="找不到這則貼文")
+
+    # The job was authorised against `club_id`, but `post_id` arrived in the
+    # job's params and has been trusted by nothing so far. Without this a club
+    # admin could aim a job at another club's post and publish it with that
+    # club's tokens. `club_id is None` only happens for a system_admin who did
+    # not pick a club.
+    if club_id is not None and row[0] != club_id:
+        raise HTTPException(status_code=403, detail="無權發布其他分會的貼文")
+
+    club     = row[0]
+    variants = row[2] or {}
+    images   = [i.get("url") for i in (row[3] or []) if i.get("url")]
+    published = dict(row[4] or {})
+
+    results = {}
+    for platform in platforms:
+        variant = variants.get(platform) or {}
+        text = (variant.get("text") or row[1] or "").strip()
+        try:
+            if not text:
+                raise HTTPException(status_code=400, detail="文案是空的")
+            account = _require_account(club, platform)
+            out = _PUBLISHERS[platform](account, text, images)
+            out["at"] = datetime.now(timezone.utc).isoformat()
+            results[platform] = {"ok": True, **out}
+            published[platform] = out
+        except HTTPException as e:
+            results[platform] = {"ok": False, "error": str(e.detail)}
+        except Exception:
+            results[platform] = {"ok": False, "error": "發布失敗，請稍後再試"}
+
+    any_ok = any(r.get("ok") for r in results.values())
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE social_posts SET published=%s::jsonb,"
+                " status=CASE WHEN %s THEN 'posted' ELSE status END, updated_at=NOW()"
+                " WHERE id=%s",
+                (json.dumps(published), any_ok, post_id),
+            )
+    return {"results": results}
+
+
+# Registered here rather than at the dict's definition so the whole Meta
+# surface stays in one place.
+_JOB_KINDS = _JOB_KINDS + ("publish",)
+_JOB_RUNNERS["publish"] = _run_publish_job

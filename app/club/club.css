@@ -217,3 +217,45 @@ th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { background: #f1f5f9; color: #0f172a; }
 .sort-icon { margin-left: 4px; font-style: normal; font-size: 10px; opacity: 0.4; }
 th.sort-asc .sort-icon, th.sort-desc .sort-icon { opacity: 1; color: #004165; }
+
+/* ================================================================
+   SOCIAL ACCOUNTS pane (Meta App + 授權狀態)
+================================================================ */
+.modal-hint { font-size: 11.5px; color: #94a3b8; line-height: 1.8; margin: 8px 0 0; }
+.modal-hint code {
+  background: #f1f5f9; padding: 1px 5px; border-radius: 4px;
+  font-size: 11px; color: #334155; word-break: break-all;
+}
+
+.social-accs { display: flex; flex-direction: column; gap: 6px; }
+.social-acc {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 11px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc;
+}
+.social-acc-name { font-size: 12.5px; font-weight: 700; color: #0f172a; }
+.social-acc-on {
+  flex: 1; font-size: 11.5px; color: #166534;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.social-acc-off { flex: 1; font-size: 11.5px; color: #94a3b8; }
+
+.social-connect-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.btn-mini-c {
+  padding: 6px 12px; background: #fff; border: 1px solid #cbd5e1;
+  border-radius: 7px; font-family: inherit; font-size: 11.5px;
+  color: #475569; cursor: pointer; white-space: nowrap; transition: all 0.15s;
+}
+.btn-mini-c:hover:not(:disabled) { background: #004165; border-color: #004165; color: #fff; }
+.btn-mini-c:disabled { opacity: 0.55; cursor: default; }
+
+/* ================================================================
+   TOAST
+================================================================ */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(12px);
+  background: #0f172a; color: #fff; padding: 11px 20px; border-radius: 9px;
+  font-size: 13px; opacity: 0; pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s; z-index: 1200; max-width: 80vw; text-align: center;
+}
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { background: #b91c1c; }

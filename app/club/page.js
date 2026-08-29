@@ -19,6 +19,12 @@ let modalImgUrls = {};
 // brand-new club's images land under media/clubs/{newId}/ (and nothing is
 // uploaded if the user cancels).
 let pendingFiles = {};
+// Which pane of the shared modal is open: 'basic' | 'template' | 'social'.
+// The footer's 儲存 button dispatches on it, because the social pane writes
+// through its own endpoints rather than the club PUT.
+let editingGroup = 'basic';
+// Pages returned by the OAuth round trip, waiting for the user to pick one.
+let metaPages = [];
 
 // Populate the template <select> from lib/agendaTemplates once on load.
 function populateTemplateOptions() {
@@ -131,6 +137,10 @@ function renderList() {
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
           版型
         </button>
+        <button class="btn-edit-row system-admin-only" onclick="window.__clubOpenModal(${c.id}, 'social')" style="display:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+          社群
+        </button>
         <button class="btn-del-row system-admin-only" onclick="window.__clubDelete(${c.id})" title="刪除" style="display:none">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
         </button>
@@ -154,12 +164,21 @@ function setPreview(imgId, url) {
 // toggling visibility never drops the fields the other view manages.
 function openModal(id = null, group = 'basic') {
   editingId = id;
+  editingGroup = group;
   const c = id ? clubs.find((c) => c.id === id) : null;
   const isTpl = group === 'template';
+  const isSoc = group === 'social';
   document.getElementById('modalTitle').textContent =
-    isTpl ? '版型設定' : (id ? '編輯分會' : '新增分會');
-  document.getElementById('modalGroupBasic').style.display = isTpl ? 'none' : '';
+    isSoc ? '社群帳號' : isTpl ? '版型設定' : (id ? '編輯分會' : '新增分會');
+  document.getElementById('modalGroupBasic').style.display = (isTpl || isSoc) ? 'none' : '';
   document.getElementById('modalGroupTemplate').style.display = isTpl ? '' : 'none';
+  document.getElementById('modalGroupSocial').style.display = isSoc ? '' : 'none';
+
+  if (isSoc) {
+    document.getElementById('modal').classList.add('open');
+    loadSocialConfig(id);
+    return;
+  }
 
   const tk = (c && c.template_key) || 'compact';
   // Universal fields (shared by every template).
@@ -176,10 +195,202 @@ function openModal(id = null, group = 'basic') {
   if (!isTpl) document.getElementById('fName').focus();
 }
 
+// ================================================================
+// SOCIAL ACCOUNTS (Meta: Facebook / Instagram / Threads)
+// ================================================================
+// The App ID and App Secret are per club, not one global pair, because App
+// Review is granted per App: a club that registers its own App can post to its
+// own Pages in development mode with no review at all. The secret is written
+// through a dedicated endpoint and never read back — the UI only ever sees a
+// masked hint, because GET /api/clubs is a public endpoint and nothing secret
+// may travel with it.
+
+const SOCIAL_LABELS = {
+  facebook: 'Facebook 粉絲專頁',
+  instagram: 'Instagram',
+  threads: 'Threads',
+};
+
+// Must match one of the App's "Valid OAuth Redirect URIs" character for
+// character, so it is derived from the live origin rather than configured.
+const metaRedirectUri = () => `${location.origin}/club`;
+
+async function loadSocialConfig(id) {
+  const body = document.getElementById('socialBody');
+  body.innerHTML = '<div class="modal-hint">載入中…</div>';
+  try {
+    renderSocialConfig(await apiJson(`/clubs/${id}/social-config`));
+  } catch (e) {
+    body.innerHTML = `<div class="modal-hint">載入失敗：${escAttr(e.message || '')}</div>`;
+  }
+}
+
+function renderSocialConfig(cfg) {
+  const body = document.getElementById('socialBody');
+  const secretSet = !!cfg.metaAppSecretHint;
+
+  const accounts = cfg.accounts.map((a) => `
+    <div class="social-acc">
+      <span class="social-acc-name">${SOCIAL_LABELS[a.platform] || a.platform}</span>
+      ${a.accountName
+        ? `<span class="social-acc-on">已連接：${escAttr(a.accountName)}</span>
+           <button class="btn-mini-c" onclick="window.__clubDisconnect('${a.platform}')">中斷</button>`
+        : '<span class="social-acc-off">未連接</span>'}
+    </div>`).join('');
+
+  body.innerHTML = `
+    <div class="modal-section-label">Meta App（在 developers.facebook.com 建立）</div>
+    <div class="modal-field">
+      <label>App ID</label>
+      <input type="text" id="fMetaAppId" value="${escAttr(cfg.metaAppId || '')}" placeholder="1234567890123456">
+    </div>
+    <div class="modal-field">
+      <label>App Secret${secretSet ? `（已設定 ${escAttr(cfg.metaAppSecretHint)}，留空即不變更）` : ''}</label>
+      <input type="password" id="fMetaAppSecret" autocomplete="off"
+             placeholder="${secretSet ? '貼上新的密鑰以覆蓋' : '貼上 App Secret'}">
+    </div>
+    <p class="modal-hint">App Secret 會加密後儲存，存好之後不會再顯示。
+       ${cfg.serverFallback ? '未填時會改用伺服器預設的 App。' : ''}</p>
+
+    <div class="modal-section-label">授權連接</div>
+    <div class="social-accs">${accounts}</div>
+    <div class="social-connect-row">
+      <button class="btn-mini-c" onclick="window.__clubConnectMeta('facebook')">連接 Facebook / Instagram</button>
+      <button class="btn-mini-c" onclick="window.__clubConnectMeta('threads')">連接 Threads</button>
+    </div>
+    <p class="modal-hint">
+      按下去會跳轉到 Meta 授權頁，完成後自動回到這裡。請先把
+      <code>${escAttr(metaRedirectUri())}</code>
+      加進該 App 的「有效的 OAuth 重新導向 URI」，否則 Meta 會拒絕。
+      Instagram 必須是<strong>商業／創作者帳號且已連結該粉專</strong>才會一起出現。
+    </p>
+    <div id="metaPagePicker"></div>`;
+}
+
+async function saveSocialConfig() {
+  const appId = document.getElementById('fMetaAppId')?.value.trim() ?? '';
+  const secret = document.getElementById('fMetaAppSecret')?.value.trim() ?? '';
+  try {
+    await apiJson(`/clubs/${editingId}/social-config`, {
+      method: 'PUT',
+      // An empty secret means "leave it alone" — sending '' would look like an
+      // intentional blanking, and there is no way to re-enter what we cannot read.
+      body: { meta_app_id: appId, meta_app_secret: secret || null },
+    });
+    toast('已儲存社群設定');
+    loadSocialConfig(editingId);
+  } catch (e) {
+    toast(e.message || '儲存失敗', true);
+  }
+}
+
+async function connectMeta(provider) {
+  try {
+    // Save first: the redirect leaves this page, and connecting needs the App
+    // credentials that may only exist in the form right now.
+    await saveSocialConfig();
+    const { url } = await apiJson(
+      `/clubs/${editingId}/meta/oauth-url?provider=${provider}`
+      + `&redirect_uri=${encodeURIComponent(metaRedirectUri())}`);
+    sessionStorage.setItem('metaConnect', JSON.stringify({ clubId: editingId, provider }));
+    location.href = url;
+  } catch (e) {
+    toast(e.message || '無法開始授權', true);
+  }
+}
+
+async function disconnectSocial(platform) {
+  if (!confirm('中斷連接後就無法發布到這個平台，確定嗎？')) return;
+  try {
+    await apiJson(`/clubs/${editingId}/social-accounts/${platform}`, { method: 'DELETE' });
+    loadSocialConfig(editingId);
+  } catch {
+    toast('中斷失敗', true);
+  }
+}
+
+/**
+ * Completes the OAuth round trip when Meta redirects back to /club?code=...
+ * The pending club/provider is carried in sessionStorage rather than parsed out
+ * of `state`, so a stray callback cannot make the page act on another club.
+ */
+async function resumeMetaConnect() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  if (!code) return;
+
+  const raw = sessionStorage.getItem('metaConnect');
+  sessionStorage.removeItem('metaConnect');
+  history.replaceState(null, '', location.pathname);   // drop the code from the URL
+  if (!raw) return;
+
+  const { clubId, provider } = JSON.parse(raw);
+  openModal(clubId, 'social');
+  try {
+    const out = await apiJson(`/clubs/${clubId}/meta/connect`, {
+      method: 'POST',
+      body: { code, redirect_uri: metaRedirectUri(), provider },
+    });
+    if (out.connected) { toast('已完成連接'); loadSocialConfig(clubId); return; }
+    metaPages = out.pages || [];
+    renderPagePicker();
+  } catch (e) {
+    toast(e.message || '授權失敗', true);
+  }
+}
+
+function renderPagePicker() {
+  const box = document.getElementById('metaPagePicker');
+  if (!box) return;
+  if (!metaPages.length) {
+    box.innerHTML = '<p class="modal-hint">這個帳號底下沒有可管理的粉絲專頁。</p>';
+    return;
+  }
+  box.innerHTML = `
+    <div class="modal-section-label">選擇要連接的粉絲專頁</div>
+    ${metaPages.map((pg, i) => `
+      <div class="social-acc">
+        <span class="social-acc-name">${escAttr(pg.name)}</span>
+        <span class="social-acc-off">${pg.instagram ? `IG: ${escAttr(pg.instagramName || pg.instagram)}` : '未連結 IG'}</span>
+        <button class="btn-mini-c" onclick="window.__clubPickPage(${i})">選這個</button>
+      </div>`).join('')}`;
+}
+
+async function pickPage(i) {
+  const pg = metaPages[i];
+  if (!pg) return;
+  try {
+    await apiJson(`/clubs/${editingId}/meta/select-page`, {
+      method: 'POST',
+      body: { page_id: pg.id },
+    });
+    metaPages = [];
+    toast('已連接粉絲專頁');
+    loadSocialConfig(editingId);
+  } catch (e) {
+    toast(e.message || '連接失敗', true);
+  }
+}
+
+/** The footer 儲存 button serves all three panes. */
+function saveModal() {
+  return editingGroup === 'social' ? saveSocialConfig() : saveClub();
+}
+
 // ---- Template-specific field generation (driven by template.settings) ----
 // A field is declared once in lib/agendaTemplates.js; here we build its DOM,
 // fill its value, and (in buildClubPayload) read it back. Generated id
 // conventions: text/textarea → f_<key>   image → prev_<key> / stat_<key>
+let toastTimer = null;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'toast visible' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, 3600);
+}
+
 function escAttr(s) {
   return String(s)
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -374,6 +585,9 @@ export default function ClubPage() {
     window.__clubOpenModal = openModal;
     window.__clubDelete = deleteClub;
     window.__clubUploadImage = uploadClubImage;
+    window.__clubConnectMeta = connectMeta;
+    window.__clubDisconnect = disconnectSocial;
+    window.__clubPickPage = pickPage;
 
     // Intentionally no backdrop-click-to-close: editing has many fields, and
     // an accidental outside click would discard everything. Close only via
@@ -387,12 +601,17 @@ export default function ClubPage() {
       const ok = await checkClubAuth();
       if (!ok) return;
       await Promise.all([fetchClubs(), fetchMembers()]);
+      // Meta redirects back here with ?code=… after an authorisation.
+      await resumeMetaConnect();
     })();
 
     return () => {
       delete window.__clubOpenModal;
       delete window.__clubDelete;
       delete window.__clubUploadImage;
+      delete window.__clubConnectMeta;
+      delete window.__clubDisconnect;
+      delete window.__clubPickPage;
     };
   }, []);
 
@@ -463,6 +682,8 @@ export default function ClubPage() {
         </div>
       </div>
 
+      <div id="toast" className="toast"></div>
+
       <div className="modal-overlay" id="modal">
         <div className="modal modal-wide">
           <div className="modal-header">
@@ -506,11 +727,16 @@ export default function ClubPage() {
               {/* 版型專屬欄位（依 template manifest 動態產生：版型區） */}
               <div id="tmplFieldsTemplate"></div>
             </div>
+
+            {/* Meta App 設定與授權狀態（自有端點，不走分會 PUT） */}
+            <div id="modalGroupSocial" className="modal-group" style={{ display: 'none' }}>
+              <div id="socialBody"></div>
+            </div>
           </div>
 
           <div className="modal-actions">
             <button className="btn-modal-cancel" onClick={closeModal}>取消</button>
-            <button className="btn-modal-save" onClick={saveClub}>儲存</button>
+            <button className="btn-modal-save" onClick={saveModal}>儲存</button>
           </div>
         </div>
       </div>

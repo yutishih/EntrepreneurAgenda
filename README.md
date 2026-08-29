@@ -329,6 +329,100 @@ const META_FIELDS = [
 
 ---
 
+## 社群發文（`/social`）
+
+把一場例會變成 Facebook / Instagram / Threads 的貼文：寫稿、配圖、依平台規則檢查，並直接發布。
+
+LinkedIn 刻意不做——它的發布 API 卡在合作夥伴審核，做出一個按不下去的分頁只會誤導。
+
+### ⚠️ 發布這段程式碼從未對真實 API 執行過
+
+Meta 的串接需要一個已建立的 App、通過的審核、以及真實 token 才能跑，開發時三者都沒有。所以那整段刻意集中在 `api/index.py` 的單一區塊，**所有失敗都原樣透出 Meta 自己的錯誤訊息**——第一次真的接上去時，那些訊息才是告訴你缺哪一步設定的東西。請把它當作「已寫完但待驗證」，不是「已驗證可用」。
+
+### 兩條路：送審，或用開發模式
+
+發文權限（`pages_manage_posts`、`instagram_content_publish`、`threads_content_publish`）是**綁在 App 上**送審的，所以有兩種走法：
+
+- **各分會註冊自己的 App** → 在**開發模式**下就能發布到自己的粉專（把幹部加進該 App 的角色即可），**完全不用送審**。對小型分會這是唯一務實的路。
+- **全站共用一個 App** → 你送審一次，所有分會只要點授權。
+
+因此 App ID / Secret 是**每個分會各自填**（分會管理 → 社群），伺服器另有一組環境變數當 fallback，兩種都支援。
+
+### 平台差異寫在哪
+
+`lib/socialPlatforms.js` 是唯一一份：字數上限、是否必須配圖、內文連結能不能點。編輯器的計數器、警告、預覽全部讀它。後端另有一份**散文版**的同一組規則（`api/index.py` 的 `_PLATFORM_BRIEF`）餵給寫文案的模型——一份是給人看的檢查，一份是給模型的指示，刻意不共用。
+
+| | 上限 | 一定要圖 | 內文連結 |
+|---|---|---|---|
+| Facebook | 63206 | 否 | 可點 |
+| Instagram | 2200 | **是** | **不可點**（要改寫成「連結在個人簡介」）|
+| Threads | 500 | 否 | 可點 |
+
+「FB 發了 IG 會不會跟著發」——不會。Meta 內建的跨平台分享只有 `IG → FB` 方向有自動開關；這裡是分別呼叫各自的 API，**你勾哪些平台就發哪些**。若同時開著 Meta 的跨平台分享，IG 會出現兩則重複貼文。
+
+### AI：文案可選 Claude 或 ChatGPT，生圖用 OpenAI，金鑰都是使用者自己的
+
+**每個使用者連自己的 AI 帳號**，存在 `user_ai_credentials`（per-user，不是 per-club）。三條規則：
+
+- **加密後才進資料庫**。欄位叫 `key_cipher` 而不是 `key`，存的是 Fernet token。主密鑰讀環境變數 `CREDENTIALS_SECRET_KEY`，**沒有預設值也沒有 fallback**——沒設定就儲存失敗，不會默默以明文落地。用 `openssl rand -base64 32` 產一組。
+- **金鑰不會再回到瀏覽器**。`GET /api/me/ai-credentials` 只回傳末四碼與「已連接」布林值。
+- **所有生成都走呼叫者自己的帳號計費**。文案可在產生視窗裡選 Claude 或 ChatGPT，用對應那組金鑰；Anthropic 另外保留伺服器 `ANTHROPIC_API_KEY` 當退路（沒有伺服器 OpenAI 帳號可以退，所以 OpenAI 一定要自己連）。生圖只走 OpenAI。
+
+輪換 `CREDENTIALS_SECRET_KEY` 會讓既有金鑰解不開——此時 `_open()` 回一個「請重新設定」的錯誤，而不是丟出無意義的例外。
+
+文案有兩條路（`COPY_WRITERS`），兩邊拿到**完全相同**的 system prompt、使用者輸入與 JSON schema，回傳同一個 dict——端點不在乎是誰寫的。刻意寫成兩個函式而不是在一個函式裡分支，是為了讓兩家 SDK 各自演進時不會互相污染：
+
+- **Claude**：`claude-opus-5` + adaptive thinking + structured outputs。`effort` 設 `medium` 而非預設的 `high`——這是掛在瀏覽器請求後面的短篇創作，深一層推理帶來的延遲比它換到的品質更貴。
+- **ChatGPT**：`chat.completions` + `response_format: json_schema`（`strict`）。模型 id 走環境變數 `OPENAI_TEXT_MODEL`，預設 `gpt-4o`——模型代號變動得比這份程式碼快，寫死只會過期；填錯會直接透出 OpenAI 自己的錯誤訊息，而不是這裡編一個。
+
+兩邊都用 structured output，所以一次就吐出主文案與各平台版本，不用解析散文。生圖用 OpenAI `gpt-image-1`，產生後直接進 R2 只回公開 URL——**IG 與 Threads 只能發布平台抓得到的公開圖片**，所以這一步 Phase 1 也用得上。
+
+### 生圖是「工作」不是「請求」
+
+生圖動輒數十秒，把瀏覽器掛在一條 HTTP 回應上是錯的形狀：闔上筆電就丟掉一張 OpenAI 已經收過錢的圖。所以**擁有結果的是 `ai_jobs` 的那一列，不是那個回應**：
+
+1. `POST /api/ai-jobs` 建立 `queued` 列，**立刻**回傳 id；
+2. 前端 `POST /api/ai-jobs/{id}/run` 但**不 await**（這才是那條長請求）；
+3. 前端每 2 秒輪詢 `GET /api/ai-jobs/{id}`，圖片區出現一格虛線佔位 + spinner + 已等秒數，這段期間**文案照樣可以編輯**。
+
+`/run` 用一次 `UPDATE ... WHERE status='queued'` 做原子認領，重複點擊或重試不會跟 OpenAI 買第二張圖。輪詢時若發現某列卡在 `running` 超過 5 分鐘（負責執行的 invocation 被砍掉了），會就地標成失敗，而不是讓前端無限轉圈。圖片完成時會比對貼文物件的 identity，避免落到使用者中途切換過去的另一則貼文上。
+
+**這個做法沒有把工作移出請求**：serverless 上沒有常駐 worker，`/run` 仍然得在函式的 `maxDuration`（`vercel.json` 設為 60 秒）內跑完。換到的是瀏覽器不再與它綁死、斷線不遺失結果、以及等待期間介面不凍結。真正的背景執行需要 Vercel 以外的 worker。
+
+### 憑證放哪，以及為什麼分兩種
+
+| 東西 | 存哪 | 範圍 | 為什麼 |
+|---|---|---|---|
+| AI API 金鑰 | `user_ai_credentials` | **每個使用者** | 是個人帳號在計費 |
+| Meta App Secret | `club_secrets` | **每個分會** | App 是分會註冊的 |
+| Page / IG / Threads Token | `club_social_accounts` | **每個分會** | 粉專是分會資產——會長授權後，教育副會長也要能發 |
+
+三者都用同一組 `_seal()` / `_open()`（Fernet，主密鑰 `CREDENTIALS_SECRET_KEY`）加密，也都套用同一條規則：**存進去之後不再回傳給瀏覽器**，UI 只看得到末四碼。
+
+Meta App Secret **刻意不放進 `clubs.settings`**：`GET /api/clubs` 是**公開、免登入**的端點（註冊表單要讀），任何進到那個 JSONB 的東西等同全世界可讀。`meta_app_id` 不算機密所以留在 settings，secret 走獨立資料表。
+
+### OAuth 流程
+
+1. 分會管理 →「社群」→ 填 App ID / Secret → 按「連接 Facebook / Instagram」
+2. 前端先存設定，再跟後端要授權網址，跳轉到 Meta
+3. Meta 導回 `<你的網域>/club`，頁面接住 `?code=`，換成長效 token
+4. 列出該帳號管理的粉專讓你挑一個 → 存下 Page token（IG 用同一個 Page token 授權）
+5. Threads 是**獨立的授權流程與 API host**（`graph.threads.net`），所以是另一顆按鈕
+
+**Valid OAuth Redirect URIs 必須把 `<你的網域>/club` 加進去**，否則 Meta 會直接拒絕。畫面上有把這串印出來給你複製。
+
+### 發布
+
+走跟生圖同一套 `ai_jobs` 管線——每個平台都是好幾次連續的 Graph 呼叫，所以前端輪詢 job 而不是掛著長請求。
+
+三個平台形狀都不同：Facebook 純文字一次呼叫、單圖走 `/photos`、多圖要先傳未發布的照片再串到 `/feed`；Instagram **一定是兩步**（建容器 → 發布）而且**沒有圖就拒收**，多圖是輪播；Threads 同樣是兩步但允許純文字。三者都只吃**圖片 URL**、不吃位元組——這就是為什麼所有圖片都先進 R2。
+
+**單一平台失敗不會中斷其他平台**：Instagram 失敗不構成把 Facebook 那則收回的理由，所以結果是逐平台收集後一起回報。發布成功的連結存在 `social_posts.published`，編輯器會列出來，讓「要不要再發一次」是個知情的選擇。
+
+### 編輯器
+
+左側草稿清單，右側編輯區：標題／狀態（草稿・待發布・已發布）／綁定例會 → AI 產生文案 → 主文案 → 各平台分頁（可各自關閉、即時字數、規則警告、一鍵複製）→ 圖片（手動上傳或 AI 生圖）。綁定例會之後，AI 會讀那場議程的日期、主題、講者、題目、單元當素材，不會自己編造沒給的資訊。
+
 ## 權限系統（RBAC）
 
 系統共有三種角色：
@@ -412,6 +506,7 @@ Push 到 GitHub，Vercel 自動部署。`/api/*` 的請求透過 `vercel.json` �
 | `/home` | `home.html` | 會務 Dashboard |
 | `/index` | `index.html` | 議程表產生器 |
 | `/roles` | `roles.html` | 角色安排（多場例會 × 角色矩陣） |
+| `/social` | — | 社群發文草稿箱（FB／IG／Threads 文案與圖片） |
 | `/member` | `member.html` | 會員管理（管理 users；system_admin 另可設定角色與所屬分會） |
 | `/club` | `club.html` | 分會管理 |
 | `/change-password` | `change-password.html` | 修改密碼 / 首次登入強制改密碼 |
@@ -573,6 +668,7 @@ DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
 | `/home` | `home.html` | 會務管理 Dashboard，含統計卡片、議程列表 | 任何登入用戶 |
 | `/index` | `index.html` | 議程表產生器，即時預覽並可匯出 PDF / JPG | 任何登入用戶 |
 | `/roles` | `roles.html` | 角色安排，多場例會 × 角色矩陣，人選可下拉選取或自由輸入 | `club_admin`（寫入） |
+| `/social` | — | 社群發文，AI 產生文案／生圖、各平台版本與規則檢查 | `club_admin`（寫入） |
 | `/member` | `member.html` | 會員管理，新增、編輯、批量匯入、審核、移除會員；system_admin 另可設定角色與所屬分會 | `club_admin`（寫入） |
 | `/club` | `club.html` | 分會管理，新增、編輯、刪除分會 | `system_admin`（寫入） |
 | `/change-password` | `change-password.html` | 修改密碼；admin 建立帳號後首次登入強制跳轉 | 任何登入用戶 |
@@ -627,6 +723,22 @@ DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.../neondb?sslmode=require
 | POST   | `/api/clubs` | 新增分會（可帶品牌欄位 + `template_key`） | `system_admin` |
 | PUT    | `/api/clubs/{id}` | 更新分會名稱與品牌 / 版型 | `system_admin` |
 | DELETE | `/api/clubs/{id}` | 刪除分會 | `system_admin` |
+| GET    | `/api/social-posts` | 貼文草稿列表（依分會） | 已登入 |
+| POST   | `/api/social-posts` | 新增貼文草稿 | `club_admin` |
+| GET/PUT/DELETE | `/api/social-posts/{id}` | 讀取／更新／刪除單則貼文 | 讀已登入，寫 `club_admin` |
+| POST   | `/api/social-posts/generate` | 用呼叫者選定的 AI 帳號（Claude／ChatGPT）產生各平台文案 | `club_admin` |
+| POST   | `/api/ai-jobs` | 建立生圖／發布工作，立刻回傳 job id | `club_admin` |
+| POST   | `/api/ai-jobs/{id}/run` | 認領並執行該工作（前端不等它回應） | `club_admin` |
+| GET    | `/api/ai-jobs/{id}` | 輪詢工作狀態與結果 | 已登入（限自己的工作） |
+| GET    | `/api/clubs/{id}/social-config` | Meta App 設定與各平台連接狀態（**不含 secret／token**） | `club_admin` |
+| PUT    | `/api/clubs/{id}/social-config` | 設定 Meta App ID／Secret（secret 加密存） | `club_admin` |
+| GET    | `/api/clubs/{id}/meta/oauth-url` | 取得 Meta 授權跳轉網址 | `club_admin` |
+| POST   | `/api/clubs/{id}/meta/connect` | 用 code 換長效 token，回傳可選的粉專清單 | `club_admin` |
+| POST   | `/api/clubs/{id}/meta/select-page` | 確定要連接的粉專（含其 IG 帳號） | `club_admin` |
+| DELETE | `/api/clubs/{id}/social-accounts/{platform}` | 中斷某平台的連接 | `club_admin` |
+| GET    | `/api/me/ai-credentials` | 自己已連接哪些 AI 服務（**只回末四碼，不回金鑰**） | 已登入 |
+| PUT    | `/api/me/ai-credentials/{provider}` | 設定自己的 API 金鑰（加密後存） | 已登入 |
+| DELETE | `/api/me/ai-credentials/{provider}` | 移除自己的金鑰 | 已登入 |
 | GET    | `/api/clubs/{id}/roles-sheet` | 後端代抓該分會 `settings.roles_sheet_url` 綁定的 Google Sheet，回傳 CSV 原文（角色安排頁匯入用） | `club_admin`（限自己分會） |
 
 > `/api/clubs` 回傳每個分會的 `name_zh / name_en / charter_no / founded_date / fee / logo_url / fb_qr_url / line_qr_url / template_key / settings`。Logo/QR 透過既有的 `/api/upload/presign` 上傳至 R2 後，URL 存進對應欄位。

@@ -386,3 +386,22 @@ tr.rm-locked-row .rm-role-en { color: #cbd5e1; }
 .imp-conf-a { color: #a8a29e; text-decoration: line-through; }
 .imp-conf-x { color: #b45309; }
 .imp-conf-b { color: #0f172a; font-weight: 600; }
+
+/* Inline spinner for a busy button — sized to sit on a line of text, and
+   coloured from the button's own `color` so it stays visible through hover. */
+.spinner-sm {
+  display: inline-block; width: 12px; height: 12px; flex-shrink: 0;
+  border: 2px solid currentColor; border-top-color: transparent;
+  border-radius: 50%; opacity: 0.8; vertical-align: -1px;
+  margin-right: 6px;
+  animation: spin 0.7s linear infinite;
+}
+
+/* Fills the preview area while the import runs. Creating a season's worth of
+   meetings is one POST each, so the sub-line counts them off. */
+.imp-progress {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 40px 16px; text-align: center;
+}
+.imp-progress-t { font-size: 13px; font-weight: 600; color: #0f172a; }
+.imp-progress-s { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }

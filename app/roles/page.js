@@ -728,6 +728,38 @@ const SPEECH_FIELDS = {
 };
 
 let importPlan = null;   // built by buildImportPlan(), consumed by applyImport()
+let importing  = false;  // true while applyImport() is mid-flight
+
+/**
+ * Put a button into a spinning "busy" state and hand back its undo.
+ *
+ * Saves `innerHTML`, not `textContent` — the toolbar button holds an <svg>
+ * icon, and a textContent round-trip drops the icon for good.
+ */
+function busyButton(btn, label) {
+  if (!btn) return () => {};
+  const html = btn.innerHTML;
+  const was  = btn.disabled;
+  btn.disabled  = true;
+  btn.innerHTML = `<span class="spinner-sm"></span>${esc(label)}`;
+  return () => { btn.innerHTML = html; btn.disabled = was; };
+}
+
+/** Replace the preview with a spinner; `sub` is a live line (e.g. "3 / 24"). */
+function showImportProgress(title, sub = '') {
+  const body = document.getElementById('importPreviewBody');
+  if (!body) return;
+  body.innerHTML = `<div class="imp-progress">
+      <div class="spinner"></div>
+      <div class="imp-progress-t">${esc(title)}</div>
+      <div class="imp-progress-s" id="importProgressSub">${esc(sub)}</div>
+    </div>`;
+}
+
+function setImportProgress(sub) {
+  const el = document.getElementById('importProgressSub');
+  if (el) el.textContent = sub;
+}
 
 function sheetUrl() {
   const club = activeClub();
@@ -853,9 +885,9 @@ async function startSheetImport() {
   const cid = activeClubId();
   if (cid == null || !canWrite()) return;
 
-  const btn = document.getElementById('btnImportSheet');
-  const label = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = '讀取中…'; }
+  // Google's CSV export is a round-trip through the backend and routinely
+  // takes a few seconds, so the button spins for the whole fetch.
+  const restoreBtn = busyButton(document.getElementById('btnImportSheet'), '讀取試算表…');
   try {
     const { csv } = await apiJson(`/clubs/${cid}/roles-sheet`);
     const sheet = parseRolesSheet(csv);
@@ -879,11 +911,12 @@ async function startSheetImport() {
   } catch (e) {
     toast(e.message || '讀取 Google Sheet 失敗', true);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = label; }
+    restoreBtn();
   }
 }
 
 function cancelImport() {
+  if (importing) return;   // mid-flight: closing would orphan the progress UI
   const modal = document.getElementById('importPreviewModal');
   if (modal) modal.style.display = 'none';
   importPlan = null;
@@ -973,12 +1006,23 @@ async function applyImport() {
   const cols = plannedColumns(plan);
   const cid  = activeClubId();
 
-  const btn = document.getElementById('importConfirmBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '匯入中…'; }
+  importing = true;
+  const restoreBtn = busyButton(document.getElementById('importConfirmBtn'), '匯入中…');
+  const cancelBtn  = document.getElementById('importCancelBtn');
+  if (cancelBtn) cancelBtn.disabled = true;
 
-  // 1. Create the meetings the sheet has and the database does not.
+  // 1. Create the meetings the sheet has and the database does not. One POST
+  //    per meeting, so a full season is a couple of dozen round-trips — worth
+  //    a counter rather than an indefinite spinner.
   const failed = [];
-  for (const col of cols.filter((c) => !c.existing)) {
+  const toCreate = cols.filter((c) => !c.existing);
+  showImportProgress(
+    toCreate.length ? '正在建立例會…' : '正在套用試算表內容…',
+    toCreate.length ? `0 / ${toCreate.length}` : '',
+  );
+
+  let created = 0;
+  for (const col of toCreate) {
     try {
       const json = await apiJson('/agendas', {
         method: 'POST',
@@ -993,7 +1037,10 @@ async function applyImport() {
     } catch {
       failed.push(fmtDate(col.date));
     }
+    setImportProgress(`${++created} / ${toCreate.length}`);
   }
+
+  if (toCreate.length) showImportProgress('正在套用試算表內容…');
 
   // 2. Redraw the board around the new columns before touching any draft —
   //    buildRows() resets roleById, so importRole() has to run after it.
@@ -1015,6 +1062,9 @@ async function applyImport() {
   });
 
   renderMatrix();
+  restoreBtn();
+  if (cancelBtn) cancelBtn.disabled = false;
+  importing = false;
   cancelImport();
 
   if (failed.length) toast(`${failed.length} 場例會建立失敗：${failed.join('、')}`, true);
@@ -1269,7 +1319,7 @@ export default function RolesPage() {
               一併建立沒有角色資料的空場次
             </label>
             <div className="imp-actions-btns">
-              <button className="modal-btn modal-btn-cancel" onClick={cancelImport}>取消</button>
+              <button className="modal-btn modal-btn-cancel" id="importCancelBtn" onClick={cancelImport}>取消</button>
               <button className="modal-btn modal-btn-confirm" id="importConfirmBtn" onClick={applyImport}>匯入</button>
             </div>
           </div>

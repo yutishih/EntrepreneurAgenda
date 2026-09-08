@@ -348,6 +348,83 @@ Meta 的串接需要一個已建立的 App、通過的審核、以及真實 toke
 
 因此 App ID / Secret 是**每個分會各自填**（分會管理 → 社群），伺服器另有一組環境變數當 fallback，兩種都支援。
 
+### 申請 Meta App（開發模式，不用送審）
+
+以下以**開發模式**為準——單一分會自己用不需要送審。走全站共用 App 的路才需要送 App Review。
+
+> Meta 開發者後台的選單名稱改版頻繁。若路徑跟畫面對不上，以畫面為準；不變的骨架是這四樣：**企業型 App、Facebook 登入、重新導向 URI、角色**。
+
+#### 先決條件
+
+- 一個 Facebook **粉絲專頁**（不是個人帳號），而且你是它的管理員
+- 要發 IG 的話：IG 必須是**商業或創作者帳號**，且**已連結到那個粉專**。個人帳號拿不到 `instagram_content_publish`
+
+#### A. 建立 App
+
+1. [developers.facebook.com](https://developers.facebook.com) → 「我的應用程式」→「建立應用程式」
+2. 第一次用要先註冊為開發者（驗證手機／信箱）
+3. 類型選 **「企業」（Business）**——只有這型給得到粉專與 IG 的發文權限
+4. 填名稱（例如「企業家分會社群發文」）與聯絡信箱
+
+#### B. 取得 App ID / Secret
+
+「應用程式設定」→「基本資料」：**應用程式編號** = App ID，**應用程式密鑰** = App Secret（按「顯示」需再輸一次 FB 密碼）。
+
+#### C. Facebook 登入 + 重新導向 URI
+
+1. 「新增產品」→ **Facebook 登入** → 設定
+2. 「Facebook 登入 → 設定」→ **「有效的 OAuth 重新導向 URI」**填 `<你的網域>/club`
+3. 儲存
+
+確切那一串不要用猜的——分會管理 →「社群」畫面上就印出來給你複製（由 `location.origin` 算出）。**漏掉這步 Meta 會直接拒絕授權**，這是最常見的第一個錯誤。
+
+#### D. Instagram
+
+「新增產品」→ **Instagram**（Graph API）→ 設定。開發模式下不需額外設定，權限跟著粉專走。
+
+#### E. Threads（獨立的一套）
+
+Threads 不共用 Facebook 登入，有自己的授權入口與 API host，所以介面上是另一顆按鈕。
+
+1. 「新增產品」→ **Threads API**
+2. 它有**自己的**重新導向 URI 欄位，同樣填 `<你的網域>/club`
+3. 要發文的 Threads 帳號，其擁有者也要在 App 裡有角色（步驟 F）
+
+暫時不做 Threads 可以跳過，不影響 FB／IG。
+
+#### F. 把幹部加進 App 角色 ← 開發模式的關鍵
+
+「應用程式設定」→「角色」→ 新增**管理員／開發人員／測試人員**。
+
+**沒有角色的人授權會失敗。** 所有要用這功能發文的幹部都要加進來，且他們得自己收 FB 通知去接受邀請。**每年 7/1 交接時要記得更新這份名單。**
+
+#### G. 回到系統連接
+
+見下方「OAuth 流程」。填 App ID / Secret 需要伺服器已設定 `CREDENTIALS_SECRET_KEY`（secret 是加密存的，沒設會直接儲存失敗）。
+
+#### H. 第一次驗證順序
+
+發布這段程式碼從未對真實 API 執行過，所以**照複雜度遞增**測，一次只加一個變數。用一則測試貼文，不要拿真的例會宣傳來試：
+
+1. **FB 純文字** — 一次 Graph 呼叫，最單純
+2. **FB 單圖** — 走 `/photos`
+3. **FB 多圖** — 先傳未發布照片再串到 `/feed`，形狀最不一樣
+4. **Instagram** — 兩步式（建容器 → 發布），**沒圖一定失敗**，這是規格不是 bug
+5. **Threads** — 獨立 host，允許純文字
+
+每步成功後到平台上眼睛確認，然後**手動刪掉**測試貼文。
+
+#### 失敗訊息對照
+
+錯誤是**原樣透出 Meta 自己的**，沒有被包裝——那串英文就是在說缺哪一步：
+
+| 訊息大意 | 缺什麼 |
+|---|---|
+| `redirect_uri isn't an absolute URI` / `URL blocked` | 步驟 C 沒做或填錯 |
+| 提到 `pages_manage_posts` 未授予 | 授權的人在 App 沒有角色（步驟 F）|
+| `not a business account` 之類 | IG 還是個人帳號，或沒連到粉專 |
+| token 失效／過期 | 長效 token 約 60 天到期（`club_social_accounts.expires_at` 有存），重新連接一次 |
+
 ### 平台差異寫在哪
 
 `lib/socialPlatforms.js` 是唯一一份：字數上限、是否必須配圖、內文連結能不能點。編輯器的計數器、警告、預覽全部讀它。後端另有一份**散文版**的同一組規則（`api/index.py` 的 `_PLATFORM_BRIEF`）餵給寫文案的模型——一份是給人看的檢查，一份是給模型的指示，刻意不共用。
@@ -474,6 +551,7 @@ Meta App Secret **刻意不放進 `clubs.settings`**：`GET /api/clubs` 是**公
 | `R2_SECRET_ACCESS_KEY` | R2 API Token Secret |
 | `R2_BUCKET_NAME` | R2 Bucket 名稱 |
 | `R2_PUBLIC_URL` | R2 Public Development URL（`https://pub-xxx.r2.dev`） |
+| `CREDENTIALS_SECRET_KEY` | 加密 AI 金鑰與 Meta App Secret 的主密鑰（`openssl rand -base64 32`）。**未設定時儲存金鑰會直接失敗**，不會以明文落地 |
 
 > ⚠️ `INVITE_CODE` 已移除：自行註冊改為審核制，不再需要邀請碼。
 
@@ -548,7 +626,10 @@ R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
 R2_BUCKET_NAME=your-bucket-name
 R2_PUBLIC_URL=https://pub-xxx.r2.dev
+CREDENTIALS_SECRET_KEY=用 openssl rand -base64 32 產生
 ```
+
+> `CREDENTIALS_SECRET_KEY` 本機與 Vercel **必須是同一組**，否則兩邊存的金鑰互相解不開。輪換它會讓既有金鑰全部失效，需要各使用者重新設定一次。
 
 ---
 

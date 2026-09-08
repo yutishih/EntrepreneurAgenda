@@ -8,18 +8,17 @@ import Sidebar from '@/components/Sidebar';
 import './social.css';
 
 // ================================================================
-// 社群發文 — Phase 0: composer + draft box
+// 社群發文 — composer, draft box, and publishing
 // ================================================================
 // Same imperative-DOM style as the other pages (see app/roles/page.js for the
 // rationale). Module-level `let` mirrors what used to be inline <script>
 // globals.
 //
-// Nothing here publishes to Facebook / Instagram / Threads. Every one of them
-// gates posting behind an app review, so this phase does the half that is not
-// blocked on anyone: write the copy, attach the images, check each platform's
-// rules, copy it out. The stored shape (`body` + per-platform `variants` +
-// `images` as public URLs) is exactly what the publishing APIs will want, so
-// Phase 1 adds a button rather than a rewrite.
+// Writes the copy, attaches the images, checks each platform's rules, and
+// publishes to Facebook / Instagram / Threads. Publishing needs the club to
+// have connected an account first (分會管理 → 社群); an unconnected platform
+// shows as 未連接帳號 in the publish dialog rather than failing at post time.
+// It runs as an ai_jobs job, not a request — see runPublish().
 //
 // AI keys belong to the *user*, not the server: the browser never sees a key
 // once saved (the API returns a masked hint only), and every generate call
@@ -1075,7 +1074,7 @@ export default function SocialPage() {
             </div>
             <div className="toolbar-spacer"></div>
             <span className="pager-label">
-              尚未串接平台 API，這裡負責寫稿與備圖，發布請先手動複製貼上。
+              發布前請先到「分會管理 → 社群」連接平台帳號；未連接的平台在發布視窗會顯示「未連接帳號」且無法勾選。
             </span>
           </div>
 

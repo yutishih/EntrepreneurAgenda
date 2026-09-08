@@ -966,12 +966,11 @@ def fetch_roles_sheet(club_id: int, user: dict = Depends(require_club_admin_or_a
 
 
 # ------------------------------------------------------------------ social posts
-# Phase 0 of the 社群發文 feature: a composer + draft box. Nothing is published
-# to Facebook / Instagram / Threads from here yet — every platform gates its
-# publishing permissions behind an app review, which is calendar time rather
-# than code. What this does give is the part that stays useful either way:
-# per-platform copy, images, and a preview, ready to be copied out by hand
-# today and handed to the platform APIs later without reshaping the data.
+# Draft storage for the 社群發文 feature: one row per post, holding the shared
+# body plus a per-platform variant and the image URLs. Publishing to Facebook /
+# Instagram / Threads lives further down in the META section and reads exactly
+# this shape — a post is stored the same way whether it is ever published or
+# only copied out by hand.
 
 SOCIAL_PLATFORMS = ("facebook", "instagram", "threads")
 
@@ -1496,7 +1495,7 @@ def _generate_image(username: str, club_id: Optional[int], params: dict) -> dict
 
     # Straight into R2: Instagram and Threads can only publish an image the
     # platform itself can fetch over HTTP, so a post's images have to live at a
-    # public URL anyway. Phase 1 gets that for free.
+    # public URL anyway, and publishing gets that for free.
     base = f"media/clubs/{club_id}/social" if club_id else "media/social"
     key = f"{base}/{uuid.uuid4()}.png"
     try:

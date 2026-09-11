@@ -2087,9 +2087,9 @@ def _await_ready(read_state, container_id: str, what: str, deadline: float):
     """
     Block until Meta has finished processing a container.
 
-    Only called when a video is involved. Image containers are ready the
-    moment they are created, and polling them would add a round trip to the
-    path that already works.
+    Skipped for a lone image, which is publishable immediately. Used for every
+    video, and — see the carousel branches — for every carousel child whatever
+    its kind.
     """
     while True:
         state, err = read_state(container_id)
@@ -2213,10 +2213,10 @@ def _publish_instagram(account: dict, text: str, media: list, deadline: float) -
             if not cid:
                 raise HTTPException(status_code=502, detail="Instagram 沒有建立輪播項目")
             children.append((cid, m["kind"]))
-        # Every video child has to finish before the parent will accept it.
-        for cid, kind in children:
-            if kind == "video":
-                _await_ready(wait, cid, "Instagram", deadline)
+        # Every child, not only the videos. A freshly created child id is not
+        # usable by the parent straight away — see the note in _publish_threads.
+        for cid, _kind in children:
+            _await_ready(wait, cid, "Instagram", deadline)
         container = _fb(f"{ig}/media", {
             "media_type": "CAROUSEL",
             "children": ",".join(c for c, _ in children),
@@ -2287,9 +2287,13 @@ def _publish_threads(account: dict, text: str, media: list, deadline: float) -> 
             if not cid:
                 raise HTTPException(status_code=502, detail="Threads 沒有建立輪播項目")
             children.append((cid, m["kind"]))
-        for cid, kind in children:
-            if kind == "video":
-                _await_ready(wait, cid, "Threads", deadline)
+        # Every child, not only the videos. An image child is NOT ready the
+        # moment it is created — one was observed reporting IN_PROGRESS on the
+        # first read and FINISHED on the next — and handing the parent a child
+        # that is not yet FINISHED fails as "Invalid parameter [100/4279004]",
+        # which names neither the child nor the reason.
+        for cid, _kind in children:
+            _await_ready(wait, cid, "Threads", deadline)
         container = step("建立輪播容器", f"{th}/threads", {
             "media_type": "CAROUSEL",
             "children": ",".join(c for c, _ in children),

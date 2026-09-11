@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 import uuid
 import bcrypt
 import jwt
@@ -1505,7 +1506,7 @@ def _generate_image(username: str, club_id: Optional[int], params: dict) -> dict
     except Exception:
         raise HTTPException(status_code=502, detail="圖片產生成功，但上傳雲端失敗")
 
-    return {"url": f"{R2_PUBLIC_URL}/{key}", "name": "AI 生成圖片"}
+    return {"url": f"{R2_PUBLIC_URL}/{key}", "name": "AI 生成圖片", "type": "image"}
 
 
 _JOB_RUNNERS = {"image": _generate_image}
@@ -2033,16 +2034,92 @@ def meta_select_page(club_id: int, req: MetaSelectPageRequest,
 
 # ------------------------------------------------------------------ publishing
 # Three different shapes for "post this":
-#   Facebook  — one call for text, /photos for a single image, unpublished
-#               photo ids stitched onto /feed for several.
+#   Facebook  — /feed for text, /photos for one image, unpublished photo ids
+#               stitched onto /feed for several, /videos for a video. A Page
+#               post is a video OR photos, never both.
 #   Instagram — always two steps (create a container, then publish it), and it
-#               refuses to post without media. Several images means a carousel:
-#               a container per child, then a CAROUSEL parent.
+#               refuses to post without media. Several items means a carousel:
+#               a container per child, then a CAROUSEL parent. A lone video is
+#               a REELS container, not a VIDEO one.
 #   Threads   — same two-step container/publish idea as Instagram, on its own
-#               host, but text-only is allowed.
+#               host, but text-only is allowed. Carousels take the same shape
+#               as Instagram's.
 #
-# All three take the image as a URL Meta fetches for itself; none of them
-# accept bytes. That is why generated and uploaded images go to R2 first.
+# All three take the file as a URL Meta fetches for itself; none of them accept
+# bytes. That is why generated and uploaded files go to R2 first.
+#
+# Videos add a wait that images do not have: the container is accepted
+# immediately but is not publishable until Meta finishes transcoding it.
+
+# The JSONB column is still called `images` although it now holds videos too.
+# Renaming it would cost a migration and buy nothing that the per-item `type`
+# does not already say; `_media_kind` is the single place that decides.
+_VIDEO_EXTS = (".mp4", ".mov", ".m4v", ".webm")
+
+# How long a publish job may spend waiting for Meta to transcode. This is a
+# budget for the WHOLE job, not per platform: three platforms each waiting
+# their own full share would run past vercel.json's maxDuration and be killed
+# mid-flight, losing the record of what had already gone out. Set below that
+# ceiling on purpose, so running out produces our own message instead.
+_MEDIA_READY_BUDGET  = 40      # seconds
+_MEDIA_POLL_INTERVAL = 3
+
+
+def _media_kind(item) -> str:
+    """'image' or 'video' for one attachment."""
+    url = ""
+    if isinstance(item, dict):
+        if item.get("type") in ("image", "video"):
+            return item["type"]          # what the uploader recorded
+        url = item.get("url") or ""
+    else:
+        url = item or ""
+    # Rows written before uploads recorded a type, and AI images, have none.
+    return "video" if url.split("?", 1)[0].lower().endswith(_VIDEO_EXTS) else "image"
+
+
+def _media_list(raw) -> list:
+    return [{"url": i["url"], "kind": _media_kind(i)}
+            for i in (raw or []) if isinstance(i, dict) and i.get("url")]
+
+
+def _await_ready(read_state, container_id: str, what: str, deadline: float):
+    """
+    Block until Meta has finished processing a container.
+
+    Only called when a video is involved. Image containers are ready the
+    moment they are created, and polling them would add a round trip to the
+    path that already works.
+    """
+    while True:
+        state, err = read_state(container_id)
+        if state in ("FINISHED", "PUBLISHED"):
+            return
+        if state in ("ERROR", "EXPIRED"):
+            raise HTTPException(status_code=502,
+                                detail=f"{what} 影片處理失敗：{err or state}")
+        if time.monotonic() >= deadline:
+            raise HTTPException(
+                status_code=504,
+                detail=f"{what} 的影片還在轉檔，等了 {_MEDIA_READY_BUDGET} 秒仍未完成。"
+                       "影片較長時這是正常的，稍後重發一次即可——這則並未發布，"
+                       "不會變成兩則。")
+        time.sleep(_MEDIA_POLL_INTERVAL)
+
+
+def _ig_state(token: str):
+    def read(cid):
+        r = _fb(cid, {"fields": "status_code,status", "access_token": token})
+        return r.get("status_code") or "", r.get("status") or ""
+    return read
+
+
+def _th_state(token: str):
+    def read(cid):
+        r = _th(cid, {"fields": "status,error_message", "access_token": token})
+        return r.get("status") or "", r.get("error_message") or ""
+    return read
+
 
 def _require_account(club_id: int, platform: str) -> dict:
     account = _load_social_account(club_id, platform)
@@ -2055,21 +2132,36 @@ def _require_account(club_id: int, platform: str) -> dict:
     return account
 
 
-def _publish_facebook(account: dict, text: str, images: list) -> dict:
+def _publish_facebook(account: dict, text: str, media: list, deadline: float) -> dict:
     page, token = account["accountId"], account["token"]
+    videos = [m["url"] for m in media if m["kind"] == "video"]
+    photos = [m["url"] for m in media if m["kind"] == "image"]
 
-    if not images:
+    if videos:
+        # A Page post is a video or photos, never both, and /videos takes one
+        # file. Splitting into two posts changes what gets published, so it is
+        # the writer's call — refuse rather than silently drop the rest.
+        if len(videos) > 1 or photos:
+            raise HTTPException(
+                status_code=400,
+                detail="Facebook 一則貼文只能放一支影片，且不能同時放圖片，請分成兩則發布")
+        # Facebook transcodes after accepting, and the post appears when it is
+        # done. Nothing to wait for here, unlike Instagram and Threads.
+        res = _fb(f"{page}/videos",
+                  {"file_url": videos[0], "description": text, "access_token": token},
+                  method="POST")
+    elif not photos:
         res = _fb(f"{page}/feed", {"message": text, "access_token": token}, method="POST")
-    elif len(images) == 1:
+    elif len(photos) == 1:
         res = _fb(f"{page}/photos",
-                  {"url": images[0], "caption": text, "access_token": token}, method="POST")
+                  {"url": photos[0], "caption": text, "access_token": token}, method="POST")
     else:
         # Upload each photo unpublished, then attach them all to one feed post.
         media_ids = [
             _fb(f"{page}/photos",
                 {"url": url, "published": "false", "access_token": token},
                 method="POST").get("id")
-            for url in images
+            for url in photos
         ]
         params = {"message": text, "access_token": token}
         for i, mid in enumerate(m for m in media_ids if m):
@@ -2081,64 +2173,134 @@ def _publish_facebook(account: dict, text: str, images: list) -> dict:
             "url": f"https://www.facebook.com/{post_id}" if post_id else ""}
 
 
-def _publish_instagram(account: dict, text: str, images: list) -> dict:
-    ig, token = account["accountId"], account["token"]
-    if not images:
-        raise HTTPException(status_code=400, detail="Instagram 貼文一定要有圖片")
+# Carousel sizes the platforms enforce themselves. Checked here so the message
+# names the limit instead of relaying a Meta error about `children`.
+_IG_CAROUSEL_MAX = 10
+_TH_CAROUSEL_MAX = 20
 
-    if len(images) == 1:
-        container = _fb(f"{ig}/media",
-                        {"image_url": images[0], "caption": text, "access_token": token},
-                        method="POST")
+
+def _publish_instagram(account: dict, text: str, media: list, deadline: float) -> dict:
+    ig, token = account["accountId"], account["token"]
+    if not media:
+        raise HTTPException(status_code=400, detail="Instagram 貼文一定要有圖片或影片")
+    if len(media) > _IG_CAROUSEL_MAX:
+        raise HTTPException(status_code=400,
+                            detail=f"Instagram 輪播最多 {_IG_CAROUSEL_MAX} 個項目")
+    wait = _ig_state(token)
+    has_video = any(m["kind"] == "video" for m in media)
+
+    if len(media) == 1:
+        one = media[0]
+        if one["kind"] == "video":
+            # A single video is a Reel. Instagram has no one-video feed post
+            # any more — asking for VIDEO here gets it filed as a Reel anyway.
+            container = _fb(f"{ig}/media", {
+                "media_type": "REELS", "video_url": one["url"],
+                "caption": text, "access_token": token}, method="POST")
+        else:
+            container = _fb(f"{ig}/media", {
+                "image_url": one["url"], "caption": text,
+                "access_token": token}, method="POST")
     else:
-        children = [
-            _fb(f"{ig}/media",
-                {"image_url": url, "is_carousel_item": "true", "access_token": token},
-                method="POST").get("id")
-            for url in images
-        ]
+        children = []
+        for m in media:
+            child = {"is_carousel_item": "true", "access_token": token}
+            if m["kind"] == "video":
+                child.update({"media_type": "VIDEO", "video_url": m["url"]})
+            else:
+                child["image_url"] = m["url"]
+            cid = _fb(f"{ig}/media", child, method="POST").get("id")
+            if not cid:
+                raise HTTPException(status_code=502, detail="Instagram 沒有建立輪播項目")
+            children.append((cid, m["kind"]))
+        # Every video child has to finish before the parent will accept it.
+        for cid, kind in children:
+            if kind == "video":
+                _await_ready(wait, cid, "Instagram", deadline)
         container = _fb(f"{ig}/media", {
             "media_type": "CAROUSEL",
-            "children": ",".join(c for c in children if c),
+            "children": ",".join(c for c, _ in children),
             "caption": text, "access_token": token,
         }, method="POST")
 
     creation_id = container.get("id")
     if not creation_id:
         raise HTTPException(status_code=502, detail="Instagram 沒有建立貼文容器")
+    if has_video:
+        _await_ready(wait, creation_id, "Instagram", deadline)
 
     res = _fb(f"{ig}/media_publish",
               {"creation_id": creation_id, "access_token": token}, method="POST")
     media_id = res.get("id", "")
     permalink = ""
     if media_id:
-        permalink = _fb(media_id, {"fields": "permalink", "access_token": token}).get("permalink", "")
+        # Cosmetic only, and the post is already public — see the same guard
+        # in _publish_threads for why this must not raise.
+        try:
+            permalink = _fb(media_id, {"fields": "permalink",
+                                       "access_token": token}).get("permalink", "")
+        except HTTPException:
+            permalink = ""
     return {"id": media_id, "url": permalink}
 
 
-def _publish_threads(account: dict, text: str, images: list) -> dict:
+def _publish_threads(account: dict, text: str, media: list, deadline: float) -> dict:
     th, token = account["accountId"], account["token"]
+    if len(media) > _TH_CAROUSEL_MAX:
+        raise HTTPException(status_code=400,
+                            detail=f"Threads 輪播最多 {_TH_CAROUSEL_MAX} 個項目")
+    wait = _th_state(token)
+    has_video = any(m["kind"] == "video" for m in media)
 
     def step(label, *args, **kwargs):
-        """Publishing is three calls; the error must say which one broke."""
+        """Publishing is several calls; the error must say which one broke."""
         try:
             return _th(*args, **kwargs)
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code,
                                 detail=f"{label}：{e.detail}")
 
-    params = {"text": text, "access_token": token}
-    if images:
-        # Only the first image: a Threads carousel is a different container
-        # shape, and one picture is what these posts actually use.
-        params.update({"media_type": "IMAGE", "image_url": images[0]})
-    else:
-        params["media_type"] = "TEXT"
+    def item(m, carousel):
+        p = {"access_token": token}
+        if carousel:
+            p["is_carousel_item"] = "true"
+        else:
+            p["text"] = text
+        if m["kind"] == "video":
+            p.update({"media_type": "VIDEO", "video_url": m["url"]})
+        else:
+            p.update({"media_type": "IMAGE", "image_url": m["url"]})
+        return p
 
-    container = step("建立貼文容器", f"{th}/threads", params, method="POST")
+    if not media:
+        container = step("建立貼文容器", f"{th}/threads",
+                         {"media_type": "TEXT", "text": text, "access_token": token},
+                         method="POST")
+    elif len(media) == 1:
+        container = step("建立貼文容器", f"{th}/threads",
+                         item(media[0], carousel=False), method="POST")
+    else:
+        children = []
+        for m in media:
+            cid = step("建立輪播項目", f"{th}/threads",
+                       item(m, carousel=True), method="POST").get("id")
+            if not cid:
+                raise HTTPException(status_code=502, detail="Threads 沒有建立輪播項目")
+            children.append((cid, m["kind"]))
+        for cid, kind in children:
+            if kind == "video":
+                _await_ready(wait, cid, "Threads", deadline)
+        container = step("建立輪播容器", f"{th}/threads", {
+            "media_type": "CAROUSEL",
+            "children": ",".join(c for c, _ in children),
+            "text": text, "access_token": token,
+        }, method="POST")
+
     creation_id = container.get("id")
     if not creation_id:
         raise HTTPException(status_code=502, detail="Threads 沒有建立貼文容器")
+    if has_video:
+        _await_ready(wait, creation_id, "Threads", deadline)
 
     res = step("發布容器", f"{th}/threads_publish",
                {"creation_id": creation_id, "access_token": token}, method="POST")
@@ -2154,7 +2316,6 @@ def _publish_threads(account: dict, text: str, images: list) -> dict:
         except HTTPException:
             permalink = ""
     return {"id": post_id, "url": permalink}
-
 
 _PUBLISHERS = {
     "facebook":  _publish_facebook,
@@ -2195,8 +2356,13 @@ def _run_publish_job(username: str, club_id: Optional[int], params: dict) -> dic
 
     club     = row[0]
     variants = row[2] or {}
-    images   = [i.get("url") for i in (row[3] or []) if i.get("url")]
+    media    = _media_list(row[3])
     published = dict(row[4] or {})
+
+    # One transcoding budget for the whole job. Per-platform budgets would add
+    # up past the function's maxDuration and get the invocation killed, which
+    # loses the record of whatever had already gone out.
+    deadline = time.monotonic() + _MEDIA_READY_BUDGET
 
     results = {}
     for platform in platforms:
@@ -2206,7 +2372,7 @@ def _run_publish_job(username: str, club_id: Optional[int], params: dict) -> dic
             if not text:
                 raise HTTPException(status_code=400, detail="文案是空的")
             account = _require_account(club, platform)
-            out = _PUBLISHERS[platform](account, text, images)
+            out = _PUBLISHERS[platform](account, text, media, deadline)
             out["at"] = datetime.now(timezone.utc).isoformat()
             results[platform] = {"ok": True, **out}
             published[platform] = out

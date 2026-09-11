@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { apiJson } from '@/lib/api';
 import { setAuth, clearAuth, applyRoleUI, isSystemAdmin, canWrite, getClubId } from '@/lib/auth';
-import { SOCIAL_PLATFORMS, PLATFORM_KEYS, platformSpec, platformWarnings } from '@/lib/socialPlatforms';
+import { SOCIAL_PLATFORMS, PLATFORM_KEYS, platformSpec, platformWarnings,
+         mediaKind, mediaLabel } from '@/lib/socialPlatforms';
 import Sidebar from '@/components/Sidebar';
 import './social.css';
 
@@ -186,7 +187,7 @@ function renderList() {
         <span class="post-row-title">${esc(p.title || '（未命名）')}</span>
         <span class="status-chip status-${esc(p.status)}">${esc(STATUS_LABELS[p.status] || p.status)}</span>
       </div>
-      <div class="post-row-sub">${esc(when)}${p.images?.length ? ` · ${p.images.length} 張圖` : ''}</div>
+      <div class="post-row-sub">${esc(when)}${p.images?.length ? ` · ${mediaLabel(p.images)}` : ''}</div>
     </button>`;
   }).join('');
 }
@@ -283,13 +284,13 @@ function renderEditor() {
     </div>
 
     <div class="ed-block">
-      <label class="ed-label">圖片</label>
+      <label class="ed-label">圖片／影片</label>
       <div id="imgStrip" class="img-strip"></div>
       ${canWrite() ? `
       <div class="img-actions">
         <label class="btn-mini btn-file">
-          上傳圖片
-          <input type="file" accept="image/*" multiple onchange="window.__socialUpload(this)">
+          上傳圖片／影片
+          <input type="file" accept="image/*,video/*" multiple onchange="window.__socialUpload(this)">
         </label>
         <button class="btn-mini" onclick="window.__socialOpenImg()">AI 生圖</button>
         <span class="ai-bar-hint">AI 生圖使用你自己的 OpenAI 帳號。</span>
@@ -375,13 +376,18 @@ function renderImages() {
   // visible without blocking the rest of the editor.
   const mine = pendingImages.filter((j) => j.owner === current);
   if (!current.images.length && !mine.length) {
-    strip.innerHTML = '<div class="img-empty">還沒有圖片。Instagram 貼文一定要有圖。</div>';
+    strip.innerHTML = '<div class="img-empty">還沒有圖片或影片。Instagram 貼文一定要有一個。</div>';
     return;
   }
 
   strip.innerHTML = current.images.map((img, i) => `
     <div class="img-thumb">
-      <img src="${esc(img.url)}" alt="${esc(img.name || '')}">
+      ${mediaKind(img) === 'video'
+        // preload=metadata so the tile shows a real frame without pulling the
+        // whole file; these are meeting clips, not thumbnails.
+        ? `<video src="${esc(img.url)}" muted playsinline preload="metadata"></video>
+           <span class="img-badge">影片</span>`
+        : `<img src="${esc(img.url)}" alt="${esc(img.name || '')}">`}
       ${canWrite() ? `<button class="img-del" onclick="window.__socialRemoveImage(${i})" title="移除">✕</button>` : ''}
     </div>`).join('') + mine.map((j) => `
     <div class="img-thumb pending" title="${esc(j.prompt)}">
@@ -480,7 +486,12 @@ async function uploadImages(input) {
         method: 'PUT', headers: { 'Content-Type': file.type }, body: file,
       });
       if (!res.ok) throw new Error('上傳至雲端失敗');
-      current.images.push({ url: publicUrl, name: file.name });
+      current.images.push({
+        url: publicUrl, name: file.name,
+        // Recorded at upload time rather than sniffed later: the browser knows
+        // exactly what it just sent, and R2 keys do not always keep a suffix.
+        type: file.type.startsWith('video/') ? 'video' : 'image',
+      });
     }
     renderImages();
     refreshPaneMeta();          // an image can clear Instagram's "需要圖片" error

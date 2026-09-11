@@ -2087,9 +2087,10 @@ def _await_ready(read_state, container_id: str, what: str, deadline: float):
     """
     Block until Meta has finished processing a container.
 
-    Skipped for a lone image, which is publishable immediately. Used for every
-    video, and — see the carousel branches — for every carousel child whatever
-    its kind.
+    Called before every publish, and for every carousel child. Nothing Meta
+    hands back is publishable the instant it is created — not videos, not
+    images, not the CAROUSEL parent — and the errors for acting too early name
+    neither the container nor the reason.
     """
     while True:
         state, err = read_state(container_id)
@@ -2187,7 +2188,6 @@ def _publish_instagram(account: dict, text: str, media: list, deadline: float) -
         raise HTTPException(status_code=400,
                             detail=f"Instagram 輪播最多 {_IG_CAROUSEL_MAX} 個項目")
     wait = _ig_state(token)
-    has_video = any(m["kind"] == "video" for m in media)
 
     if len(media) == 1:
         one = media[0]
@@ -2226,8 +2226,7 @@ def _publish_instagram(account: dict, text: str, media: list, deadline: float) -
     creation_id = container.get("id")
     if not creation_id:
         raise HTTPException(status_code=502, detail="Instagram 沒有建立貼文容器")
-    if has_video:
-        _await_ready(wait, creation_id, "Instagram", deadline)
+    _await_ready(wait, creation_id, "Instagram", deadline)
 
     res = _fb(f"{ig}/media_publish",
               {"creation_id": creation_id, "access_token": token}, method="POST")
@@ -2250,7 +2249,6 @@ def _publish_threads(account: dict, text: str, media: list, deadline: float) -> 
         raise HTTPException(status_code=400,
                             detail=f"Threads 輪播最多 {_TH_CAROUSEL_MAX} 個項目")
     wait = _th_state(token)
-    has_video = any(m["kind"] == "video" for m in media)
 
     def step(label, *args, **kwargs):
         """Publishing is several calls; the error must say which one broke."""
@@ -2303,8 +2301,12 @@ def _publish_threads(account: dict, text: str, media: list, deadline: float) -> 
     creation_id = container.get("id")
     if not creation_id:
         raise HTTPException(status_code=502, detail="Threads 沒有建立貼文容器")
-    if has_video:
-        _await_ready(wait, creation_id, "Threads", deadline)
+    # Unconditionally, not just for video. A CAROUSEL parent reports
+    # IN_PROGRESS the moment it is created and FINISHED about two seconds
+    # later; publishing it in between fails as "The requested resource does
+    # not exist [24/4279009]". A text container is ready at once, so the extra
+    # read costs one round trip and removes a whole class of this bug.
+    _await_ready(wait, creation_id, "Threads", deadline)
 
     res = step("發布容器", f"{th}/threads_publish",
                {"creation_id": creation_id, "access_token": token}, method="POST")

@@ -1741,8 +1741,15 @@ def _graph(url: str, params: dict = None, method: str = "GET") -> dict:
             return json.loads(res.read(8 * 1024 * 1024).decode("utf-8"))
     except urllib.error.HTTPError as e:
         try:
-            body = json.loads(e.read().decode("utf-8"))
-            msg = (body.get("error") or {}).get("message") or str(body)
+            err = (json.loads(e.read().decode("utf-8")).get("error") or {})
+            msg = err.get("message") or f"HTTP {e.code}"
+            # The code/subcode pair is the searchable half of a Meta error.
+            # The prose alone is not enough to act on: "The requested
+            # resource does not exist" is returned for several unrelated
+            # causes, and without the code there is no way to tell which.
+            tags = [str(err[k]) for k in ("code", "error_subcode") if err.get(k)]
+            if tags:
+                msg = f"{msg} [{'/'.join(tags)}]"
         except Exception:
             msg = f"HTTP {e.code}"
         raise HTTPException(status_code=502, detail=f"Meta 回應錯誤：{msg}"[:400])
@@ -2112,6 +2119,14 @@ def _publish_instagram(account: dict, text: str, images: list) -> dict:
 def _publish_threads(account: dict, text: str, images: list) -> dict:
     th, token = account["accountId"], account["token"]
 
+    def step(label, *args, **kwargs):
+        """Publishing is three calls; the error must say which one broke."""
+        try:
+            return _th(*args, **kwargs)
+        except HTTPException as e:
+            raise HTTPException(status_code=e.status_code,
+                                detail=f"{label}：{e.detail}")
+
     params = {"text": text, "access_token": token}
     if images:
         # Only the first image: a Threads carousel is a different container
@@ -2120,17 +2135,24 @@ def _publish_threads(account: dict, text: str, images: list) -> dict:
     else:
         params["media_type"] = "TEXT"
 
-    container = _th(f"{th}/threads", params, method="POST")
+    container = step("建立貼文容器", f"{th}/threads", params, method="POST")
     creation_id = container.get("id")
     if not creation_id:
         raise HTTPException(status_code=502, detail="Threads 沒有建立貼文容器")
 
-    res = _th(f"{th}/threads_publish",
-              {"creation_id": creation_id, "access_token": token}, method="POST")
+    res = step("發布容器", f"{th}/threads_publish",
+               {"creation_id": creation_id, "access_token": token}, method="POST")
     post_id = res.get("id", "")
     permalink = ""
     if post_id:
-        permalink = _th(post_id, {"fields": "permalink", "access_token": token}).get("permalink", "")
+        # Cosmetic: the post is already public by now. Letting a failed
+        # permalink lookup raise would report a successful post as failed
+        # and invite the user to publish it a second time.
+        try:
+            permalink = _th(post_id, {"fields": "permalink",
+                                      "access_token": token}).get("permalink", "")
+        except HTTPException:
+            permalink = ""
     return {"id": post_id, "url": permalink}
 
 

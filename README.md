@@ -335,9 +335,26 @@ const META_FIELDS = [
 
 LinkedIn 刻意不做——它的發布 API 卡在合作夥伴審核，做出一個按不下去的分頁只會誤導。
 
-### ⚠️ 發布這段程式碼從未對真實 API 執行過
+### 狀態：哪些真的發出去過
 
-Meta 的串接需要一個已建立的 App、通過的審核、以及真實 token 才能跑，開發時三者都沒有。所以那整段刻意集中在 `api/index.py` 的單一區塊，**所有失敗都原樣透出 Meta 自己的錯誤訊息**——第一次真的接上去時，那些訊息才是告訴你缺哪一步設定的東西。請把它當作「已寫完但待驗證」，不是「已驗證可用」。
+2026-09-11 第一次接上真實的 Meta App。**不要假設沒打勾的那幾行能用。**
+
+| 路徑 | 狀態 |
+|---|---|
+| Facebook 純文字 | ✅ 實際發布成功 |
+| Threads 純文字 | ✅ 實際發布成功 |
+| Facebook 圖片（單張／多張）| ⚠️ 已寫完，未驗證 |
+| Instagram（全部）| ⚠️ 已寫完，未驗證 |
+| Threads 輪播 | ⚠️ 已寫完，未驗證 |
+| 影片（三個平台）| ⚠️ 已寫完，未驗證 |
+
+所有 Meta 相關的程式碼刻意集中在 `api/index.py` 的單一區塊，**失敗一律原樣透出 Meta 自己的錯誤訊息**，並補上**錯誤碼**與**失敗的步驟名**：
+
+```
+建立貼文容器：Meta 回應錯誤：Unsupported post request. Object with ID … [100/33]
+```
+
+方括號裡那組 `code/subcode` 才是可以拿去查的東西。只有散文訊息時查不到——「The requested resource does not exist」對應好幾種互不相干的成因。
 
 ### 兩條路：送審，或用開發模式
 
@@ -357,7 +374,7 @@ Meta 的串接需要一個已建立的 App、通過的審核、以及真實 toke
 #### 先決條件
 
 - 一個 Facebook **粉絲專頁**（不是個人帳號），而且你是它的管理員
-- 要發 IG 的話：IG 必須是**商業或創作者帳號**，且**已連結到那個粉專**。個人帳號拿不到 `instagram_content_publish`
+- 要發 IG 的話，還有兩個條件，見步驟 E
 
 #### A. 建立 App
 
@@ -370,70 +387,162 @@ Meta 的串接需要一個已建立的 App、通過的審核、以及真實 toke
 
 「應用程式設定」→「基本資料」：**應用程式編號** = App ID，**應用程式密鑰** = App Secret（按「顯示」需再輸一次 FB 密碼）。
 
-#### C. Facebook 登入 + 重新導向 URI
+#### C. 網域、平台、重新導向 URI ← 三個欄位，兩個頁面
 
-1. 「新增產品」→ **Facebook 登入** → 設定
-2. 「Facebook 登入 → 設定」→ **「有效的 OAuth 重新導向 URI」**填 `<你的網域>/club`
-3. 儲存
+少任何一個都會被擋，而且三者的格式都不一樣。
 
-確切那一串不要用猜的——分會管理 →「社群」畫面上就印出來給你複製（由 `location.origin` 算出）。**漏掉這步 Meta 會直接拒絕授權**，這是最常見的第一個錯誤。
+**C-1「基本資料」頁**
 
-#### D. Instagram
+1. 拉到頁面**最下方** →「＋ 新增平台」→ 選**網站** → 網址填 `https://<你的網域>/`
+2. 回到頁面**上半部** →「**應用程式網域**」填 `<你的網域>`
+3. 儲存變更
 
-「新增產品」→ **Instagram**（Graph API）→ 設定。開發模式下不需額外設定，權限跟著粉專走。
+**順序不能顛倒**：沒有平台，應用程式網域存不起來。
 
-#### E. Threads（獨立的一套）
+**C-2「Facebook 登入 → 設定」頁**
 
-Threads 不共用 Facebook 登入，有自己的授權入口與 API host，所以介面上是另一顆按鈕。
+「**有效的 OAuth 重新導向 URI**」填 `https://<你的網域>/club`。同一區塊的「用戶端 OAuth 登入」與「網路 OAuth 登入」要開啟。
 
-1. 「新增產品」→ **Threads API**
-2. 它有**自己的**重新導向 URI 欄位，同樣填 `<你的網域>/club`
-3. 要發文的 Threads 帳號，其擁有者也要在 App 裡有角色（步驟 F）
+| 欄位 | 在哪頁 | 格式 |
+|---|---|---|
+| 應用程式網域 | 基本資料（上半）| `example.vercel.app`（純網域）|
+| 網站平台的網址 | 基本資料（最下方）| `https://example.vercel.app/` |
+| 有效的 OAuth 重新導向 URI | Facebook 登入 → 設定 | `https://example.vercel.app/club` |
 
-暫時不做 Threads 可以跳過，不影響 FB／IG。
+重新導向那一串不要用猜的——分會管理 →「社群」畫面上就印出來給你複製（由 `location.origin` 算出）。
 
-#### F. 把幹部加進 App 角色 ← 開發模式的關鍵
+漏掉 C-1 的症狀是授權頁顯示「**這個網址的網域未包含在應用程式的網域中**」。注意它講的是**應用程式網域**，不是重新導向 URI——這兩個是不同欄位，訊息很容易讓人去改錯的那一個。
+
+#### D. 加上發文權限（使用案例）
+
+企業型 App 預設只掛「商家專用 Facebook 登入」，而它**只管登入驗證，不含發文**。不加這步，授權頁會回：
+
+```
+Invalid Scopes: pages_manage_posts, instagram_content_publish
+```
+
+`Invalid` 不是拼錯，是「這個 App 沒有這個權限」。而且 Meta 會**直接把它丟掉**——就算按了同意，拿到的 token 也發不了文。
+
+左側「**使用案例**」→「＋ 新增使用案例」：
+
+| 使用案例 | 給你 |
+|---|---|
+| **管理粉絲專頁的所有內容** | `pages_manage_posts` |
+| **管理 Instagram 的訊息和內容** | `instagram_content_publish` |
+| **存取 Threads API** | `threads_content_publish`（見步驟 F）|
+
+加完之後還要點該使用案例的「**✎ 自訂**」→「**權限**」→ 逐一按「**新增**」。**只把使用案例加進來、沒按權限的「新增」，一樣是 Invalid Scopes。**
+
+核對 IG 的權限名稱剛好是 `instagram_content_publish`。若只提供 `instagram_business_content_publish`，那是 Instagram 原生登入的另一條路，跟本專案「用粉專 token 發 IG」的實作不相容。
+
+開發模式下顯示「標準存取權」就夠了；「進階存取權」才要送審，那是給非 App 成員使用時才需要。
+
+#### E. Instagram：把 IG 連到粉專
+
+App 這邊不用設定，權限跟著粉專走。真正會卡住的是 IG 帳號本身，有兩個條件：
+
+**1. 必須是專業帳號**
+
+IG App → 個人檔案 → ☰ → 設定和隱私 → 帳號類型和工具 → 切換為專業帳號（商業或創作者）。個人帳號不會出現在授權清單裡。
+
+**2. 必須連結到那個粉專** ← 最容易搞混的一步
+
+Meta 有兩種「連結 Instagram」，名字很像，只有一種有用：
+
+| | 連的是什麼 | 我們要的嗎 |
+|---|---|---|
+| **帳號中心**（Accounts Center）| IG 個人檔案 ↔ FB **個人**檔案 | ❌ 不是 |
+| **粉專的「連結的帳號」** | IG **專業帳號** ↔ FB **粉絲專頁** | ✅ 是這個 |
+
+只做了帳號中心那個，`instagram_business_account` 還是空的，程式一樣抓不到——因為程式是從**粉專**取 IG，不是直接取 IG：
+
+```python
+_fb("me/accounts", {"fields": "id,name,instagram_business_account{id,username}"})
+```
+
+做法（任一條都行）：
+
+- Meta Business Suite → ⚙ 設定 → **Instagram 帳號** → 連結帳號
+- 粉專 → 設定 → **連結的帳號** → Instagram
+- IG App → 編輯個人檔案 → **粉絲專頁**
+
+連好之後，那個 IG 才會出現在授權時的帳號清單裡。
+
+#### F. Threads：獨立的一套，連 App ID 都不同
+
+Threads 不共用 Facebook 登入。它有自己的授權入口（`threads.net`）、自己的 API host（`graph.threads.net`）、**自己的 App ID / Secret**，以及自己的測試人員名單。介面上因此是另一顆按鈕。
+
+1. 使用案例 →「**存取 Threads API**」→ **✎ 自訂**
+2. 拿 **Threads 應用程式編號 / 應用程式密鑰**——**這組跟步驟 B 的 Facebook App ID 不同**
+3. 同一頁的「**重新導向回呼網址**」填 `https://<你的網域>/club`。這是 Threads 專屬欄位，跟 C-2 那份是兩回事
+4. 「權限和功能」確認 `threads_basic`、`threads_content_publish` 已新增
+5. 最下方「**用戶權杖產生器**」→「新增或移除 Threads 測試人員」→ 邀請要發文的 Threads 帳號
+6. **那個帳號要自己接受邀請**：Threads → 設定 → 帳號 → **網站權限** → **邀請** → 接受
+
+第 2 步填錯（把 Facebook 的 App ID 填進來）會得到 `Authorization Failed: No app ID was sent with the request`——那句話會讓你去找一個其實存在的參數。
+
+第 6 步最容易漏，症狀是 `The user has not accepted the invite to test the app`。邀請不會有明顯通知，要自己走進那個選單找。
+
+Threads 帳號必須是**公開**的，私人帳號拿不到權杖。
+
+這兩組憑證在系統裡也是分開存的（`clubs.settings.threads_app_id` 與 `club_secrets.threads_app_secret`）。`_threads_app()` 讀它們，**刻意不回退到 Meta 那組**——回退不會讓它變得能用，只會把「你還沒填 Threads App ID」重新包裝成上面那句指向錯方向的話。
+
+暫時不做 Threads 可以整段跳過，不影響 FB／IG。
+
+#### G. 把幹部加進 App 角色 ← 開發模式的關鍵
 
 「應用程式設定」→「角色」→ 新增**管理員／開發人員／測試人員**。
 
-**沒有角色的人授權會失敗。** 所有要用這功能發文的幹部都要加進來，且他們得自己收 FB 通知去接受邀請。**每年 7/1 交接時要記得更新這份名單。**
+**沒有角色的人授權會失敗。** 所有要用這功能發文的幹部都要加進來，且他們得自己收 FB 通知去接受邀請。
 
-#### G. 回到系統連接
+**這份名單跟步驟 F 的 Threads 測試人員是兩張表**，Facebook 角色不涵蓋 Threads，反之亦然。**每年 7/1 交接時兩張都要更新。**
+
+#### H. 回到系統連接
 
 見下方「OAuth 流程」。填 App ID / Secret 需要伺服器已設定 `CREDENTIALS_SECRET_KEY`（secret 是加密存的，沒設會直接儲存失敗）。
 
-#### H. 第一次驗證順序
+#### I. 第一次驗證順序
 
-發布這段程式碼從未對真實 API 執行過，所以**照複雜度遞增**測，一次只加一個變數。用一則測試貼文，不要拿真的例會宣傳來試：
+**照複雜度遞增**測，一次只加一個變數。用測試貼文，不要拿真的例會宣傳來試：
 
-1. **FB 純文字** — 一次 Graph 呼叫，最單純
-2. **FB 單圖** — 走 `/photos`
-3. **FB 多圖** — 先傳未發布照片再串到 `/feed`，形狀最不一樣
-4. **Instagram** — 兩步式（建容器 → 發布），**沒圖一定失敗**，這是規格不是 bug
-5. **Threads** — 獨立 host，允許純文字
+1. **FB 純文字** — 一次 Graph 呼叫，最單純 ✅ 已驗證
+2. **Threads 純文字** — 獨立 host，允許純文字 ✅ 已驗證
+3. **FB 單圖 → FB 多圖** — 多圖形狀最不一樣（未發布照片 → `/feed`）
+4. **Threads 多圖** — 走輪播，沒有轉檔等待
+5. **Instagram** — 兩步式，**沒有媒體一定失敗**，這是規格不是 bug
+6. **短影片，單一平台** — 先確認轉檔等待邏輯
+7. **影片 + 多平台** — 最後測，最容易撞到時間預算
 
 每步成功後到平台上眼睛確認，然後**手動刪掉**測試貼文。
 
-#### 失敗訊息對照
+> 測試時**每次換一句文案**。Threads 疑似會擋重複內容（未證實）：同一段文字發第二次失敗過，而 Facebook 不擋，於是看起來很像「兩個平台一起發就壞」。
 
-錯誤是**原樣透出 Meta 自己的**，沒有被包裝——那串英文就是在說缺哪一步：
+#### 失敗訊息對照
 
 | 訊息大意 | 缺什麼 |
 |---|---|
-| `redirect_uri isn't an absolute URI` / `URL blocked` | 步驟 C 沒做或填錯 |
-| 提到 `pages_manage_posts` 未授予 | 授權的人在 App 沒有角色（步驟 F）|
-| `not a business account` 之類 | IG 還是個人帳號，或沒連到粉專 |
+| `這個網址的網域未包含在應用程式的網域中` | C-1：基本資料的「應用程式網域」＋網站平台 |
+| `redirect_uri isn't an absolute URI` / `URL blocked` | C-2 沒做或填錯 |
+| `Invalid Scopes: pages_manage_posts, …` | D：使用案例沒加，或加了但權限沒按「新增」|
+| 提到 `pages_manage_posts` 未授予 | 授權的人在 App 沒有角色（步驟 G）|
+| `not a business account` 之類 | IG 還是個人帳號，或沒連到粉專（步驟 E）|
+| `No app ID was sent with the request` | Threads 填成了 Facebook 的 App ID（F-2）|
+| `The user has not accepted the invite to test the app` | Threads 測試人員沒接受邀請（F-6）|
 | token 失效／過期 | 長效 token 約 60 天到期（`club_social_accounts.expires_at` 有存），重新連接一次 |
 
 ### 平台差異寫在哪
 
-`lib/socialPlatforms.js` 是唯一一份：字數上限、是否必須配圖、內文連結能不能點。編輯器的計數器、警告、預覽全部讀它。後端另有一份**散文版**的同一組規則（`api/index.py` 的 `_PLATFORM_BRIEF`）餵給寫文案的模型——一份是給人看的檢查，一份是給模型的指示，刻意不共用。
+`lib/socialPlatforms.js` 是唯一一份：字數上限、要不要媒體、影片與多媒體的規則、內文連結能不能點。編輯器的計數器、警告、發布視窗的可勾選狀態全部讀它。後端另有一份**散文版**的同一組規則（`api/index.py` 的 `_PLATFORM_BRIEF`）餵給寫文案的模型——一份是給人看的檢查，一份是給模型的指示，刻意不共用。
 
-| | 上限 | 一定要圖 | 內文連結 |
-|---|---|---|---|
-| Facebook | 63206 | 否 | 可點 |
-| Instagram | 2200 | **是** | **不可點**（要改寫成「連結在個人簡介」）|
-| Threads | 500 | 否 | 可點 |
+| | 字數上限 | 一定要媒體 | 影片 | 多個媒體 | 內文連結 |
+|---|---|---|---|---|---|
+| Facebook | 63206 | 否 | 1 支，**不能和圖片混放** | 多圖可 | 可點 |
+| Instagram | 2200 | **是** | 可，單支發成 **Reels** | 輪播上限 **10** | **不可點** |
+| Threads | 500 | 否 | 可 | 輪播上限 **20** | 可點 |
+
+Facebook 那條不是偷懶：Page 貼文就是「一支影片」**或**「若干張圖」，`/videos` 也只吃一個檔案。硬要合併只能悄悄丟掉東西，所以選擇在發布前擋下來並說明要分成兩則。
+
+hashtag 沒有特殊處理——就是文案的一部分，**算在字數裡**。AI 產文案時會依平台調整數量（FB 2–3 個、IG 5–10 個、Threads 1–2 個）。
 
 「FB 發了 IG 會不會跟著發」——不會。Meta 內建的跨平台分享只有 `IG → FB` 方向有自動開關；這裡是分別呼叫各自的 API，**你勾哪些平台就發哪些**。若同時開著 Meta 的跨平台分享，IG 會出現兩則重複貼文。
 
@@ -484,15 +593,35 @@ Meta App Secret **刻意不放進 `clubs.settings`**：`GET /api/clubs` 是**公
 2. 前端先存設定，再跟後端要授權網址，跳轉到 Meta
 3. Meta 導回 `<你的網域>/club`，頁面接住 `?code=`，換成長效 token
 4. 列出該帳號管理的粉專讓你挑一個 → 存下 Page token（IG 用同一個 Page token 授權）
-5. Threads 是**獨立的授權流程與 API host**（`graph.threads.net`），所以是另一顆按鈕
+5. Threads 是**另一顆按鈕**：獨立的授權入口（`threads.net`）、獨立的 API host（`graph.threads.net`）、**獨立的 App ID / Secret**，以及獨立的重新導向網址欄位
 
-**Valid OAuth Redirect URIs 必須把 `<你的網域>/club` 加進去**，否則 Meta 會直接拒絕。畫面上有把這串印出來給你複製。
+設定畫面因此有**兩組** App 憑證欄位，不是一組。`_meta_app()` 與 `_threads_app()` 各讀各的，後者不回退到前者——見步驟 F。
+
+重新導向網址同樣是兩份，`<你的網域>/club` 兩邊都要填。畫面上有把這串印出來給你複製。
+
+IG 的取得方式是**從粉專身上取**（`instagram_business_account`），不是直接取 IG 帳號。所以 IG 沒有連結到那個粉專時，授權再多次也拿不到——見步驟 E。
 
 ### 發布
 
 走跟生圖同一套 `ai_jobs` 管線——每個平台都是好幾次連續的 Graph 呼叫，所以前端輪詢 job 而不是掛著長請求。
 
-三個平台形狀都不同：Facebook 純文字一次呼叫、單圖走 `/photos`、多圖要先傳未發布的照片再串到 `/feed`；Instagram **一定是兩步**（建容器 → 發布）而且**沒有圖就拒收**，多圖是輪播；Threads 同樣是兩步但允許純文字。三者都只吃**圖片 URL**、不吃位元組——這就是為什麼所有圖片都先進 R2。
+三個平台形狀都不同：
+
+| | 純文字 | 單圖 | 多圖 | 影片 |
+|---|---|---|---|---|
+| Facebook | `/feed` | `/photos` | 未發布照片 → `attached_media` 串到 `/feed` | `/videos` + `file_url` |
+| Instagram | 拒收 | 容器 → 發布 | 子容器 → `CAROUSEL` → 發布 | 單支是 **REELS** 容器 |
+| Threads | `media_type=TEXT` | `IMAGE` | 子容器 → `CAROUSEL` → 發布 | `media_type=VIDEO` |
+
+三者都只吃**檔案 URL**、不吃位元組——這就是為什麼所有圖片和影片都先進 R2。
+
+**影片多一段等待**：容器被接受不代表可以發布，Meta 轉檔完成（`FINISHED`）之前 `media_publish` 與 `threads_publish` 都會失敗。所以有影片時會輪詢容器狀態；**只有影片會輪詢**，圖片容器建立當下就緒，多一次往返只會拖慢本來就能用的路徑。Facebook 沒有這段——它接收後自己轉檔，貼文晚點才出現。
+
+轉檔等待是**整個工作共用一份 40 秒預算**（`_MEDIA_READY_BUDGET`），不是每個平台各一份。各等各的會超過 `vercel.json` 的 `maxDuration`，invocation 被砍掉的話，連「哪些平台已經成功發布」的紀錄都會一起消失——那比等不到更糟。超時時該則**並未發布**，重試不會變成兩則。
+
+> 長影片或同時發多個平台很可能撞到這個上限。真正的解法是把 `maxDuration` 調高（Vercel Hobby 上限就是 60 秒，Pro 可到 300），不是把預算調大。
+
+附件的種類由**上傳當下記下的 `type`** 決定，副檔名只是舊資料的退路（`_media_kind`）。JSONB 欄位仍叫 `images` 雖然它現在也放影片：改名要一次 migration，而它換不到 `type` 沒說清楚的事。
 
 **單一平台失敗不會中斷其他平台**：Instagram 失敗不構成把 Facebook 那則收回的理由，所以結果是逐平台收集後一起回報。發布成功的連結存在 `social_posts.published`，編輯器會列出來，讓「要不要再發一次」是個知情的選擇。
 
@@ -552,6 +681,16 @@ Meta App Secret **刻意不放進 `clubs.settings`**：`GET /api/clubs` 是**公
 | `R2_BUCKET_NAME` | R2 Bucket 名稱 |
 | `R2_PUBLIC_URL` | R2 Public Development URL（`https://pub-xxx.r2.dev`） |
 | `CREDENTIALS_SECRET_KEY` | 加密 AI 金鑰與 Meta App Secret 的主密鑰（`openssl rand -base64 32`）。**未設定時儲存金鑰會直接失敗**，不會以明文落地 |
+
+以下為**選填**，只有「全站共用一個 App」才需要。各分會自己填 App ID / Secret 時用不到——分會層的值優先，這些只是沒填時的退路：
+
+| Key | Value |
+|-----|-------|
+| `META_APP_ID` / `META_APP_SECRET` | 全站共用的 Facebook App。**注意變數名是 `META_` 不是 `FACEBOOK_`**，取名 `FACEBOOK_APP_ID` 不會被讀到 |
+| `THREADS_APP_ID` / `THREADS_APP_SECRET` | 全站共用的 **Threads** App。跟上面那組是不同的值，見「Threads：獨立的一套」|
+| `META_GRAPH_VERSION` | Graph API 版本，預設 `v21.0` |
+| `OPENAI_TEXT_MODEL` | 寫文案的 OpenAI 模型，預設 `gpt-4o` |
+| `ANTHROPIC_API_KEY` | Claude 文案的伺服器退路（OpenAI 沒有對應退路，一定要使用者自己連）|
 
 > ⚠️ `INVITE_CODE` 已移除：自行註冊改為審核制，不再需要邀請碼。
 

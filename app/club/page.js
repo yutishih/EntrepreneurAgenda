@@ -204,6 +204,12 @@ function openModal(id = null, group = 'basic') {
 // through a dedicated endpoint and never read back — the UI only ever sees a
 // masked hint, because GET /api/clubs is a public endpoint and nothing secret
 // may travel with it.
+//
+// There are TWO pairs, not one. Threads issues its own App ID/Secret under the
+// "Access the Threads API" use case, and the Facebook pair is not interchangeable
+// with it — threads.net rejects the Facebook App ID as "No app ID was sent with
+// the request", which reads like a missing parameter rather than a wrong value.
+// Hence two sets of fields rather than one.
 
 const SOCIAL_LABELS = {
   facebook: 'Facebook 粉絲專頁',
@@ -228,6 +234,7 @@ async function loadSocialConfig(id) {
 function renderSocialConfig(cfg) {
   const body = document.getElementById('socialBody');
   const secretSet = !!cfg.metaAppSecretHint;
+  const thSecretSet = !!cfg.threadsAppSecretHint;
 
   const accounts = cfg.accounts.map((a) => `
     <div class="social-acc">
@@ -252,6 +259,21 @@ function renderSocialConfig(cfg) {
     <p class="modal-hint">App Secret 會加密後儲存，存好之後不會再顯示。
        ${cfg.serverFallback ? '未填時會改用伺服器預設的 App。' : ''}</p>
 
+    <div class="modal-section-label">Threads App（在「存取 Threads API」使用案例裡，另一組）</div>
+    <div class="modal-field">
+      <label>Threads App ID</label>
+      <input type="text" id="fThreadsAppId" value="${escAttr(cfg.threadsAppId || '')}"
+             placeholder="不填則無法連接 Threads">
+    </div>
+    <div class="modal-field">
+      <label>Threads App Secret${thSecretSet ? `（已設定 ${escAttr(cfg.threadsAppSecretHint)}，留空即不變更）` : ''}</label>
+      <input type="password" id="fThreadsAppSecret" autocomplete="off"
+             placeholder="${thSecretSet ? '貼上新的密鑰以覆蓋' : '貼上 Threads App Secret'}">
+    </div>
+    <p class="modal-hint">Threads 發的是<strong>另一組憑證</strong>，不是上面那個 Facebook App ID。
+       只做 Facebook / Instagram 的話可以留空。
+       ${cfg.threadsServerFallback ? '未填時會改用伺服器預設的 Threads App。' : ''}</p>
+
     <div class="modal-section-label">授權連接</div>
     <div class="social-accs">${accounts}</div>
     <div class="social-connect-row">
@@ -262,6 +284,7 @@ function renderSocialConfig(cfg) {
       按下去會跳轉到 Meta 授權頁，完成後自動回到這裡。請先把
       <code>${escAttr(metaRedirectUri())}</code>
       加進該 App 的「有效的 OAuth 重新導向 URI」，否則 Meta 會拒絕。
+      <strong>Threads 另有一份自己的重新導向網址欄位</strong>，在它的使用案例設定裡，同樣要填這一串。
       Instagram 必須是<strong>商業／創作者帳號且已連結該粉專</strong>才會一起出現。
     </p>
     <div id="metaPagePicker"></div>`;
@@ -270,12 +293,17 @@ function renderSocialConfig(cfg) {
 async function saveSocialConfig() {
   const appId = document.getElementById('fMetaAppId')?.value.trim() ?? '';
   const secret = document.getElementById('fMetaAppSecret')?.value.trim() ?? '';
+  const thAppId = document.getElementById('fThreadsAppId')?.value.trim() ?? '';
+  const thSecret = document.getElementById('fThreadsAppSecret')?.value.trim() ?? '';
   try {
     await apiJson(`/clubs/${editingId}/social-config`, {
       method: 'PUT',
       // An empty secret means "leave it alone" — sending '' would look like an
       // intentional blanking, and there is no way to re-enter what we cannot read.
-      body: { meta_app_id: appId, meta_app_secret: secret || null },
+      body: {
+        meta_app_id: appId, meta_app_secret: secret || null,
+        threads_app_id: thAppId, threads_app_secret: thSecret || null,
+      },
     });
     toast('已儲存社群設定');
     loadSocialConfig(editingId);

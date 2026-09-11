@@ -1622,6 +1622,12 @@ THREADS_GRAPH_HOST = "https://graph.threads.net"
 META_APP_ID     = os.getenv("META_APP_ID", "")
 META_APP_SECRET = os.getenv("META_APP_SECRET", "")
 
+# Threads issues its OWN App ID/Secret under the "Access the Threads API"
+# use case. They are different values from the Facebook App's pair, even
+# though both live under the same App in the console.
+THREADS_APP_ID     = os.getenv("THREADS_APP_ID", "")
+THREADS_APP_SECRET = os.getenv("THREADS_APP_SECRET", "")
+
 # What each connection asks Meta for. `pages_manage_posts` and
 # `instagram_content_publish` are the two that require App Review before they
 # work for anyone who is not a developer/tester on the App.
@@ -1673,7 +1679,8 @@ def _club_secret_hint(club_id: int, name: str) -> str:
     return row[0] if row else ""
 
 
-def _meta_app(club_id: Optional[int]) -> tuple:
+def _app_pair(club_id: Optional[int], settings_key: str, secret_name: str,
+              env_id: str, env_secret: str, label: str) -> tuple:
     """(app_id, app_secret) for this club, falling back to the server-wide pair."""
     app_id = ""
     if club_id is not None:
@@ -1683,17 +1690,36 @@ def _meta_app(club_id: Optional[int]) -> tuple:
                 row = cur.fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="找不到此分會")
-        app_id = (parse_jsonb(row[0]).get("meta_app_id") or "").strip()
+        app_id = (parse_jsonb(row[0]).get(settings_key) or "").strip()
 
-    secret = _get_club_secret(club_id, "meta_app_secret") if club_id is not None else None
+    secret = _get_club_secret(club_id, secret_name) if club_id is not None else None
     if not app_id or not secret:
-        app_id, secret = app_id or META_APP_ID, secret or META_APP_SECRET
+        app_id, secret = app_id or env_id, secret or env_secret
     if not app_id or not secret:
         raise HTTPException(
             status_code=400,
-            detail="這個分會還沒有填 Meta App ID / App Secret，請先到分會設定填寫",
+            detail=f"這個分會還沒有填 {label} App ID / App Secret，請先到分會設定填寫",
         )
     return app_id, secret
+
+
+def _meta_app(club_id: Optional[int]) -> tuple:
+    return _app_pair(club_id, "meta_app_id", "meta_app_secret",
+                     META_APP_ID, META_APP_SECRET, "Meta")
+
+
+def _threads_app(club_id: Optional[int]) -> tuple:
+    """
+    The Threads pair, which is NOT the Facebook App's pair.
+
+    Deliberately no fallback to the Meta credentials: sending the Facebook
+    App ID to threads.net/oauth/authorize comes back not as "wrong app" but
+    as "Authorization Failed: No app ID was sent with the request" — an error
+    that sends you hunting for a missing parameter which is in fact present.
+    Failing here, naming the field, is the cheaper failure.
+    """
+    return _app_pair(club_id, "threads_app_id", "threads_app_secret",
+                     THREADS_APP_ID, THREADS_APP_SECRET, "Threads")
 
 
 # ------------------------------------------------------------------ graph calls
@@ -1766,8 +1792,10 @@ def _load_social_account(club_id: int, platform: str) -> Optional[dict]:
 
 
 class ClubSocialConfigRequest(BaseModel):
-    meta_app_id:     Optional[str] = None
-    meta_app_secret: Optional[str] = None   # write-only; never returned
+    meta_app_id:        Optional[str] = None
+    meta_app_secret:    Optional[str] = None   # write-only; never returned
+    threads_app_id:     Optional[str] = None
+    threads_app_secret: Optional[str] = None   # write-only; never returned
 
 
 @app.get("/api/clubs/{club_id}/social-config")
@@ -1791,6 +1819,9 @@ def get_club_social_config(club_id: int, user: dict = Depends(require_club_admin
         "metaAppId": settings.get("meta_app_id") or "",
         "metaAppSecretHint": _club_secret_hint(club_id, "meta_app_secret"),
         "serverFallback": bool(META_APP_ID and META_APP_SECRET),
+        "threadsAppId": settings.get("threads_app_id") or "",
+        "threadsAppSecretHint": _club_secret_hint(club_id, "threads_app_secret"),
+        "threadsServerFallback": bool(THREADS_APP_ID and THREADS_APP_SECRET),
         "accounts": [connected.get(p, {"platform": p, "accountName": "", "expiresAt": ""})
                      for p in SOCIAL_ACCOUNT_PLATFORMS],
     }
@@ -1800,20 +1831,27 @@ def get_club_social_config(club_id: int, user: dict = Depends(require_club_admin
 def set_club_social_config(club_id: int, req: ClubSocialConfigRequest,
                            user: dict = Depends(require_club_admin_or_above)):
     _social_scope(user, club_id)
+    updates = {}
     if req.meta_app_id is not None:
+        updates["meta_app_id"] = req.meta_app_id.strip()
+    if req.threads_app_id is not None:
+        updates["threads_app_id"] = req.threads_app_id.strip()
+    if updates:
         with get_db() as conn:
             with conn.cursor() as cur:
                 # Merge into settings rather than replacing: other keys
                 # (roles_sheet_url, template fields) live in the same JSONB.
                 cur.execute(
                     "UPDATE clubs SET settings = COALESCE(settings, '{}'::jsonb)"
-                    " || jsonb_build_object('meta_app_id', %s::text) WHERE id=%s",
-                    (req.meta_app_id.strip(), club_id),
+                    " || %s::jsonb WHERE id=%s",
+                    (json.dumps(updates), club_id),
                 )
                 if cur.rowcount == 0:
                     raise HTTPException(status_code=404, detail="找不到此分會")
     if req.meta_app_secret:
         _set_club_secret(club_id, "meta_app_secret", req.meta_app_secret.strip())
+    if req.threads_app_secret:
+        _set_club_secret(club_id, "threads_app_secret", req.threads_app_secret.strip())
     return {"ok": True}
 
 
@@ -1839,7 +1877,7 @@ def meta_oauth_url(club_id: int, redirect_uri: str = Query(...),
     frontend knows its own origin; the API does not).
     """
     _social_scope(user, club_id)
-    app_id, _ = _meta_app(club_id)
+    app_id, _ = (_threads_app if provider == "threads" else _meta_app)(club_id)
     import urllib.parse
 
     # `state` carries the club through the round trip so the callback knows
@@ -1879,7 +1917,8 @@ def meta_connect(club_id: int, req: MetaConnectRequest,
     has no such fan-out, so it connects in one step.
     """
     _social_scope(user, club_id)
-    app_id, app_secret = _meta_app(club_id)
+    app_id, app_secret = (_threads_app if req.provider == "threads"
+                          else _meta_app)(club_id)
 
     if req.provider == "threads":
         short = _th("oauth/access_token", {
